@@ -260,9 +260,15 @@
     gap: 8px;
   }
   .lock-banner[hidden] { display: none; }
-  .lock-banner .lock-icon {
-    font-size: 16px;
+
+  /* Inline icons inside text — keep them sized to the line. */
+  .icon {
+    flex-shrink: 0;
+    vertical-align: -2px;
   }
+  .badge .icon { vertical-align: -2px; margin-right: 3px; }
+  .row-meta .icon { vertical-align: -2px; margin-right: 3px; }
+  .lock-banner .icon { color: currentColor; }
 
   /* Missed-task row variant */
   .row-missed {
@@ -703,11 +709,11 @@
     color: var(--text);
     letter-spacing: -0.02em;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
     margin-top: 4px;
   }
-  .streak-num .fire { font-size: 28px; }
+  .streak-num .icon { vertical-align: 0; }
   .streak-num .unit-inline {
     font-size: 15px;
     font-weight: 500;
@@ -1570,7 +1576,7 @@
           <path d="M7 10l2 2 4-4"/>
           <path d="M14 14h4"/>
         </svg>
-        To Do List
+        Tasks
       </button>
       <button class="tab" data-tab="streaks">
         <svg viewBox="0 0 24 24">
@@ -2072,17 +2078,21 @@ const Store = (() => {
    ============================================================ */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const trashIcon = `
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-    <line x1="10" y1="11" x2="10" y2="17"/>
-    <line x1="14" y1="11" x2="14" y2="17"/>
-  </svg>`;
-const pencilIcon = `
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 20h9"/>
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-  </svg>`;
+// Outline-style SVG icon set. Stroke uses currentColor so each icon picks up
+// the surrounding text color (no need for separate light/dark variants).
+function svgIcon(size, paths) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+const trashIcon = svgIcon(18, '<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>');
+const pencilIcon = svgIcon(16, '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>');
+const lockIcon = svgIcon(14, '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
+const unlockIcon = svgIcon(14, '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 7-2.7"/>');
+const wrenchIcon = svgIcon(14, '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4 2.6-2.6z"/>');
+const checkIcon = svgIcon(14, '<polyline points="5 12 10 17 19 8"/>');
+const flameIcon = svgIcon(14, '<path d="M12 2c1 4 5 5 5 10a5 5 0 1 1-10 0 5 5 0 0 1 2-4c0 2 1 3 3 3-1-3 0-6 0-9z"/>');
+const flameLgIcon = svgIcon(28, '<path d="M12 2c1 4 5 5 5 10a5 5 0 1 1-10 0 5 5 0 0 1 2-4c0 2 1 3 3 3-1-3 0-6 0-9z"/>');
+const repeatIcon = svgIcon(12, '<polyline points="17 1 21 5 17 9"/><path d="M3 11v-2a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>');
+const restoreIcon = svgIcon(12, '<polyline points="3 7 8 7 8 12"/><path d="M3.5 13a9 9 0 1 0 2.4-7.5L3 8"/>');
 
 const els = {
   tabs: document.querySelectorAll('.tab'),
@@ -2158,7 +2168,7 @@ const TaskForm = {
   loadFromTask(task) {
     this.editingId = task.id;
     els.taskInput.value = task.text;
-    els.taskSubmit.textContent = '✓';
+    els.taskSubmit.innerHTML = checkIcon;
     if (task.recurrence) {
       this.repeat = task.recurrence.type;
       this.daysOfWeek = (task.recurrence.daysOfWeek || []).slice();
@@ -2404,16 +2414,16 @@ function renderDayToggle(state) {
 function renderLockBanner(state) {
   const banner = document.getElementById('lock-banner');
   if (!banner) return;
-  let msg = '';
+  let icon = lockIcon, msg = '';
   if (selectedDay === 'today') {
-    if (Auth.isDev()) msg = '🛠 Developer mode — locks bypassed.';
-    else if (state.overrideActive) msg = '🔓 Override active — today is editable until midnight.';
-    else msg = '🔒 Today is locked. Tap each task to check it off.';
+    if (Auth.isDev()) { icon = wrenchIcon; msg = 'Developer mode \u2014 locks bypassed.'; }
+    else if (state.overrideActive) { icon = unlockIcon; msg = 'Override active \u2014 today is editable until midnight.'; }
+    else { icon = lockIcon; msg = 'Today is locked. Tap each task to check it off.'; }
   } else {
-    if (state.todayComplete) msg = '✓ Today is complete. Plan tomorrow — list locks at midnight.';
-    else msg = `🔒 Finish today's tasks first to unlock tomorrow's planning.`;
+    if (state.todayComplete) { icon = checkIcon; msg = 'Today is complete. Plan tomorrow \u2014 list locks at midnight.'; }
+    else { icon = lockIcon; msg = `Finish today\u2019s tasks first to unlock tomorrow\u2019s planning.`; }
   }
-  banner.innerHTML = msg;
+  banner.innerHTML = `${icon}<span>${msg}</span>`;
   banner.hidden = false;
 }
 
@@ -2434,7 +2444,7 @@ function renderTasksView(state) {
     els.habitsList.innerHTML = habits.map(t => {
       const done = isTaskDoneOn(t, dayISO);
       const streak = doingStreak(t.completedDates);
-      const meta = (selectedDay === 'today' && streak > 0) ? `<span class="row-meta">🔥 ${streak}</span>` : '';
+      const meta = (selectedDay === 'today' && streak > 0) ? `<span class="row-meta">${flameIcon} ${streak}</span>` : '';
       // Habit rows on the locked day show no edit pencil. On tomorrow (when
       // editable) we let the user adjust the recurrence/category.
       const editBtn = canEditDay(state, selectedDay)
@@ -2479,9 +2489,9 @@ function renderTasksView(state) {
       const done = isTaskDoneOn(t, dayISO);
       const schedule = scheduleLabel(t.recurrence);
       const badges = [];
-      if (schedule) badges.push(`<span class="badge">↻ ${esc(schedule)}</span>`);
+      if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
       if (t.category) badges.push(`<span class="badge">${esc(t.category)}</span>`);
-      if (t.parentTaskId) badges.push(`<span class="badge">↺ from missed</span>`);
+      if (t.parentTaskId) badges.push(`<span class="badge">${restoreIcon} from missed</span>`);
       const sub = badges.length ? `<div class="row-sub">${badges.join('')}</div>` : '';
       const editBtn = editable
         ? `<button class="icon-btn" data-action="task-edit" aria-label="Edit task">${pencilIcon}</button>`
@@ -2532,12 +2542,12 @@ function renderStreaksView(state) {
             <button class="icon-btn" data-action="edit" aria-label="Edit">${pencilIcon}</button>
             <button class="icon-btn danger" data-action="delete" aria-label="Delete">${trashIcon}</button>
           </div>
-          <div class="streak-num"><span class="fire">🔥</span>${streak}</div>
+          <div class="streak-num">${flameLgIcon}<span>${streak}</span></div>
           <div class="streak-sub">${streak === 1 ? 'day in a row' : 'days in a row'}</div>
-          <div class="streak-meta">Best: ${best} · Since ${fmtDateOnly(t.startedAt)}</div>
+          <div class="streak-meta">Best: ${best} \u00b7 Since ${fmtDateOnly(t.startedAt)}</div>
           <div class="streak-actions">
             <button class="action-btn ${doneToday ? 'success' : 'primary'}" data-action="check-in">
-              ${doneToday ? '✓ Done today' : 'Check in today'}
+              ${doneToday ? `${checkIcon} Done today` : 'Check in today'}
             </button>
           </div>
         </li>`;
@@ -2717,6 +2727,9 @@ function render(state) {
   renderAnalyticsView(state);
   renderOverrides(state);
   renderMissed(state);
+  // Re-sync the Profile view (including the dev toggle) on every render
+  // so the visible state never drifts from `DevMode.on` / `Auth.user`.
+  renderProfile();
 }
 
 /* ============================================================
