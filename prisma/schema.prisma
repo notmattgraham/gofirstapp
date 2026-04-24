@@ -57,3 +57,15 @@ model QuitStreak {
 
   @@index([userId])
 }
+
+// Managed by connect-pg-simple. Declared here so `prisma db push` doesn't try
+// to drop it on every deploy (it's auto-created the first time a session is
+// written, but the migration would lose all active logins without this).
+model Session {
+  sid    String   @id @db.VarChar
+  sess   Json     @db.Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}
