@@ -834,6 +834,16 @@
     border-top: 1px solid var(--border);
     max-width: 480px;
     margin: 0 auto;
+    transform: translateY(0);
+    transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.28, 1);
+    will-change: transform;
+  }
+  /* `.closed` slides the whole dock (input + options) down off the viewport.
+     120px of slack accommodates the tabbar + safe-area below. pointer-events
+     off when closed so swipes don't interact with hidden controls. */
+  .dock-wrap.closed {
+    transform: translateY(calc(100% + 120px));
+    pointer-events: none;
   }
   .dock-wrap[hidden] { display: none; }
 
@@ -1327,8 +1337,10 @@
       </div>
     </main>
 
-    <!-- Docked new-task area: input on top, options below (category + repeat required). -->
-    <div class="dock-wrap" id="dock-wrap">
+    <!-- Docked new-task area: input on top, options below (category + repeat required).
+         Starts in `closed` state so it's already translated off-screen before
+         JS runs — prevents the flash-open-then-close on page load. -->
+    <div class="dock-wrap closed" id="dock-wrap">
       <div class="dock-edit-banner" id="edit-banner" hidden>
         <span id="edit-banner-text">Editing task</span>
         <button type="button" id="edit-cancel">Cancel</button>
@@ -2061,11 +2073,23 @@ function setTopAction() {
     els.topAction.textContent = els.streakForm.hidden ? '+ New streak' : 'Close';
   } else if (currentTab === 'todo') {
     els.topAction.hidden = false;
-    els.topAction.textContent = els.dockWrap.hidden ? '+ New task' : 'Close';
+    els.topAction.textContent = els.dockWrap.classList.contains('closed') ? '+ New task' : 'Close';
   } else {
     els.topAction.hidden = true;
   }
 }
+
+// Dock open/close helpers — toggle the `closed` class so the transition runs.
+function openDock() {
+  els.dockWrap.classList.remove('closed');
+}
+function closeDock() {
+  els.dockWrap.classList.add('closed');
+}
+function isDockClosed() {
+  return els.dockWrap.classList.contains('closed');
+}
+
 const TAB_ORDER = ['todo', 'streaks', 'analytics', 'profile'];
 function setTab(name) {
   if (!TAB_ORDER.includes(name)) name = 'todo';
@@ -2076,7 +2100,7 @@ function setTab(name) {
   if (slider) slider.style.transform = `translateX(-${idx * 100}%)`;
   // Dock only shows when the user has explicitly tapped "+ New task".
   // Leaving the tab always closes it so it doesn't pop up on other tabs.
-  if (name !== 'todo') els.dockWrap.hidden = true;
+  if (name !== 'todo') closeDock();
   setTopAction();
 }
 
@@ -2426,12 +2450,14 @@ els.topAction.addEventListener('click', () => {
     return;
   }
   if (currentTab === 'todo') {
-    if (els.dockWrap.hidden) {
+    if (isDockClosed()) {
       TaskForm.reset();
-      els.dockWrap.hidden = false;
-      setTimeout(() => els.taskInput.focus(), 50);
+      openDock();
+      // Wait for the slide-up transition before focusing so the keyboard
+      // doesn't pop up ahead of the dock.
+      setTimeout(() => els.taskInput.focus(), 300);
     } else {
-      els.dockWrap.hidden = true;
+      closeDock();
     }
     setTopAction();
   }
@@ -2478,13 +2504,13 @@ els.taskForm.addEventListener('submit', (e) => {
   }
 
   TaskForm.reset();
-  els.dockWrap.hidden = true;
+  closeDock();
   setTopAction();
 });
 
 els.editCancel.addEventListener('click', () => {
   TaskForm.reset();
-  els.dockWrap.hidden = true;
+  closeDock();
   setTopAction();
 });
 
@@ -2504,8 +2530,9 @@ els.views.todo.addEventListener('click', (e) => {
     const task = Store.get().tasks.find(t => t.id === id);
     if (!task) return;
     TaskForm.loadFromTask(task);
-    els.taskInput.focus();
-    els.main.scrollTop = els.main.scrollHeight;
+    openDock();
+    setTopAction();
+    setTimeout(() => els.taskInput.focus(), 300);
   }
 });
 
@@ -2693,7 +2720,7 @@ function showSplash(errorMsg) {
   if (errorMsg) { elSplashError.textContent = errorMsg; elSplashError.hidden = false; }
   else { elSplashError.hidden = true; }
   els.topAction.hidden = true;
-  els.dockWrap.hidden = true;
+  closeDock();
 }
 function hideSplash() {
   elSplash.hidden = true;
@@ -2819,7 +2846,7 @@ async function boot() {
   hideSplash();
   renderProfile();
   // Dock starts closed — user opens it with "+ New task" in the header.
-  els.dockWrap.hidden = true;
+  closeDock();
   setTopAction();
   try {
     await Store.load();
