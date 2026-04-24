@@ -128,6 +128,9 @@
   .brand {
     display: inline-flex;
     align-items: center;
+    /* Match the height of the top-action button so the header stays the
+       exact same size on every tab, whether the button is showing or not. */
+    min-height: 36px;
   }
   .brand img {
     height: 22px;
@@ -422,8 +425,12 @@
     color: var(--text-dim);
     margin-top: 2px;
   }
+  .setting-select-wrap {
+    flex: 0 0 auto;
+    min-width: 140px;
+  }
   .setting-select {
-    width: auto;
+    width: 100%;
     min-height: 36px;
     padding: 6px 36px 6px 12px;
     font-size: 14px;
@@ -1239,11 +1246,13 @@
               <div class="setting-title">Theme</div>
               <div class="setting-sub">Match system, force dark, or force light.</div>
             </div>
-            <select id="theme-select" class="field-input setting-select">
-              <option value="system">System</option>
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-            </select>
+            <div class="select-wrap setting-select-wrap">
+              <select id="theme-select" class="field-input setting-select">
+                <option value="system">System</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1254,14 +1263,14 @@
               <div class="setting-title">Display name</div>
               <div class="setting-sub" id="profile-name-sub"></div>
             </div>
-            <button class="action-btn ghost setting-btn" id="edit-name-btn" disabled>Coming soon</button>
+            <button class="action-btn ghost setting-btn" id="edit-name-btn">Edit</button>
           </div>
           <div class="setting-row">
             <div class="setting-copy">
               <div class="setting-title">Profile picture</div>
-              <div class="setting-sub">Currently pulled from your Google account.</div>
+              <div class="setting-sub">JPG/PNG — downscaled to 256×256 automatically.</div>
             </div>
-            <button class="action-btn ghost setting-btn" id="edit-avatar-btn" disabled>Coming soon</button>
+            <button class="action-btn ghost setting-btn" id="edit-avatar-btn">Change</button>
           </div>
         </div>
 
@@ -1472,6 +1481,12 @@ const Auth = {
     }
     this.loading = false;
     return this.user;
+  },
+
+  async updateMe(updates) {
+    const { user } = await api('PATCH', '/api/auth/me', updates);
+    this.user = user;
+    return user;
   },
 
   async logout() {
@@ -2003,6 +2018,9 @@ function setTopAction() {
   if (currentTab === 'streaks') {
     els.topAction.hidden = false;
     els.topAction.textContent = els.streakForm.hidden ? '+ New streak' : 'Close';
+  } else if (currentTab === 'todo') {
+    els.topAction.hidden = false;
+    els.topAction.textContent = els.dockWrap.hidden ? '+ New task' : 'Close';
   } else {
     els.topAction.hidden = true;
   }
@@ -2015,7 +2033,9 @@ function setTab(name) {
   const idx = TAB_ORDER.indexOf(name);
   const slider = document.getElementById('view-slider');
   if (slider) slider.style.transform = `translateX(-${idx * 100}%)`;
-  els.dockWrap.hidden = name !== 'todo';
+  // Dock only shows when the user has explicitly tapped "+ New task".
+  // Leaving the tab always closes it so it doesn't pop up on other tabs.
+  if (name !== 'todo') els.dockWrap.hidden = true;
   setTopAction();
 }
 
@@ -2355,11 +2375,24 @@ document.getElementById('task-category').addEventListener('change', (e) => {
   });
 })();
 
-// --- Top action (new streak / close) ---
+// --- Top action (context-sensitive per tab) ---
 els.topAction.addEventListener('click', () => {
-  if (currentTab !== 'streaks') return;
-  if (els.streakForm.hidden) StreakForm.open();
-  else StreakForm.close();
+  if (currentTab === 'streaks') {
+    if (els.streakForm.hidden) StreakForm.open();
+    else StreakForm.close();
+    return;
+  }
+  if (currentTab === 'todo') {
+    if (els.dockWrap.hidden) {
+      els.dockWrap.hidden = false;
+      setTimeout(() => els.taskInput.focus(), 50);
+    } else {
+      els.dockWrap.hidden = true;
+      els.taskOptions.hidden = true;
+      els.dockToggle.classList.remove('active');
+    }
+    setTopAction();
+  }
 });
 
 // --- Task dock: options toggle ---
@@ -2412,12 +2445,16 @@ els.taskForm.addEventListener('submit', (e) => {
   TaskForm.reset();
   els.taskOptions.hidden = true;
   els.dockToggle.classList.remove('active');
+  els.dockWrap.hidden = true;
+  setTopAction();
 });
 
 els.editCancel.addEventListener('click', () => {
   TaskForm.reset();
   els.taskOptions.hidden = true;
   els.dockToggle.classList.remove('active');
+  els.dockWrap.hidden = true;
+  setTopAction();
 });
 
 // --- Delegated clicks on To Do list ---
@@ -2627,6 +2664,70 @@ document.getElementById('profile-logout').addEventListener('click', async () => 
   setTab('todo');
 });
 
+// Profile → Edit display name (inline prompt for MVP; inline field later)
+document.getElementById('edit-name-btn').addEventListener('click', async () => {
+  const current = (Auth.user && Auth.user.name) || '';
+  const v = window.prompt('Display name:', current);
+  if (v == null) return;
+  try {
+    await Auth.updateMe({ name: v.trim().slice(0, 60) });
+    renderProfile();
+    banner('Name updated');
+  } catch (e) {
+    console.warn(e);
+    banner('Could not save name', true);
+  }
+});
+
+// Profile → Change profile picture. Client downscales to 256×256 JPEG @85%
+// quality, which keeps the payload ~30–60 KB so the DB stays small.
+document.getElementById('edit-avatar-btn').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToSquareDataURL(file, 256);
+      banner('Uploading…', false, 4000);
+      await Auth.updateMe({ picture: dataUrl });
+      renderProfile();
+      banner('Photo updated');
+    } catch (e) {
+      console.warn(e);
+      banner('Upload failed', true);
+    }
+  });
+  input.click();
+});
+
+function fileToSquareDataURL(file, size) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Theme toggle — stored locally, applies via data-theme on <html>.
 (() => {
   const THEME_KEY = 'gofirst:theme';
@@ -2655,7 +2756,9 @@ async function boot() {
   }
   hideSplash();
   renderProfile();
-  els.dockWrap.hidden = currentTab !== 'todo';
+  // Dock starts closed — user opens it with "+ New task" in the header.
+  els.dockWrap.hidden = true;
+  setTopAction();
   try {
     await Store.load();
     await Store.maybeImportLocal();
