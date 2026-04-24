@@ -859,6 +859,28 @@
     margin-left: 2px;
   }
 
+  /* Small drag handle at the top of the dock — hint for swipe-to-close. */
+  .dock-grabber {
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+    margin: 6px auto 2px;
+    cursor: grab;
+  }
+
+  /* "+" chip that expands the category row to reveal Other. */
+  .chip-plus {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
   .dock {
     padding: 10px 12px;
     display: flex;
@@ -1323,6 +1345,20 @@
           </div>
         </div>
 
+        <div class="section-title" id="dev-section-title" hidden>Developer</div>
+        <div class="card" id="dev-card" hidden>
+          <label class="setting-row" for="dev-toggle">
+            <div class="setting-copy">
+              <div class="setting-title">Developer mode</div>
+              <div class="setting-sub">Bypass lock rules; tasks created while on are excluded from analytics.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" id="dev-toggle" />
+              <span class="switch-slider"></span>
+            </span>
+          </label>
+        </div>
+
         <div class="section-title">Session</div>
         <div class="card">
           <div class="setting-row">
@@ -1341,6 +1377,7 @@
          Starts in `closed` state so it's already translated off-screen before
          JS runs — prevents the flash-open-then-close on page load. -->
     <div class="dock-wrap closed" id="dock-wrap">
+      <div class="dock-grabber" id="dock-grabber" aria-hidden="true"></div>
       <div class="dock-edit-banner" id="edit-banner" hidden>
         <span id="edit-banner-text">Editing task</span>
         <button type="button" id="edit-cancel">Cancel</button>
@@ -1366,7 +1403,8 @@
             <button type="button" class="chip" data-category="Fitness">Fitness</button>
             <button type="button" class="chip" data-category="Career">Career</button>
             <button type="button" class="chip" data-category="Self-Improvement">Self-Improvement</button>
-            <button type="button" class="chip" data-category="Other">Other</button>
+            <button type="button" class="chip chip-plus" id="category-expand" aria-label="Show more categories">+</button>
+            <button type="button" class="chip" data-category="Other" id="category-other" hidden>Other</button>
           </div>
         </div>
 
@@ -1532,6 +1570,23 @@ const Auth = {
   async logout() {
     try { await api('POST', '/api/auth/logout'); } catch {}
     this.user = null;
+  },
+
+  isDev() {
+    return !!(this.user && this.user.email === 'mattgraham15@gmail.com');
+  },
+};
+
+/* Developer-mode flag. Only the dev account is permitted to flip this on;
+   any other account's toggle is invisible and the server would reject a
+   devMode=true payload anyway. Dev-mode tasks are excluded from analytics. */
+const DevMode = {
+  _key: 'gofirst:devMode',
+  get on() {
+    try { return localStorage.getItem(this._key) === '1'; } catch { return false; }
+  },
+  set(v) {
+    try { localStorage.setItem(this._key, v ? '1' : '0'); } catch {}
   },
 };
 
@@ -1740,6 +1795,7 @@ const Store = (() => {
       if (!t) return;
       const tmpId = 'tmp:' + uid();
       const isDaily = recurrence && recurrence.type === 'daily';
+      const devMode = Auth.isDev() && DevMode.on;
       const optimistic = {
         id: tmpId,
         text: t,
@@ -1748,6 +1804,7 @@ const Store = (() => {
         recurrence: recurrence || null,
         trackStreak: !!(isDaily && trackStreak),
         category: category || null,
+        devMode,
         done: false,
         completedDates: [],
       };
@@ -1760,6 +1817,7 @@ const Store = (() => {
             recurrence: optimistic.recurrence,
             trackStreak: optimistic.trackStreak,
             category: optimistic.category,
+            devMode,
           });
           return (s) => ({ ...s, tasks: s.tasks.map(x => x.id === tmpId ? task : x) });
         }
@@ -1926,6 +1984,11 @@ const TaskForm = {
     this.category = '';
     els.taskInput.value = '';
     els.taskSubmit.textContent = '+';
+    // Collapse the category row back to just 4 chips + "+".
+    const plus = document.getElementById('category-expand');
+    const other = document.getElementById('category-other');
+    if (plus) plus.hidden = false;
+    if (other) other.hidden = true;
     this.renderChips();
     this.applyVisibility();
     this.updateSubmitEnabled();
@@ -1946,6 +2009,16 @@ const TaskForm = {
     this.track = !!task.trackStreak;
     this.category = task.category || '';
     els.trackInput.checked = this.track;
+    // If this task uses "Other", pre-expand the row so the chip is visible.
+    const plus = document.getElementById('category-expand');
+    const other = document.getElementById('category-other');
+    if (this.category === 'Other') {
+      if (plus) plus.hidden = true;
+      if (other) other.hidden = false;
+    } else {
+      if (plus) plus.hidden = false;
+      if (other) other.hidden = true;
+    }
     this.renderChips();
     this.applyVisibility();
     this.updateSubmitEnabled();
@@ -2108,7 +2181,7 @@ function setTab(name) {
 function renderStatStrip(state) {
   // Execution rate = (tasks done today) / (tasks scheduled today), for today's list.
   // Includes one-shot tasks, recurring tasks scheduled today (tracked or not).
-  const eligible = state.tasks.filter(t => scheduledToday(t));
+  const eligible = state.tasks.filter(t => !t.devMode && scheduledToday(t));
   // One-shots whose `done` has been true for a while but weren't created today
   // shouldn't inflate "today's" rate — only count pending + same-day done.
   // Simpler rule: count all currently-visible tasks; done = isDoneToday(t).
@@ -2292,7 +2365,9 @@ function periodRange(period) {
 }
 
 // Walk a task across a period and return { scheduled, completed } counts.
+// Dev-mode tasks are excluded entirely so they don't skew the execution rate.
 function countTaskInRange(t, start, end) {
+  if (t.devMode) return { scheduled: 0, completed: 0 };
   const today = todayISO();
   const effectiveEnd = end < today ? end : today;
   const createdISO = toISO(new Date(t.createdAt));
@@ -2417,9 +2492,47 @@ document.getElementById('analytics-period').addEventListener('change', (e) => {
   renderAnalyticsView(Store.get());
 });
 
+// --- Dismiss the dock by swiping down on it, or tapping anywhere above it. ---
+(() => {
+  let start = null;
+  const threshold = 60; // px pulled down before we count it as a close gesture
+  els.dockWrap.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || isDockClosed()) { start = null; return; }
+    start = { y: e.touches[0].clientY, x: e.touches[0].clientX, at: Date.now() };
+  }, { passive: true });
+  els.dockWrap.addEventListener('touchend', (e) => {
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dy = t.clientY - start.y;
+    const dx = Math.abs(t.clientX - start.x);
+    const dt = Date.now() - start.at;
+    start = null;
+    if (dy > threshold && dy > dx && dt < 700) {
+      closeDock();
+      setTopAction();
+    }
+  }, { passive: true });
+
+  // Tap anywhere on the main content area (above the dock) closes it.
+  els.main.addEventListener('pointerdown', () => {
+    if (!isDockClosed()) {
+      closeDock();
+      setTopAction();
+    }
+  });
+})();
+
 // --- Task category chips ---
 els.categoryToggle.addEventListener('click', (e) => {
-  const c = e.target.closest('.chip');
+  // + button reveals the "Other" chip and hides itself.
+  if (e.target.closest('#category-expand')) {
+    const plus = document.getElementById('category-expand');
+    const other = document.getElementById('category-other');
+    if (plus) plus.hidden = true;
+    if (other) other.hidden = false;
+    return;
+  }
+  const c = e.target.closest('.chip[data-category]');
   if (!c) return;
   TaskForm.setCategory(c.dataset.category);
 });
@@ -2743,7 +2856,24 @@ function renderProfile() {
   nameEl.textContent = u.name || '(no name)';
   emailEl.textContent = u.email || '';
   if (nameSubEl) nameSubEl.textContent = u.name || u.email || '';
+
+  // Developer mode row — only visible to the allow-listed account.
+  const devTitle = document.getElementById('dev-section-title');
+  const devCard = document.getElementById('dev-card');
+  const devToggle = document.getElementById('dev-toggle');
+  const isDev = Auth.isDev();
+  if (devTitle) devTitle.hidden = !isDev;
+  if (devCard) devCard.hidden = !isDev;
+  if (devToggle) devToggle.checked = isDev && DevMode.on;
 }
+
+// Dev-mode toggle — persists to localStorage; the server enforces the
+// allow-list separately, so flipping this on as a different user is a no-op.
+document.getElementById('dev-toggle').addEventListener('change', (e) => {
+  if (!Auth.isDev()) { e.target.checked = false; return; }
+  DevMode.set(e.target.checked);
+  render(Store.get()); // re-render so stat strip / analytics reflect the change immediately
+});
 
 // Profile → Sign out
 document.getElementById('profile-logout').addEventListener('click', async () => {

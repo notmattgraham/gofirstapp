@@ -34,6 +34,10 @@ model Task {
   trackStreak     Boolean  @default(false)
   // One of: Family, Fitness, Career, Self-Improvement, Other. Drives analytics breakdown.
   category        String?
+  // Developer-mode tasks exist outside the normal rules (no lock enforcement,
+  // excluded from execution-rate analytics). Only the designated dev account
+  // ever sets this to true. Regular users always submit devMode=false.
+  devMode         Boolean  @default(false)
   // For one-shot tasks only (recurrence === null).
   done            Boolean  @default(false)
   // For recurring tasks: local-date strings (YYYY-MM-DD) the task was completed on.
