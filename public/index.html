@@ -137,9 +137,32 @@
     width: auto;
     display: block;
   }
-  /* Logo asset is white — invert it in light mode so it stays visible on the white bg. */
+  /* Dark-mode default: show white logo. Light-mode (or data-theme="light"):
+     show black logo. .brand-light is hidden by default and un-hidden when the
+     light palette is active. */
+  .brand .brand-light { display: none; }
+  [data-theme="light"] .brand .brand-dark { display: none; }
+  [data-theme="light"] .brand .brand-light { display: block; }
   @media (prefers-color-scheme: light) {
-    .brand img { filter: invert(1); }
+    :root:not([data-theme="dark"]) .brand .brand-dark { display: none; }
+    :root:not([data-theme="dark"]) .brand .brand-light { display: block; }
+  }
+
+  /* Countdown bar that appears in the last 4 hours before midnight. */
+  .countdown-bar {
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .countdown-bar[hidden] { display: none; }
+  .countdown-bar.urgent {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.08);
+    border-bottom-color: rgba(239, 68, 68, 0.2);
   }
 
   .top-action {
@@ -815,10 +838,16 @@
   .dock-wrap[hidden] { display: none; }
 
   .task-options {
-    padding: 12px 12px 4px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 12px 16px;
+    border-top: 1px solid var(--border);
+    max-height: 45vh;
+    overflow-y: auto;
   }
   .task-options[hidden] { display: none; }
+  .field-req {
+    color: var(--danger);
+    margin-left: 2px;
+  }
 
   .dock {
     padding: 10px 12px;
@@ -977,8 +1006,12 @@
     width: auto;
     display: block;
   }
+  .splash-brand .brand-light { display: none; }
+  [data-theme="light"] .splash-brand .brand-dark { display: none; }
+  [data-theme="light"] .splash-brand .brand-light { display: block; }
   @media (prefers-color-scheme: light) {
-    .splash-brand img { filter: invert(1); }
+    :root:not([data-theme="dark"]) .splash-brand .brand-dark { display: none; }
+    :root:not([data-theme="dark"]) .splash-brand .brand-light { display: block; }
   }
 
   .splash-tag {
@@ -1129,9 +1162,15 @@
 <body>
   <div class="app">
     <header class="top">
-      <div class="brand"><img src="applogo.svg" alt="GoFirst" /></div>
+      <div class="brand">
+        <img class="brand-dark" src="applogo.svg" alt="GoFirst" />
+        <img class="brand-light" src="applogo-black.svg" alt="GoFirst" />
+      </div>
       <button class="top-action" id="top-action" hidden></button>
     </header>
+    <div class="countdown-bar" id="countdown-bar" hidden>
+      <span id="countdown-text"></span>
+    </div>
     <div class="sync-banner" id="sync-banner"></div>
 
     <main class="main" id="main">
@@ -1288,32 +1327,41 @@
       </div>
     </main>
 
-    <!-- Docked new-task area: options panel + input bar -->
+    <!-- Docked new-task area: input on top, options below (category + repeat required). -->
     <div class="dock-wrap" id="dock-wrap">
       <div class="dock-edit-banner" id="edit-banner" hidden>
         <span id="edit-banner-text">Editing task</span>
         <button type="button" id="edit-cancel">Cancel</button>
       </div>
 
-      <div class="task-options" id="task-options" hidden>
+      <form class="dock" id="task-form" autocomplete="off">
+        <input
+          class="dock-input"
+          id="task-input"
+          placeholder="New task"
+          inputmode="text"
+          maxlength="240"
+          aria-label="New task"
+        />
+        <button class="dock-send" id="task-submit" type="submit" disabled aria-label="Add task">+</button>
+      </form>
+
+      <div class="task-options" id="task-options">
         <div class="field">
-          <label class="field-label" for="task-category">Category</label>
-          <div class="select-wrap">
-            <select id="task-category" class="field-input">
-              <option value="">— No category —</option>
-              <option value="Family">Family</option>
-              <option value="Fitness">Fitness</option>
-              <option value="Career">Career</option>
-              <option value="Self-Improvement">Self-Improvement</option>
-              <option value="Other">Other</option>
-            </select>
+          <span class="field-label">Category <span class="field-req">*</span></span>
+          <div class="chip-row" id="category-toggle">
+            <button type="button" class="chip" data-category="Family">Family</button>
+            <button type="button" class="chip" data-category="Fitness">Fitness</button>
+            <button type="button" class="chip" data-category="Career">Career</button>
+            <button type="button" class="chip" data-category="Self-Improvement">Self-Improvement</button>
+            <button type="button" class="chip" data-category="Other">Other</button>
           </div>
         </div>
 
         <div class="field">
-          <span class="field-label">Repeat</span>
+          <span class="field-label">Repeat <span class="field-req">*</span></span>
           <div class="chip-row" id="repeat-toggle">
-            <button type="button" class="chip selected" data-repeat="none">Once</button>
+            <button type="button" class="chip" data-repeat="none">Once</button>
             <button type="button" class="chip" data-repeat="daily">Daily</button>
             <button type="button" class="chip" data-repeat="weekly">Weekly</button>
             <button type="button" class="chip" data-repeat="custom">Custom</button>
@@ -1347,34 +1395,14 @@
           </label>
         </div>
       </div>
-
-      <form class="dock" id="task-form" autocomplete="off">
-        <button type="button" class="dock-toggle" id="dock-toggle" aria-label="Task options">
-          <!-- Sliders icon — represents category, repeat, tracking options. -->
-          <svg viewBox="0 0 24 24">
-            <line x1="4" y1="7" x2="20" y2="7"/>
-            <circle cx="9" cy="7" r="2.2" fill="currentColor" stroke="none"/>
-            <line x1="4" y1="12" x2="20" y2="12"/>
-            <circle cx="15" cy="12" r="2.2" fill="currentColor" stroke="none"/>
-            <line x1="4" y1="17" x2="20" y2="17"/>
-            <circle cx="8" cy="17" r="2.2" fill="currentColor" stroke="none"/>
-          </svg>
-        </button>
-        <input
-          class="dock-input"
-          id="task-input"
-          placeholder="New task"
-          inputmode="text"
-          maxlength="240"
-          aria-label="New task"
-        />
-        <button class="dock-send" id="task-submit" type="submit" disabled aria-label="Add task">+</button>
-      </form>
     </div>
 
     <!-- Sign-in splash (covers the app when signed out) -->
     <div class="splash" id="splash" hidden>
-      <div class="splash-brand"><img src="applogo.svg" alt="GoFirst" /></div>
+      <div class="splash-brand">
+        <img class="brand-dark" src="applogo.svg" alt="GoFirst" />
+        <img class="brand-light" src="applogo-black.svg" alt="GoFirst" />
+      </div>
       <div class="splash-tag">Your tasks and streaks, synced across your devices.</div>
       <a class="btn-google" id="btn-google" href="/api/auth/google">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1847,8 +1875,8 @@ const els = {
   taskForm: document.getElementById('task-form'),
   taskInput: document.getElementById('task-input'),
   taskSubmit: document.getElementById('task-submit'),
-  dockToggle: document.getElementById('dock-toggle'),
   taskOptions: document.getElementById('task-options'),
+  categoryToggle: document.getElementById('category-toggle'),
   repeatToggle: document.getElementById('repeat-toggle'),
   daysField: document.getElementById('days-field'),
   daysToggle: document.getElementById('days-toggle'),
@@ -1868,34 +1896,33 @@ const els = {
   sSubmit: document.getElementById('s-submit'),
 };
 
-/* ---- Task form state (new or edit) ---- */
+/* ---- Task form state (new or edit) ----
+   Both Repeat and Category must be explicitly selected before the submit
+   button enables. No defaults — forces a conscious choice per task. */
 const TaskForm = {
   editingId: null,
-  repeat: 'none',       // 'none' | 'daily' | 'weekly' | 'custom'
+  repeat: null,         // null until user taps a chip; else 'none'|'daily'|'weekly'|'custom'
   daysOfWeek: [],       // for 'weekly' (single) and 'custom' (many)
   track: false,
-  category: '',         // '' | Family | Fitness | Career | Self-Improvement | Other
+  category: '',         // '' until user taps a chip; else Family|Fitness|Career|Self-Improvement|Other
 
   reset() {
     this.editingId = null;
-    this.repeat = 'none';
+    this.repeat = null;
     this.daysOfWeek = [];
     this.track = false;
     this.category = '';
     els.taskInput.value = '';
-    els.taskSubmit.disabled = true;
     els.taskSubmit.textContent = '+';
-    const catEl = document.getElementById('task-category');
-    if (catEl) catEl.value = '';
     this.renderChips();
     this.applyVisibility();
+    this.updateSubmitEnabled();
     els.editBanner.hidden = true;
   },
 
   loadFromTask(task) {
     this.editingId = task.id;
     els.taskInput.value = task.text;
-    els.taskSubmit.disabled = !task.text.trim();
     els.taskSubmit.textContent = '✓';
     if (task.recurrence) {
       this.repeat = task.recurrence.type;
@@ -1906,15 +1933,13 @@ const TaskForm = {
     }
     this.track = !!task.trackStreak;
     this.category = task.category || '';
-    const catEl = document.getElementById('task-category');
-    if (catEl) catEl.value = this.category;
     els.trackInput.checked = this.track;
     this.renderChips();
     this.applyVisibility();
+    this.updateSubmitEnabled();
     els.editBannerText.textContent = 'Editing task';
     els.editBanner.hidden = false;
     els.taskOptions.hidden = false;
-    els.dockToggle.classList.add('active');
   },
 
   renderChips() {
@@ -1922,6 +1947,8 @@ const TaskForm = {
       c.classList.toggle('selected', c.dataset.repeat === this.repeat));
     els.daysToggle.querySelectorAll('.chip').forEach(c =>
       c.classList.toggle('selected', this.daysOfWeek.includes(Number(c.dataset.day))));
+    els.categoryToggle.querySelectorAll('.chip').forEach(c =>
+      c.classList.toggle('selected', c.dataset.category === this.category));
   },
 
   applyVisibility() {
@@ -1931,18 +1958,31 @@ const TaskForm = {
     els.trackInput.checked = this.track;
   },
 
+  updateSubmitEnabled() {
+    const hasText = els.taskInput.value.trim().length > 0;
+    const hasRepeat = this.repeat !== null;
+    const hasCategory = !!this.category;
+    els.taskSubmit.disabled = !(hasText && hasRepeat && hasCategory);
+  },
+
   setRepeat(type) {
     this.repeat = type;
     if (type === 'none') this.daysOfWeek = [];
     if (type === 'daily') this.daysOfWeek = [0,1,2,3,4,5,6];
     if (type === 'weekly') {
-      // default to today's weekday if none picked
       if (!this.daysOfWeek.length) this.daysOfWeek = [todayDow()];
       else this.daysOfWeek = this.daysOfWeek.slice(0, 1);
     }
     if (type === 'custom' && !this.daysOfWeek.length) this.daysOfWeek = [todayDow()];
     this.renderChips();
     this.applyVisibility();
+    this.updateSubmitEnabled();
+  },
+
+  setCategory(cat) {
+    this.category = cat || '';
+    this.renderChips();
+    this.updateSubmitEnabled();
   },
 
   toggleDay(day) {
@@ -1955,10 +1995,11 @@ const TaskForm = {
       this.daysOfWeek.sort();
     }
     this.renderChips();
+    this.updateSubmitEnabled();
   },
 
   toRecurrence() {
-    if (this.repeat === 'none') return null;
+    if (this.repeat === null || this.repeat === 'none') return null;
     if (this.repeat === 'daily') return { type: 'daily', daysOfWeek: [0,1,2,3,4,5,6] };
     const days = this.daysOfWeek.slice().sort();
     if (!days.length) return null;
@@ -2352,9 +2393,11 @@ document.getElementById('analytics-period').addEventListener('change', (e) => {
   renderAnalyticsView(Store.get());
 });
 
-// --- Task category dropdown keeps TaskForm in sync ---
-document.getElementById('task-category').addEventListener('change', (e) => {
-  TaskForm.category = e.target.value || '';
+// --- Task category chips ---
+els.categoryToggle.addEventListener('click', (e) => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  TaskForm.setCategory(c.dataset.category);
 });
 
 // --- Notes textarea (persistent scratch pad, local-only for now) ---
@@ -2384,27 +2427,19 @@ els.topAction.addEventListener('click', () => {
   }
   if (currentTab === 'todo') {
     if (els.dockWrap.hidden) {
+      TaskForm.reset();
       els.dockWrap.hidden = false;
       setTimeout(() => els.taskInput.focus(), 50);
     } else {
       els.dockWrap.hidden = true;
-      els.taskOptions.hidden = true;
-      els.dockToggle.classList.remove('active');
     }
     setTopAction();
   }
 });
 
-// --- Task dock: options toggle ---
-els.dockToggle.addEventListener('click', () => {
-  const show = els.taskOptions.hidden;
-  els.taskOptions.hidden = !show;
-  els.dockToggle.classList.toggle('active', show);
-});
-
 // --- Task dock: input enable/disable submit ---
 els.taskInput.addEventListener('input', () => {
-  els.taskSubmit.disabled = els.taskInput.value.trim().length === 0;
+  TaskForm.updateSubmitEnabled();
 });
 
 // --- Repeat chips ---
@@ -2443,16 +2478,12 @@ els.taskForm.addEventListener('submit', (e) => {
   }
 
   TaskForm.reset();
-  els.taskOptions.hidden = true;
-  els.dockToggle.classList.remove('active');
   els.dockWrap.hidden = true;
   setTopAction();
 });
 
 els.editCancel.addEventListener('click', () => {
   TaskForm.reset();
-  els.taskOptions.hidden = true;
-  els.dockToggle.classList.remove('active');
   els.dockWrap.hidden = true;
   setTopAction();
 });
@@ -2582,6 +2613,37 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (!document.hidden && currentTab === 'streaks') render(Store.get());
 }, 60000);
+
+/* ============================================================
+   Countdown bar — visible in the last 4 hours before midnight,
+   turns red in the final hour. Nudges the user to close out tasks
+   and plan tomorrow before the day locks.
+   ============================================================ */
+(() => {
+  const bar = document.getElementById('countdown-bar');
+  const txt = document.getElementById('countdown-text');
+  if (!bar || !txt) return;
+  function tick() {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // next local midnight
+    const msLeft = midnight - now;
+    const hoursLeft = msLeft / 3600000;
+    if (hoursLeft > 4 || hoursLeft <= 0) {
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    bar.classList.toggle('urgent', hoursLeft <= 1);
+    const totalMin = Math.max(0, Math.floor(msLeft / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    const left = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    txt.textContent = `You have ${left} to complete your tasks and plan tomorrow`;
+  }
+  tick();
+  setInterval(tick, 30000);
+})();
 
 // Wire store → view
 Store.subscribe(render);
