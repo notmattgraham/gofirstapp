@@ -205,6 +205,72 @@
     margin-top: 2px;
   }
 
+  /* Analytics tab */
+  .analytics-hero {
+    padding: 22px 20px 18px;
+    text-align: center;
+  }
+  .analytics-big {
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--text);
+  }
+  .analytics-sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+  .analytics-bar {
+    margin-top: 16px;
+    height: 6px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .analytics-bar span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 0.25s ease-out;
+  }
+  .analytics-placeholder {
+    padding: 18px 18px;
+  }
+  .analytics-placeholder-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .analytics-placeholder-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .notes-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+  }
+  .notes-textarea::placeholder { color: var(--text-faint); }
+  .notes-status {
+    padding: 0 16px 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
   /* --- Cards & list rows --------------------------------------- */
   .card {
     background: var(--surface);
@@ -965,6 +1031,45 @@
           <div>Track a daily habit or something you've quit.</div>
         </div>
       </section>
+
+      <!-- Analytics view -->
+      <section id="view-analytics" class="view">
+        <div class="section-title">Period</div>
+        <div class="chip-row" id="analytics-period">
+          <button type="button" class="chip selected" data-period="week">This week</button>
+          <button type="button" class="chip" data-period="month">This month</button>
+          <button type="button" class="chip" data-period="lastMonth">Last month</button>
+          <button type="button" class="chip" data-period="year">This year</button>
+          <button type="button" class="chip" data-period="lastYear">Last year</button>
+        </div>
+
+        <div class="section-title">Execution rate</div>
+        <div class="analytics-hero card">
+          <div class="analytics-big" id="analytics-rate">—</div>
+          <div class="analytics-sub" id="analytics-sub">No data yet</div>
+          <div class="analytics-bar"><span id="analytics-bar-fill" style="width: 0%"></span></div>
+        </div>
+
+        <div class="section-title">By category</div>
+        <div class="card analytics-placeholder">
+          <div class="analytics-placeholder-title">Category breakdown — coming soon</div>
+          <div class="analytics-placeholder-sub">
+            Once tasks can be tagged (Family, Work, Fitness, etc.) you'll see your
+            execution rate sliced by category here.
+          </div>
+        </div>
+
+        <div class="section-title">Notes</div>
+        <div class="card">
+          <textarea
+            id="notes-text"
+            class="notes-textarea"
+            placeholder="Persistent scratch pad — captures thoughts that don't belong on today's locked list. Saves automatically."
+            maxlength="4000"
+          ></textarea>
+          <div class="notes-status" id="notes-status">Saved</div>
+        </div>
+      </section>
     </main>
 
     <!-- Docked new-task area: options panel + input bar -->
@@ -1064,6 +1169,15 @@
           <path d="M12 22a7 7 0 0 0 7-7c0-3.3-2-5-3-7.5 0 2.5-1.2 3.7-3 4.5-1.8-.8-3-2-3-4.5-1 2.5-3 4.2-3 7.5a7 7 0 0 0 5 7z"/>
         </svg>
         Streaks
+      </button>
+      <button class="tab" data-tab="analytics">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 20V10"/>
+          <path d="M10 20V4"/>
+          <path d="M16 20v-7"/>
+          <path d="M22 20H2"/>
+        </svg>
+        Analytics
       </button>
     </nav>
   </div>
@@ -1464,6 +1578,7 @@ const els = {
   views: {
     todo: document.getElementById('view-todo'),
     streaks: document.getElementById('view-streaks'),
+    analytics: document.getElementById('view-analytics'),
   },
   main: document.getElementById('main'),
   habitsWrap: document.getElementById('habits-wrap'),
@@ -1809,9 +1924,114 @@ function renderStreaksView(state) {
   els.streaksList.innerHTML = trackedHTML + quitHTML;
 }
 
+/* ============================================================
+   Analytics — execution rate over a selected period.
+
+   Completion data we can use today:
+     - Recurring tasks: completedDates[] (YYYY-MM-DD entries)
+     - One-shot tasks: `done` bool — we don't yet store completedAt, so
+       we count them as scheduled on createdAt and completed if done.
+   Once the day-lock + scheduledDate system lands, this math gets exact.
+   ============================================================ */
+let analyticsPeriod = 'week';
+
+function periodRange(period) {
+  const now = new Date();
+  const today = todayISO();
+  if (period === 'week') {
+    return { start: addDaysISO(today, -6), end: today, label: 'the last 7 days' };
+  }
+  if (period === 'month') {
+    const s = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    return { start: s, end: today, label: 'this month' };
+  }
+  if (period === 'lastMonth') {
+    const m = now.getMonth(), y = now.getFullYear();
+    const lm = m === 0 ? 11 : m - 1;
+    const ly = m === 0 ? y - 1 : y;
+    const lastDay = new Date(ly, lm + 1, 0).getDate();
+    return {
+      start: `${ly}-${pad(lm + 1)}-01`,
+      end: `${ly}-${pad(lm + 1)}-${pad(lastDay)}`,
+      label: 'last month',
+    };
+  }
+  if (period === 'year') {
+    return { start: `${now.getFullYear()}-01-01`, end: today, label: 'this year' };
+  }
+  if (period === 'lastYear') {
+    const y = now.getFullYear() - 1;
+    return { start: `${y}-01-01`, end: `${y}-12-31`, label: 'last year' };
+  }
+  return { start: today, end: today, label: 'today' };
+}
+
+function computePeriodRate(state, period) {
+  const { start, end } = periodRange(period);
+  let completed = 0, scheduled = 0;
+  const today = todayISO();
+  const effectiveEnd = end < today ? end : today;
+  for (const t of state.tasks) {
+    const createdISO = toISO(new Date(t.createdAt));
+    if (!t.recurrence) {
+      // One-shot tasks count once, at their creation date.
+      if (createdISO >= start && createdISO <= effectiveEnd) {
+        scheduled++;
+        if (t.done) completed++;
+      }
+    } else {
+      const days = t.recurrence.daysOfWeek || [];
+      if (!days.length) continue;
+      const doneSet = new Set(t.completedDates || []);
+      const startCursor = createdISO > start ? createdISO : start;
+      let cursor = startCursor;
+      while (cursor <= effectiveEnd) {
+        const dow = new Date(cursor + 'T00:00:00').getDay();
+        if (days.includes(dow)) {
+          scheduled++;
+          if (doneSet.has(cursor)) completed++;
+        }
+        cursor = addDaysISO(cursor, 1);
+      }
+    }
+  }
+  return { completed, scheduled };
+}
+
+function renderAnalyticsView(state) {
+  const { completed, scheduled, } = computePeriodRate(state, analyticsPeriod);
+  const { label } = periodRange(analyticsPeriod);
+  const rate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
+  const rateEl = document.getElementById('analytics-rate');
+  const subEl = document.getElementById('analytics-sub');
+  const barEl = document.getElementById('analytics-bar-fill');
+  if (scheduled === 0) {
+    rateEl.textContent = '—';
+    subEl.textContent = `No tasks scheduled ${label} yet`;
+    barEl.style.width = '0%';
+  } else {
+    rateEl.textContent = rate + '%';
+    subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
+    barEl.style.width = rate + '%';
+  }
+}
+
+/* ============================================================
+   Notes — persistent scratch pad. Local-only for now; the server
+   endpoint will come with the day-lock build.
+   ============================================================ */
+const NOTES_KEY = 'gofirst:notes';
+function loadNotes() {
+  try { return localStorage.getItem(NOTES_KEY) || ''; } catch { return ''; }
+}
+function saveNotesValue(v) {
+  try { localStorage.setItem(NOTES_KEY, v); } catch {}
+}
+
 function render(state) {
   renderTasksView(state);
   renderStreaksView(state);
+  renderAnalyticsView(state);
 }
 
 /* ============================================================
@@ -1820,6 +2040,34 @@ function render(state) {
 
 // --- Tab bar ---
 els.tabs.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
+
+// --- Analytics period chips ---
+document.getElementById('analytics-period').addEventListener('click', (e) => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  analyticsPeriod = c.dataset.period;
+  document.querySelectorAll('#analytics-period .chip').forEach(x =>
+    x.classList.toggle('selected', x.dataset.period === analyticsPeriod));
+  renderAnalyticsView(Store.get());
+});
+
+// --- Notes textarea (persistent scratch pad, local-only for now) ---
+(() => {
+  const ta = document.getElementById('notes-text');
+  const status = document.getElementById('notes-status');
+  if (!ta) return;
+  ta.value = loadNotes();
+  status.textContent = ta.value ? 'Saved' : '';
+  let t;
+  ta.addEventListener('input', () => {
+    status.textContent = 'Saving…';
+    clearTimeout(t);
+    t = setTimeout(() => {
+      saveNotesValue(ta.value);
+      status.textContent = 'Saved';
+    }, 400);
+  });
+})();
 
 // --- Top action (new streak / close) ---
 els.topAction.addEventListener('click', () => {
@@ -2021,7 +2269,7 @@ Store.subscribe(render);
 (() => {
   const mainEl = document.getElementById('main');
   if (!mainEl) return;
-  const TABS = ['todo', 'streaks'];
+  const TABS = ['todo', 'streaks', 'analytics'];
   let start = null;
   mainEl.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { start = null; return; }
@@ -2130,6 +2378,15 @@ boot();
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed', err));
+  });
+  // When a new service worker takes control (new build deployed while the PWA
+  // was open) reload the page so the user sees the update instead of a stale
+  // bundle. The guard prevents an infinite reload loop on first install.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
   });
 }
 </script>

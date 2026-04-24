@@ -7,7 +7,7 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-const CACHE = 'gofirst-v2';
+const CACHE = 'gofirst-v3';
 const ASSETS = [
   './',
   './index.html',
