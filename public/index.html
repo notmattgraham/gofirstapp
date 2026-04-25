@@ -1628,8 +1628,13 @@ async function api(method, path, body) {
   let data = null;
   try { data = await res.json(); } catch { /* no body */ }
   if (!res.ok) {
-    const msg = (data && data.error) || `HTTP ${res.status}`;
-    throw new Error(msg);
+    // Prefer the human-readable `message` (always safe to show to the user).
+    // Fall back to the machine `error` code, then to the HTTP status.
+    const msg = (data && data.message) || (data && data.error) || `HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
   return data;
 }
@@ -1911,7 +1916,12 @@ const Store = (() => {
       console.warn('mutation failed', e);
       state = prev;
       emit();
-      if (e.message !== 'unauthenticated') banner('Save failed — reverted', true, 3000);
+      if (e.message === 'unauthenticated') return;
+      // Show the server's human message verbatim when present (lock errors etc.).
+      const msg = e.message && e.message !== 'locked' && e.message !== 'HTTP 403'
+        ? e.message
+        : 'Save failed \u2014 try again.';
+      banner(msg, true, 4500);
     }
   }
 
@@ -2416,12 +2426,35 @@ function renderLockBanner(state) {
   if (!banner) return;
   let icon = lockIcon, msg = '';
   if (selectedDay === 'today') {
-    if (Auth.isDev()) { icon = wrenchIcon; msg = 'Developer mode \u2014 locks bypassed.'; }
-    else if (state.overrideActive) { icon = unlockIcon; msg = 'Override active \u2014 today is editable until midnight.'; }
-    else { icon = lockIcon; msg = 'Today is locked. Tap each task to check it off.'; }
+    if (Auth.isDev()) {
+      icon = wrenchIcon;
+      msg = 'Developer mode \u2014 locks bypassed.';
+    } else if (state.overrideActive) {
+      icon = unlockIcon;
+      msg = 'Override active \u2014 today is editable until midnight.';
+    } else {
+      // Same context-aware copy the dock tap uses, so the messaging matches
+      // whether the user reads the banner or taps + New task.
+      const todayTaskCount = state.tasks.filter(t =>
+        !t.devMode && taskScheduledFor(t, state.today)
+      ).length;
+      icon = lockIcon;
+      msg = todayTaskCount > 0
+        ? 'Today is locked. Complete all tasks to unlock tomorrow.'
+        : 'Today is locked. Start planning for tomorrow.';
+    }
   } else {
-    if (state.todayComplete) { icon = checkIcon; msg = 'Today is complete. Plan tomorrow \u2014 list locks at midnight.'; }
-    else { icon = lockIcon; msg = `Finish today\u2019s tasks first to unlock tomorrow\u2019s planning.`; }
+    if (state.todayComplete) {
+      icon = checkIcon;
+      msg = 'Today is complete. Plan tomorrow \u2014 list locks at midnight.';
+    } else {
+      const incomplete = state.tasks.filter(t =>
+        !t.devMode && taskScheduledFor(t, state.today) && !isTaskDoneOn(t, state.today)
+      ).length;
+      const word = incomplete === 1 ? 'task' : 'tasks';
+      icon = lockIcon;
+      msg = `Finish today\u2019s ${incomplete} unchecked ${word} before planning tomorrow.`;
+    }
   }
   banner.innerHTML = `${icon}<span>${msg}</span>`;
   banner.hidden = false;
@@ -2850,10 +2883,26 @@ els.topAction.addEventListener('click', () => {
       // Refuse to open the dock if the day isn't editable — saves the user
       // from typing a task that the server would reject. Surface why.
       if (!canEditDay(Store.get(), selectedDay)) {
+        const s = Store.get();
         if (selectedDay === 'today') {
-          banner('Today is locked. Use an override on the Profile tab.', true, 3500);
+          // Count whether today actually has scheduled tasks (locked-with-tasks
+          // vs locked-empty get different guidance).
+          const todayTaskCount = s.tasks.filter(t =>
+            !t.devMode && taskScheduledFor(t, s.today)
+          ).length;
+          banner(
+            todayTaskCount > 0
+              ? 'Today is locked. Complete all tasks to unlock tomorrow.'
+              : 'Today is locked. Start planning for tomorrow.',
+            true, 4000
+          );
         } else {
-          banner('Finish today\u2019s tasks before planning tomorrow.', true, 3500);
+          // Tomorrow tab — server has the authoritative incomplete count.
+          const incomplete = s.tasks.filter(t =>
+            !t.devMode && taskScheduledFor(t, s.today) && !isTaskDoneOn(t, s.today)
+          ).length;
+          const word = incomplete === 1 ? 'task' : 'tasks';
+          banner(`Finish today\u2019s ${incomplete} unchecked ${word} before planning tomorrow.`, true, 4000);
         }
         return;
       }

@@ -37,42 +37,77 @@ function shape(t) {
 
 // "Today is complete" → no remaining incomplete tasks scheduled for today.
 // Recurring tasks count as complete if today's ISO is in completedDates.
-async function isTodayComplete(user) {
+async function todayCompletionState(user) {
   const today = userToday(user);
   const tasks = await prisma.task.findMany({ where: { userId: user.id } });
+  let total = 0, incomplete = 0;
+  const dow = new Date(today + 'T00:00:00').getDay();
   for (const t of tasks) {
     if (t.devMode) continue;
     if (t.recurrence) {
       const days = (t.recurrence.daysOfWeek) || [];
-      const dow = new Date(today + 'T00:00:00').getDay();
-      if (days.includes(dow) && !(t.completedDates || []).includes(today)) return false;
-    } else if (t.scheduledDate === today && !t.done) {
-      return false;
+      if (days.includes(dow)) {
+        total++;
+        if (!(t.completedDates || []).includes(today)) incomplete++;
+      }
+    } else if (t.scheduledDate === today) {
+      total++;
+      if (!t.done) incomplete++;
     }
   }
-  return true;
+  return { total, incomplete, complete: incomplete === 0 };
+}
+
+async function isTodayComplete(user) {
+  return (await todayCompletionState(user)).complete;
 }
 
 // Decide if a task with the given scheduledDate may be created/edited/deleted.
-// Rules:
-//   - dev account always allowed
-//   - "today" allowed if user has an active override for today
-//   - "tomorrow" allowed if today is complete (so the user has earned planning rights)
-//   - Anything in the past or further future is rejected
+// Returns ok:true OR ok:false plus a reason code AND a friendly message
+// suitable for showing the user verbatim.
 async function canMutateForDate(user, scheduledDate) {
   if (isDevAccount(user)) return { ok: true };
   const today = userToday(user);
   const tomorrow = userTomorrow(user);
   if (scheduledDate === today) {
     if (isOverrideActive(user)) return { ok: true };
-    return { ok: false, reason: 'today_locked' };
+    const todayState = await todayCompletionState(user);
+    if (todayState.total > 0) {
+      return {
+        ok: false,
+        reason: 'today_locked',
+        message: 'Today is locked. Complete all tasks to unlock tomorrow.',
+      };
+    }
+    return {
+      ok: false,
+      reason: 'today_locked',
+      message: 'Today is locked. Start planning for tomorrow.',
+    };
   }
   if (scheduledDate === tomorrow) {
-    const complete = await isTodayComplete(user);
-    if (complete) return { ok: true };
-    return { ok: false, reason: 'today_incomplete' };
+    const todayState = await todayCompletionState(user);
+    if (todayState.complete) return { ok: true };
+    const word = todayState.incomplete === 1 ? 'task' : 'tasks';
+    return {
+      ok: false,
+      reason: 'today_incomplete',
+      message: `Finish today\u2019s ${todayState.incomplete} unchecked ${word} before planning tomorrow.`,
+    };
   }
-  return { ok: false, reason: 'date_out_of_window' };
+  return {
+    ok: false,
+    reason: 'date_out_of_window',
+    message: 'Tasks can only be added for tomorrow.',
+  };
+}
+
+function rejectLocked(res, guard) {
+  return res.status(403).json({
+    error: 'locked',
+    reason: guard.reason,
+    message: guard.message,
+  });
 }
 
 router.get('/', async (req, res) => {
@@ -103,7 +138,7 @@ router.post('/', async (req, res) => {
   const checkDate = isRecurring ? userTomorrow(req.user) : date;
   const guard = await canMutateForDate(req.user, checkDate);
   if (!guard.ok) {
-    return res.status(403).json({ error: 'locked', reason: guard.reason });
+    return rejectLocked(res, guard);
   }
 
   const isDaily = recurrence && recurrence.type === 'daily';
@@ -148,7 +183,7 @@ router.patch('/:id', async (req, res) => {
     const date = existing.scheduledDate || (existing.recurrence ? userTomorrow(req.user) : userToday(req.user));
     const guard = await canMutateForDate(req.user, date);
     if (!guard.ok) {
-      return res.status(403).json({ error: 'locked', reason: guard.reason });
+      return rejectLocked(res, guard);
     }
   }
 
@@ -168,7 +203,7 @@ router.delete('/:id', async (req, res) => {
     const date = existing.scheduledDate || (existing.recurrence ? userTomorrow(req.user) : userToday(req.user));
     const guard = await canMutateForDate(req.user, date);
     if (!guard.ok) {
-      return res.status(403).json({ error: 'locked', reason: guard.reason });
+      return rejectLocked(res, guard);
     }
   }
 
