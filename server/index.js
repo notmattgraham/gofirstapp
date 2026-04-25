@@ -40,6 +40,9 @@ app.use(passport.session());
 // Health probe for Railway.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
+// Keepalive ping — clients and this server itself hit this to prevent Railway sleep.
+app.get('/ping', (_req, res) => res.status(200).send('pong'));
+
 // API
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
@@ -72,4 +75,21 @@ app.use((err, _req, res, _next) => {
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => {
   console.log(`GoFirst listening on :${port}  (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
+
+  // Server-side keepalive: ping ourselves every 5 minutes so Railway never
+  // idles the dyno even when no clients are connected.
+  const selfUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/ping`
+    : null;
+  if (selfUrl) {
+    const https = require('https');
+    setInterval(() => {
+      https.get(selfUrl, (res) => {
+        res.resume(); // drain the response so the socket closes cleanly
+      }).on('error', (err) => {
+        console.warn('[keepalive] self-ping failed:', err.message);
+      });
+    }, 5 * 60 * 1000); // every 5 minutes
+    console.log(`[keepalive] Server self-ping active → ${selfUrl}`);
+  }
 });
