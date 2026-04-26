@@ -1,0 +1,20 @@
+name: Keepalive
+
+# Pings the Railway server every 5 minutes so it never idles or sleeps.
+# GitHub Actions runs this from their infrastructure regardless of whether
+# any users have the app open.
+
+on:
+  schedule:
+      - cron: '*/5 * * * *'
+        workflow_dispatch: # allow manual trigger from the Actions tab
+
+        jobs:
+          ping:
+              runs-on: ubuntu-latest
+                  steps:
+                        - name: Ping GoFirst
+                                run: |
+                                          curl -sf https://gofirst.up.railway.app/ping -o /dev/null \
+                                                      && echo "OK" \
+                                                                  || echo "Ping failed -- server may be cold-starting"
