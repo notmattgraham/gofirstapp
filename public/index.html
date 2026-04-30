@@ -216,35 +216,169 @@
   }
   .section-title:first-child { margin-top: 4px; }
 
-  /* Today / Tomorrow toggle at the top of the To Do tab */
-  .day-toggle {
-    display: inline-flex;
+  /* Date navigation bar */
+  .date-nav {
+    display: flex;
+    align-items: center;
+    margin: 0 -4px 12px;
+    width: calc(100% + 8px);
+  }
+  .date-nav-arrow {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .date-nav-arrow:active { opacity: 0.5; }
+  .date-nav-label {
+    flex: 1;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    padding: 6px 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .date-nav-day-text {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1px;
+  }
+  .date-nav-date-text {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .date-nav-label.is-today .date-nav-date-text { color: var(--accent); }
+
+  /* Calendar overlay */
+  .cal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .cal-overlay[hidden] { display: none; }
+  .cal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+  }
+  .cal-panel {
+    position: relative;
+    background: var(--bg-elev);
+    border-radius: 20px 20px 0 0;
+    padding: 8px 16px 40px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 -4px 32px rgba(0,0,0,0.4);
+  }
+  .cal-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 8px auto 16px;
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .cal-month-label {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+  }
+  .cal-nav-btn {
+    background: var(--surface);
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+  }
+  .cal-nav-btn:active { opacity: 0.6; }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .cal-weekdays span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    padding: 4px 0;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    border-radius: 50%;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--text);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+  }
+  .cal-day.empty { pointer-events: none; }
+  .cal-day.other-month { color: var(--text-faint); }
+  .cal-day.today { font-weight: 700; color: var(--accent); }
+  .cal-day.selected { background: var(--accent); color: var(--accent-fg); font-weight: 700; }
+  .cal-day.selected.today { color: var(--accent-fg); }
+  .cal-day.has-tasks::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .cal-day.selected.has-tasks::after { background: var(--accent-fg); }
+  .cal-today-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 13px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 3px;
-    margin: 4px 0 12px;
-    align-self: flex-start;
-  }
-  .day-chip {
-    padding: 6px 16px;
-    border: none;
-    background: transparent;
-    color: var(--text-dim);
-    font-size: 13px;
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    border-radius: 999px;
-    min-height: 32px;
   }
-  .day-chip.selected {
-    background: var(--accent);
-    color: var(--accent-fg);
-  }
-  .day-chip:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
+  .cal-today-btn:active { opacity: 0.7; }
 
   /* Lock state banner */
   .lock-banner {
@@ -767,6 +901,7 @@
   .action-btn.ghost { background: transparent; }
 
   /* --- Forms (streak + task options) --------------------------- */
+
   .panel {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -1286,38 +1421,46 @@
       <div class="view-slider" id="view-slider">
       <!-- To Do List view -->
       <section id="view-todo" class="view">
-        <div class="day-toggle" id="day-toggle">
-          <button type="button" class="day-chip selected" data-day="today">Today</button>
-          <button type="button" class="day-chip" data-day="tomorrow">Tomorrow</button>
+        <div class="date-nav" id="date-nav">
+          <button class="date-nav-arrow" id="date-prev" aria-label="Previous day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+          <button class="date-nav-label" id="date-label-btn" aria-label="Open calendar">
+            <span class="date-nav-day-text" id="date-nav-day">Today</span>
+            <span class="date-nav-date-text" id="date-nav-date">April 29</span>
+          </button>
+          <button class="date-nav-arrow" id="date-next" aria-label="Next day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
         </div>
 
-        <div class="lock-banner" id="lock-banner" hidden></div>
-
-        <div class="stat-strip" id="stat-strip" hidden>
-          <div class="stat-ring" id="stat-ring"
-               style="background: conic-gradient(var(--accent) 0deg, var(--surface-2) 0deg);">
-            <span id="stat-ring-pct">0%</span>
+        <div class="cal-overlay" id="cal-overlay" hidden>
+          <div class="cal-backdrop" id="cal-backdrop"></div>
+          <div class="cal-panel">
+            <div class="cal-handle"></div>
+            <div class="cal-header">
+              <button class="cal-nav-btn" id="cal-prev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+              <span class="cal-month-label" id="cal-month-label">April 2026</span>
+              <button class="cal-nav-btn" id="cal-next"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+            </div>
+            <div class="cal-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+            <div class="cal-grid" id="cal-grid"></div>
+            <button class="cal-today-btn" id="cal-today-btn">Jump to Today</button>
           </div>
-          <div class="stat-body">
-            <div class="stat-title" id="stat-title">Today's execution</div>
-            <div class="stat-sub" id="stat-sub">0 of 0 complete</div>
-          </div>
         </div>
 
-        <div id="habits-wrap" hidden>
-          <div class="section-title">Today's habits</div>
-          <div class="card"><ul class="list" id="habits-list"></ul></div>
+        <div id="lock-banner" class="lock-banner" hidden></div>
+        <div id="stat-strip" class="stat-strip" hidden></div>
+
+        <div class="card" id="habits-wrap" hidden>
+          <ul class="list" id="habits-list"></ul>
         </div>
 
-        <div class="section-title" id="tasks-title">Tasks</div>
-        <div class="card">
+        <div class="card" style="margin-top:12px">
           <ul class="list" id="tasks-list"></ul>
-          <div class="empty" id="tasks-empty">
-            <div class="empty-title">Nothing on the list</div>
+          <div class="empty" id="tasks-empty" style="display:none">
+            <div class="empty-title">Nothing here yet</div>
             <div id="tasks-empty-sub">Add a task below to get moving.</div>
           </div>
         </div>
       </section>
+
 
       <!-- Streaks view -->
       <section id="view-streaks" class="view">
@@ -2366,23 +2509,91 @@ function renderStatStrip(state) {
 }
 
 // Currently-selected day on the To Do tab. Toggle pill at the top.
-let selectedDay = 'today';
+// Currently-selected date ISO string (YYYY-MM-DD). Empty until first render.
+let selectedDateISO = '';
 
-// True if the user can mutate (add/edit/delete) tasks for the given day right now.
-// Day-lock is suspended until the app is stable — always editable.
-function canEditDay(state, dayKey) {
-  return true;
+// Calendar view state
+let calViewYear = 0, calViewMonth = 0;
+
+// Day-lock is suspended — always editable.
+function canEditDay() { return true; }
+
+// Offset an ISO date string by N days
+function offsetDate(iso, days) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
-// Pick which date string a task is scheduled for, given the current state.
-// Recurring templates schedule by day-of-week; one-shots use scheduledDate
-// (with a fallback to "today" for legacy rows that pre-date the column).
+// Format a date label for the nav bar
+function formatDateLabel(iso, todayISO) {
+  const d = new Date(iso + 'T00:00:00');
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayStr = iso === todayISO ? 'Today' : (iso === offsetDate(todayISO, -1) ? 'Yesterday' : (iso === offsetDate(todayISO, 1) ? 'Tomorrow' : dayNames[d.getDay()]));
+  return { day: dayStr, date: `${monthNames[d.getMonth()]} ${d.getDate()}` };
+}
+
+function renderDateNav(state) {
+  if (!selectedDateISO) selectedDateISO = state.today;
+  const labelBtn = document.getElementById('date-label-btn');
+  const dayEl = document.getElementById('date-nav-day');
+  const dateEl = document.getElementById('date-nav-date');
+  if (!labelBtn) return;
+  const { day, date } = formatDateLabel(selectedDateISO, state.today);
+  dayEl.textContent = day;
+  dateEl.textContent = date;
+  labelBtn.classList.toggle('is-today', selectedDateISO === state.today);
+}
+
+function renderCalGrid(state) {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const labelEl = document.getElementById('cal-month-label');
+  const grid = document.getElementById('cal-grid');
+  if (!labelEl || !grid) return;
+  labelEl.textContent = `${monthNames[calViewMonth]} ${calViewYear}`;
+  const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+  const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<span class="cal-day other-month"></span>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = iso === state.today;
+    const isSelected = iso === selectedDateISO;
+    const hasTasks = state.tasks.some(t => taskScheduledFor(t, iso));
+    const cls = ['cal-day', isToday && 'today', isSelected && 'selected', hasTasks && 'has-tasks'].filter(Boolean).join(' ');
+    html += `<button class="${cls}" data-iso="${iso}">${d}</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+function openCalendar(state) {
+  if (!selectedDateISO) selectedDateISO = state.today;
+  const d = new Date(selectedDateISO + 'T00:00:00');
+  calViewYear = d.getFullYear();
+  calViewMonth = d.getMonth();
+  renderCalGrid(state);
+  const overlay = document.getElementById('cal-overlay');
+  if (overlay) overlay.hidden = false;
+}
+
+function closeCalendar() {
+  const overlay = document.getElementById('cal-overlay');
+  if (overlay) overlay.hidden = true;
+}
+
+// Pick which date string a task is scheduled for.
+// Recurring templates schedule by day-of-week but only on/after their start date.
+// One-shots use their scheduledDate field.
 function taskScheduledFor(t, dayISO) {
   if (t.recurrence) {
+    // Don't show recurring tasks before their creation date
+    const startDate = (t.startedAt || '').slice(0, 10);
+    if (startDate && dayISO < startDate) return false;
     const days = (t.recurrence.daysOfWeek) || [];
     return days.includes(new Date(dayISO + 'T00:00:00').getDay());
   }
-  const sched = t.scheduledDate || dayISO; // legacy fallback
+  const sched = t.scheduledDate || dayISO;
   return sched === dayISO;
 }
 
@@ -2443,11 +2654,12 @@ function renderLockBanner(state) {
 }
 
 function renderTasksView(state) {
-  renderDayToggle(state);
+  if (!selectedDateISO) selectedDateISO = state.today;
+  renderDateNav(state);
   renderLockBanner(state);
 
-  const dayISO = selectedDay === 'today' ? state.today : state.tomorrow;
-  const showStatStrip = selectedDay === 'today';
+  const dayISO = selectedDateISO;
+  const showStatStrip = (dayISO === state.today);
   if (showStatStrip) renderStatStrip(state);
   else document.getElementById('stat-strip').hidden = true;
 
@@ -2459,12 +2671,8 @@ function renderTasksView(state) {
     els.habitsList.innerHTML = habits.map(t => {
       const done = isTaskDoneOn(t, dayISO);
       const streak = doingStreak(t.completedDates);
-      const meta = (selectedDay === 'today' && streak > 0) ? `<span class="row-meta">${flameIcon} ${streak}</span>` : '';
-      // Habit rows on the locked day show no edit pencil. On tomorrow (when
-      // editable) we let the user adjust the recurrence/category.
-      const editBtn = canEditDay(state, selectedDay)
-        ? `<button class="icon-btn" data-action="task-edit" aria-label="Edit habit">${pencilIcon}</button>`
-        : '';
+      const meta = streak > 0 ? `<span class="row-meta">${flameIcon} ${streak}</span>` : '';
+      const editBtn = `<button class="icon-btn" data-action="task-edit" aria-label="Edit habit">${pencilIcon}</button>`;
       return `
         <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
           <button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
@@ -2475,7 +2683,7 @@ function renderTasksView(state) {
     }).join('');
   }
 
-  const editable = canEditDay(state, selectedDay);
+  const editable = true;
   const tasks = state.tasks
     .filter(t => !(t.recurrence && t.recurrence.type === 'daily' && t.trackStreak))
     .filter(t => taskScheduledFor(t, dayISO))
@@ -2491,12 +2699,7 @@ function renderTasksView(state) {
     els.tasksEmpty.style.display = 'block';
     const sub = document.getElementById('tasks-empty-sub');
     if (sub) {
-      if (selectedDay === 'today') sub.textContent = state.overrideActive
-        ? 'Override active — tap "+ New task" to add to today.'
-        : 'Today\u2019s list was empty when it locked.';
-      else sub.textContent = state.todayComplete
-        ? 'Tap "+ New task" to plan tomorrow.'
-        : 'Finish today\u2019s tasks to unlock planning.';
+      sub.textContent = 'No tasks for this day. Tap "+ New task" to add one.';
     }
   } else {
     els.tasksEmpty.style.display = 'none';
@@ -2752,11 +2955,56 @@ function render(state) {
 // --- Tab bar ---
 els.tabs.forEach(btn => btn.addEventListener('click', () => setTab(btn.dataset.tab)));
 
-// --- Day toggle (Today / Tomorrow) on the To Do tab ---
-document.getElementById('day-toggle').addEventListener('click', (e) => {
-  const c = e.target.closest('.day-chip');
-  if (!c || c.disabled) return;
-  selectedDay = c.dataset.day;
+// --- Date navigation (prev/next arrows + calendar) ---
+document.getElementById('date-prev').addEventListener('click', () => {
+  const state = Store.get();
+  if (!selectedDateISO) selectedDateISO = state.today;
+  selectedDateISO = offsetDate(selectedDateISO, -1);
+  render(state);
+});
+
+document.getElementById('date-next').addEventListener('click', () => {
+  const state = Store.get();
+  if (!selectedDateISO) selectedDateISO = state.today;
+  selectedDateISO = offsetDate(selectedDateISO, 1);
+  render(state);
+});
+
+document.getElementById('date-label-btn').addEventListener('click', () => {
+  const state = Store.get();
+  if (document.getElementById('cal-overlay').hidden) {
+    openCalendar(state);
+  } else {
+    closeCalendar();
+  }
+});
+
+document.getElementById('cal-backdrop').addEventListener('click', () => closeCalendar());
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calViewMonth--;
+  if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+  renderCalGrid(Store.get());
+});
+
+document.getElementById('cal-next').addEventListener('click', () => {
+  calViewMonth++;
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  renderCalGrid(Store.get());
+});
+
+document.getElementById('cal-today-btn').addEventListener('click', () => {
+  const state = Store.get();
+  selectedDateISO = state.today;
+  closeCalendar();
+  render(state);
+});
+
+document.getElementById('cal-grid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.cal-day');
+  if (!cell || cell.classList.contains('other-month')) return;
+  selectedDateISO = cell.dataset.iso;
+  closeCalendar();
   render(Store.get());
 });
 
@@ -2860,32 +3108,6 @@ els.topAction.addEventListener('click', () => {
   }
   if (currentTab === 'todo') {
     if (isDockClosed()) {
-      // Refuse to open the dock if the day isn't editable — saves the user
-      // from typing a task that the server would reject. Surface why.
-      if (!canEditDay(Store.get(), selectedDay)) {
-        const s = Store.get();
-        if (selectedDay === 'today') {
-          // Count whether today actually has scheduled tasks (locked-with-tasks
-          // vs locked-empty get different guidance).
-          const todayTaskCount = s.tasks.filter(t =>
-            taskScheduledFor(t, s.today)
-          ).length;
-          banner(
-            todayTaskCount > 0
-              ? 'Today is locked. Complete all tasks to unlock tomorrow.'
-              : 'Today is locked. Start planning for tomorrow.',
-            true, 4000
-          );
-        } else {
-          // Tomorrow tab — server has the authoritative incomplete count.
-          const incomplete = s.tasks.filter(t =>
-            taskScheduledFor(t, s.today) && !isTaskDoneOn(t, s.today)
-          ).length;
-          const word = incomplete === 1 ? 'task' : 'tasks';
-          banner(`Finish today\u2019s ${incomplete} unchecked ${word} before planning tomorrow.`, true, 4000);
-        }
-        return;
-      }
       TaskForm.reset();
       openDock();
       setTimeout(() => els.taskInput.focus(), 300);
@@ -2929,9 +3151,8 @@ els.taskForm.addEventListener('submit', (e) => {
   const recurrence = TaskForm.toRecurrence();
   const category = TaskForm.category || null;
   const state = Store.get();
-  // The new task goes to whichever day the user is currently looking at —
-  // today (only allowed with override active) or tomorrow (the planning lane).
-  const scheduledDate = recurrence ? null : (selectedDay === 'today' ? state.today : state.tomorrow);
+  // The new task goes on the date currently selected in the date navigator.
+  const scheduledDate = recurrence ? null : (selectedDateISO || state.today);
   const updates = { text, recurrence, trackStreak: TaskForm.track, category, scheduledDate };
 
   if (TaskForm.editingId) {
