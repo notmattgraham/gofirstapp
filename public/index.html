@@ -1238,6 +1238,23 @@
   }
   .splash[hidden] { display: none; }
 
+  /* Checking-auth state: show brand + spinner only; hide the sign-in UI.
+     Prevents Google button from flashing for already-authenticated users. */
+  .splash[data-checking] .btn-google,
+  .splash[data-checking] .splash-tag,
+  .splash[data-checking] .splash-foot { visibility: hidden; }
+  .splash[data-checking] .splash-brand { margin-bottom: 24px; }
+  .splash-checking-spinner {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-top-color: var(--text-dim);
+    border-radius: 50%;
+    animation: splash-spin 0.8s linear infinite;
+  }
+  .splash[data-checking] .splash-checking-spinner { display: block; }
+  .splash:not([data-checking]) .splash-checking-spinner { display: none; }
+  @keyframes splash-spin { to { transform: rotate(360deg); } }
+
   .splash-brand {
     margin-bottom: 40px;
     display: flex;
@@ -1689,8 +1706,10 @@
       </div>
     </div>
 
-    <!-- Sign-in splash (covers the app when signed out) -->
-    <div class="splash" id="splash">
+    <!-- Sign-in splash (covers the app when signed out).
+         data-checking is removed once auth state is known. -->
+    <div class="splash" id="splash" data-checking>
+      <div class="splash-checking-spinner"></div>
       <div class="splash-brand">
         <img class="brand-dark" src="splash-typelogo.svg" alt="GoFirst" />
         <img class="brand-light" src="splash-typelogo-black.svg" alt="GoFirst" />
@@ -1982,6 +2001,20 @@ const Store = (() => {
       overrideActive: !!(t && t.overrideActive),
     };
     emit();
+    // Persist a snapshot so the next boot can render instantly from cache
+    // while fresh data loads in the background.
+    try {
+      localStorage.setItem('gofirst:ui-cache', JSON.stringify({
+        tasks: state.tasks,
+        streaks: state.streaks,
+        overrides: state.overrides,
+        today: state.today,
+        tomorrow: state.tomorrow,
+        todayComplete: state.todayComplete,
+        overrideActive: state.overrideActive,
+        ts: Date.now(),
+      }));
+    } catch {}
   }
 
   // Best-effort post-action refresh: if it fails (network blip, server
@@ -2081,6 +2114,21 @@ const Store = (() => {
     load,
     maybeImportLocal,
     reset() { state = { tasks: [], streaks: [] }; emit(); },
+    // Hydrate state from localStorage cache for instant render while load() runs.
+    // Does NOT emit — caller renders manually then load() will emit with fresh data.
+    seedCache(cached) {
+      if (!cached || typeof cached !== 'object') return;
+      state = {
+        ...state,
+        tasks: Array.isArray(cached.tasks) ? cached.tasks : state.tasks,
+        streaks: Array.isArray(cached.streaks) ? cached.streaks : state.streaks,
+        overrides: cached.overrides || state.overrides,
+        today: cached.today || state.today,
+        tomorrow: cached.tomorrow || state.tomorrow,
+        todayComplete: !!cached.todayComplete,
+        overrideActive: !!cached.overrideActive,
+      };
+    },
 
     async addTask({ text, recurrence, trackStreak, startedAt, category, scheduledDate }) {
       const t = (text || '').trim();
@@ -3408,6 +3456,8 @@ const elSplash = document.getElementById('splash');
 const elSplashError = document.getElementById('splash-error');
 
 function showSplash(errorMsg) {
+  // Strip checking state so the Google button and footer become visible
+  elSplash.removeAttribute('data-checking');
   elSplash.hidden = false;
   if (errorMsg) { elSplashError.textContent = errorMsg; elSplashError.hidden = false; }
   else { elSplashError.hidden = true; }
@@ -3603,6 +3653,16 @@ async function replayPendingTasks() {
 }
 
 async function boot() {
+  // Seed UI from cache immediately — before the auth round-trip completes —
+  // so the app renders tasks right away on next open instead of blanking for 3s.
+  try {
+    const cached = JSON.parse(localStorage.getItem('gofirst:ui-cache') || 'null');
+    // Accept cache up to 48 hours old so overnight gaps don't block the fast path.
+    if (cached && (Date.now() - (cached.ts || 0)) < 172800000) {
+      Store.seedCache(cached);
+    }
+  } catch {}
+
   await Auth.load();
   if (!Auth.user) {
     const q = new URLSearchParams(location.search);
@@ -3610,13 +3670,17 @@ async function boot() {
     showSplash(err);
     return;
   }
+
+  // Auth confirmed — hide splash and paint cached state instantly.
   hideSplash();
   renderProfile();
-  // Dock starts closed — user opens it with "+ New task" in the header.
   closeDock();
   setTopAction();
+  render(Store.get()); // instant render from cache (or empty on first boot)
+
+  // Fetch fresh data in the background; Store.load() calls emit() when done,
+  // which triggers a second render with the live server state.
   try {
-    // Replay any tasks added but not confirmed before the app last closed.
     await replayPendingTasks();
     await Store.load();
     await Store.maybeImportLocal();
@@ -3624,7 +3688,6 @@ async function boot() {
     console.warn('boot data load failed', e);
   }
 }
-
 boot();
 
 // Client-side keepalive: ping the server every 4 minutes while this tab is
