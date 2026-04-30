@@ -1446,7 +1446,16 @@
         </div>
 
         <div id="lock-banner" class="lock-banner" hidden></div>
-        <div id="stat-strip" class="stat-strip" hidden></div>
+        <div class="stat-strip" id="stat-strip" hidden>
+          <div class="stat-ring" id="stat-ring"
+               style="background: conic-gradient(var(--accent) 0deg, var(--surface-2) 0deg);">
+            <span id="stat-ring-pct">0%</span>
+          </div>
+          <div class="stat-body">
+            <div class="stat-title" id="stat-title">Today's execution</div>
+            <div class="stat-sub" id="stat-sub">0 of 0 complete</div>
+          </div>
+        </div>
 
         <div class="card" id="habits-wrap" hidden>
           <ul class="list" id="habits-list"></ul>
@@ -2514,15 +2523,16 @@ function renderStatStrip(state) {
   const ring = document.getElementById('stat-ring');
   const pct = document.getElementById('stat-ring-pct');
   const sub = document.getElementById('stat-sub');
+  if (!strip) return; // guard: elements may be absent in some deploys
   if (total === 0) {
     strip.hidden = true;
     return;
   }
   strip.hidden = false;
   const rate = Math.round((done / total) * 100);
-  ring.style.background = `conic-gradient(var(--accent) ${rate * 3.6}deg, var(--surface-2) 0deg)`;
-  pct.textContent = rate + '%';
-  sub.textContent = `${done} of ${total} complete`;
+  if (ring) ring.style.background = `conic-gradient(var(--accent) ${rate * 3.6}deg, var(--surface-2) 0deg)`;
+  if (pct) pct.textContent = rate + '%';
+  if (sub) sub.textContent = `${done} of ${total} complete`;
 }
 
 // Currently-selected day on the To Do tab. Toggle pill at the top.
