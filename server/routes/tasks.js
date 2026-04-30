@@ -1,4 +1,5 @@
 const express = require('express');
+const { Prisma } = require('@prisma/client');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { userToday, userTomorrow, isOverrideActive, isFirstDay } = require('../time');
