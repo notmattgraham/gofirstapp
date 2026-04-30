@@ -565,6 +565,68 @@
     padding-right: 40px;
   }
 
+  /* Task list category section headers */
+  .task-category-header {
+    list-style: none;
+    padding: 10px 16px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
+
+  /* Recurring-delete confirmation sheet */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-end;
+  }
+  .confirm-sheet {
+    width: 100%;
+    background: var(--bg-elev);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 24px 20px calc(var(--safe-bottom) + 24px);
+  }
+  .confirm-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .confirm-msg {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .confirm-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .confirm-btn {
+    width: 100%;
+    min-height: var(--tap);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+  }
+  .confirm-btn.danger { color: var(--danger); border-color: var(--danger); }
+  .confirm-btn.muted { color: var(--text-dim); background: transparent; border-color: transparent; }
+
   /* Analytics category breakdown rows */
   .category-list {
     list-style: none;
@@ -2566,14 +2628,12 @@ function setTab(name) {
 
 /* ---- Rendering ---- */
 function renderStatStrip(state) {
-  // Execution rate = (tasks done today) / (tasks scheduled today), for today's list.
-  // Includes one-shot tasks, recurring tasks scheduled today (tracked or not).
-  const eligible = state.tasks.filter(t => scheduledToday(t));
-  // One-shots whose `done` has been true for a while but weren't created today
-  // shouldn't inflate "today's" rate — only count pending + same-day done.
-  // Simpler rule: count all currently-visible tasks; done = isDoneToday(t).
+  // Count exactly the tasks visible in today's list — uses taskScheduledFor so
+  // one-shots on other days and skipped recurring days are excluded correctly.
+  const today = state.today;
+  const eligible = state.tasks.filter(t => taskScheduledFor(t, today));
   const total = eligible.length;
-  const done = eligible.filter(t => isDoneToday(t)).length;
+  const done = eligible.filter(t => isTaskDoneOn(t, today)).length;
   const strip = document.getElementById('stat-strip');
   const ring = document.getElementById('stat-ring');
   const pct = document.getElementById('stat-ring-pct');
@@ -2669,6 +2729,8 @@ function closeCalendar() {
 // One-shots use their scheduledDate field.
 function taskScheduledFor(t, dayISO) {
   if (t.recurrence) {
+    // If the user chose "skip today" the date is stored as 'skip:YYYY-MM-DD'
+    if ((t.completedDates || []).includes('skip:' + dayISO)) return false;
     // Don't show recurring tasks before their creation date
     const startDate = (t.startedAt || '').slice(0, 10);
     if (startDate && dayISO < startDate) return false;
@@ -2741,78 +2803,82 @@ function renderTasksView(state) {
   renderLockBanner(state);
 
   const dayISO = selectedDateISO;
-  const showStatStrip = (dayISO === state.today);
-  if (showStatStrip) renderStatStrip(state);
+  if (dayISO === state.today) renderStatStrip(state);
   else document.getElementById('stat-strip').hidden = true;
 
-  const habits = state.tasks.filter(t =>
-    t.recurrence && t.recurrence.type === 'daily' && t.trackStreak && taskScheduledFor(t, dayISO)
-  );
-  els.habitsWrap.hidden = habits.length === 0;
-  if (habits.length) {
-    els.habitsList.innerHTML = habits.map(t => {
-      const done = isTaskDoneOn(t, dayISO);
-      const streak = doingStreak(t.completedDates);
-      const meta = streak > 0 ? `<span class="row-meta">${flameIcon} ${streak}</span>` : '';
-      const editBtn = `<button class="icon-btn" data-action="task-edit" aria-label="Edit habit">${pencilIcon}</button>`;
-      return `
-        <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
-          <button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
-          <div class="row-body"><div class="row-text">${esc(t.text)}</div></div>
-          ${meta}
-          ${editBtn}
-        </li>`;
-    }).join('');
-  }
+  // Habits section retired — everything lives in the unified category list.
+  els.habitsWrap.hidden = true;
+  const tasksTitle = document.getElementById('tasks-title');
+  if (tasksTitle) tasksTitle.hidden = true;
 
-  const editable = true;
-  const tasks = state.tasks
-    .filter(t => !(t.recurrence && t.recurrence.type === 'daily' && t.trackStreak))
+  // All tasks visible on this day (habits + one-shots + non-tracked recurring)
+  const allTasks = state.tasks
     .filter(t => taskScheduledFor(t, dayISO))
     .sort((a, b) => {
       const ad = isTaskDoneOn(a, dayISO) ? 1 : 0;
       const bd = isTaskDoneOn(b, dayISO) ? 1 : 0;
       if (ad !== bd) return ad - bd;
-      return b.createdAt - a.createdAt;
+      return (a.createdAt || 0) - (b.createdAt || 0);
     });
 
-  if (tasks.length === 0) {
+  if (allTasks.length === 0) {
     els.tasksList.innerHTML = '';
     els.tasksEmpty.style.display = 'block';
     const sub = document.getElementById('tasks-empty-sub');
-    if (sub) {
-      sub.textContent = 'No tasks for this day. Tap "+ New task" to add one.';
-    }
-  } else {
-    els.tasksEmpty.style.display = 'none';
-    els.tasksList.innerHTML = tasks.map(t => {
-      const done = isTaskDoneOn(t, dayISO);
-      const schedule = scheduleLabel(t.recurrence);
-      const badges = [];
-      if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
-      if (t.category) badges.push(`<span class="badge">${esc(t.category)}</span>`);
-      if (t.parentTaskId) badges.push(`<span class="badge">${restoreIcon} from missed</span>`);
-      const sub = badges.length ? `<div class="row-sub">${badges.join('')}</div>` : '';
-      const editBtn = editable
-        ? `<button class="icon-btn" data-action="task-edit" aria-label="Edit task">${pencilIcon}</button>`
-        : '';
-      const deleteBtn = editable
-        ? `<button class="icon-btn danger" data-action="task-delete" aria-label="Delete task">${trashIcon}</button>`
-        : '';
-      return `
-        <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
-          <button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
-          <div class="row-body">
-            <div class="row-text">${esc(t.text)}</div>
-            ${sub}
-          </div>
-          ${editBtn}
-          ${deleteBtn}
-        </li>`;
-    }).join('');
+    if (sub) sub.textContent = 'No tasks for this day. Tap "+ New task" to add one.';
+    return;
   }
-}
 
+  els.tasksEmpty.style.display = 'none';
+
+  const CATEGORY_ORDER = ['Family', 'Fitness', 'Career', 'Self-Improvement', 'Other'];
+
+  const grouped = {};
+  const uncategorized = [];
+  for (const t of allTasks) {
+    if (t.category && CATEGORY_ORDER.includes(t.category)) {
+      (grouped[t.category] = grouped[t.category] || []).push(t);
+    } else {
+      uncategorized.push(t);
+    }
+  }
+
+  const renderRow = (t) => {
+    const done = isTaskDoneOn(t, dayISO);
+    const schedule = scheduleLabel(t.recurrence);
+    const badges = [];
+    if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
+    if (t.trackStreak) {
+      const streak = doingStreak(t.completedDates.filter(d => !d.startsWith('skip:')));
+      if (streak > 0) badges.push(`<span class="row-meta">${flameIcon} ${streak}</span>`);
+    }
+    if (t.parentTaskId) badges.push(`<span class="badge">${restoreIcon} from missed</span>`);
+    const sub = badges.length ? `<div class="row-sub">${badges.join('')}</div>` : '';
+    const editBtn = `<button class="icon-btn" data-action="task-edit" aria-label="Edit task">${pencilIcon}</button>`;
+    const deleteBtn = `<button class="icon-btn danger" data-action="task-delete" aria-label="Delete task">${trashIcon}</button>`;
+    return `
+      <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
+        <button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
+        <div class="row-body">
+          <div class="row-text">${esc(t.text)}</div>
+          ${sub}
+        </div>
+        ${editBtn}
+        ${deleteBtn}
+      </li>`;
+  };
+
+  let html = uncategorized.map(renderRow).join('');
+
+  for (const cat of CATEGORY_ORDER) {
+    const group = grouped[cat];
+    if (!group || !group.length) continue;
+    html += `<li class="task-category-header">${esc(cat)}</li>`;
+    html += group.map(renderRow).join('');
+  }
+
+  els.tasksList.innerHTML = html;
+}
 function renderStreaksView(state) {
   const tracked = state.tasks.filter(t =>
     t.recurrence && t.recurrence.type === 'daily' && t.trackStreak
@@ -3264,7 +3330,21 @@ els.views.todo.addEventListener('click', (e) => {
   const id = row.dataset.taskId;
   if (action === 'task-toggle') Store.toggleTaskToday(id);
   if (action === 'task-delete') {
-    if (confirm('Delete this task?')) Store.removeTask(id);
+    const task = Store.get().tasks.find(t => t.id === id);
+    if (!task) return;
+    if (task.recurrence) {
+      showRecurringDeleteDialog(task).then(choice => {
+        if (choice === 'skip') {
+          const today = Store.get().today;
+          const nextDates = [...(task.completedDates || []), 'skip:' + today];
+          Store.updateTask(id, { completedDates: nextDates });
+        } else if (choice === 'all') {
+          Store.removeTask(id);
+        }
+      });
+    } else {
+      if (confirm('Delete this task?')) Store.removeTask(id);
+    }
   }
   if (action === 'task-edit') {
     const task = Store.get().tasks.find(t => t.id === id);
