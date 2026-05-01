@@ -627,6 +627,93 @@
   .confirm-btn.danger { color: var(--danger); border-color: var(--danger); }
   .confirm-btn.muted { color: var(--text-dim); background: transparent; border-color: transparent; }
 
+  /* Task-level analytics panel */
+  .task-analytics-panel {
+    list-style: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px 18px;
+  }
+  .analytics-stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .analytics-stat {
+    flex: 1;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .analytics-stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .analytics-stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .analytics-cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .analytics-cal-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .analytics-cal-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 4px 6px;
+    cursor: pointer;
+    line-height: 1;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .analytics-cal-nav-btn:disabled { opacity: 0.25; cursor: default; }
+  .analytics-cal-nav-btn:not(:disabled):active { background: var(--surface-2); }
+  .analytics-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .analytics-cal-dow {
+    font-size: 9px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-faint);
+    padding: 2px 0 4px;
+    text-transform: uppercase;
+  }
+  .analytics-cal-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-faint);
+  }
+  .analytics-cal-cell.sched { color: var(--text-dim); }
+  .analytics-cal-cell.done  { background: rgba(16,185,129,0.15); color: var(--success); }
+  .analytics-cal-cell.miss  { background: rgba(239,68,68,0.10);  color: var(--danger); }
+  .analytics-cal-cell.skip  { opacity: 0.35; color: var(--text-faint); }
+  .analytics-cal-cell.is-today { box-shadow: inset 0 0 0 1px var(--border); }
+  .icon-btn.active { color: var(--text); background: var(--surface-2); }
+
   /* Analytics category breakdown rows */
   .category-list {
     list-style: none;
@@ -2372,6 +2459,9 @@ const flameIcon = svgIcon(14, '<path d="M12 2c1 4 5 5 5 10a5 5 0 1 1-10 0 5 5 0 
 const flameLgIcon = svgIcon(28, '<path d="M12 2c1 4 5 5 5 10a5 5 0 1 1-10 0 5 5 0 0 1 2-4c0 2 1 3 3 3-1-3 0-6 0-9z"/>');
 const repeatIcon = svgIcon(12, '<polyline points="17 1 21 5 17 9"/><path d="M3 11v-2a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>');
 const restoreIcon = svgIcon(12, '<polyline points="3 7 8 7 8 12"/><path d="M3.5 13a9 9 0 1 0 2.4-7.5L3 8"/>');
+const barChartIcon = svgIcon(15, '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>');
+const chevronLeftIcon = svgIcon(14, '<polyline points="15 18 9 12 15 6"/>');
+const chevronRightIcon = svgIcon(14, '<polyline points="9 18 15 12 9 6"/>');
 
 const els = {
   tabs: document.querySelectorAll('.tab'),
@@ -2797,6 +2887,105 @@ function renderLockBanner(state) {
   } // end if (false) — lock banner disabled
 }
 
+// ---- Per-task analytics panel state ----
+const analyticsOpen = new Map();
+
+function getTaskAnalytics(task, today) {
+  const recurrence = task.recurrence;
+  if (!recurrence) return null;
+  const daysOfWeek = (recurrence.daysOfWeek) || [];
+  const startDate = (task.startedAt || '').slice(0, 10) || today;
+  const rawDates = task.completedDates || [];
+  const completedSet = new Set(rawDates.filter(d => !d.startsWith('skip:')));
+  const skippedSet  = new Set(rawDates.filter(d => d.startsWith('skip:')).map(d => d.slice(5)));
+  const allScheduled = [];
+  const cur = new Date(startDate + 'T00:00:00');
+  const todayDate = new Date(today + 'T00:00:00');
+  while (cur <= todayDate) {
+    const iso = cur.toISOString().slice(0, 10);
+    if (daysOfWeek.includes(cur.getDay())) allScheduled.push(iso);
+    cur.setDate(cur.getDate() + 1);
+  }
+  const pastScheduled = allScheduled.filter(d => d < today);
+  const completedPast = pastScheduled.filter(d => completedSet.has(d));
+  const pct = pastScheduled.length > 0 ? Math.round(100 * completedPast.length / pastScheduled.length) : null;
+  let bestStreak = 0, runStreak = 0;
+  for (const d of allScheduled) {
+    if (completedSet.has(d)) { runStreak++; if (runStreak > bestStreak) bestStreak = runStreak; }
+    else if (d < today) { runStreak = 0; }
+  }
+  let currentStreak = 0;
+  for (let i = allScheduled.length - 1; i >= 0; i--) {
+    const d = allScheduled[i];
+    if (completedSet.has(d)) { currentStreak++; }
+    else if (d <= today) break;
+  }
+  return { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate };
+}
+
+function renderAnalyticsPanel(task, today) {
+  const openState = analyticsOpen.get(task.id) || { monthOffset: 0 };
+  const analytics = getTaskAnalytics(task, today);
+  if (!analytics) return '';
+  const { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate } = analytics;
+  const pctDisplay = pct === null ? '--' : pct + '%';
+  const statsHTML = `
+    <div class="analytics-stats">
+      <div class="analytics-stat">
+        <div class="analytics-stat-val">${pctDisplay}</div>
+        <div class="analytics-stat-label">Completion</div>
+      </div>
+      <div class="analytics-stat">
+        <div class="analytics-stat-val">${bestStreak}</div>
+        <div class="analytics-stat-label">Best streak</div>
+      </div>
+      <div class="analytics-stat">
+        <div class="analytics-stat-val">${currentStreak}</div>
+        <div class="analytics-stat-label">Current streak</div>
+      </div>
+    </div>`;
+  const monthOffset = openState.monthOffset;
+  const todayDate = new Date(today + 'T00:00:00');
+  const firstOfMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + monthOffset, 1);
+  const year = firstOfMonth.getFullYear();
+  const month = firstOfMonth.getMonth();
+  const monthLabel = firstOfMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startFirstOfMonth = new Date(startDate + 'T00:00:00');
+  const canPrev = firstOfMonth > startFirstOfMonth;
+  const canNext = firstOfMonth < new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+  const DOW = ['S','M','T','W','T','F','S'];
+  let calHTML = DOW.map(d => `<div class="analytics-cal-dow">${d}</div>`).join('');
+  for (let i = 0; i < new Date(year, month, 1).getDay(); i++) calHTML += `<div class="analytics-cal-cell"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso = year + '-' + String(month + 1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const dayOfWeek = new Date(iso + 'T00:00:00').getDay();
+    const isScheduled = daysOfWeek.includes(dayOfWeek) && iso >= startDate;
+    const isDone = completedSet.has(iso);
+    const isSkipped = skippedSet.has(iso);
+    const isPast = iso < today;
+    const isToday = iso === today;
+    let cls = 'analytics-cal-cell';
+    let inner = day;
+    if (isScheduled) {
+      if (isDone) { cls += ' done'; inner = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12 10 17 19 8"/></svg>`; }
+      else if (isSkipped) { cls += ' skip'; inner = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`; }
+      else if (isPast) { cls += ' miss'; inner = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`; }
+      else { cls += ' sched'; }
+    }
+    if (isToday) cls += ' is-today';
+    calHTML += `<div class="${cls}">${inner}</div>`;
+  }
+  const calNavHTML = `
+    <div class="analytics-cal-nav">
+      <button class="analytics-cal-nav-btn" data-action="analytics-prev" ${canPrev ? '' : 'disabled'}>${chevronLeftIcon}</button>
+      <span class="analytics-cal-title">${monthLabel}</span>
+      <button class="analytics-cal-nav-btn" data-action="analytics-next" ${canNext ? '' : 'disabled'}>${chevronRightIcon}</button>
+    </div>
+    <div class="analytics-cal-grid">${calHTML}</div>`;
+  return `<li class="task-analytics-panel" data-task-id="${task.id}">${statsHTML}${calNavHTML}</li>`;
+}
+
 function renderTasksView(state) {
   if (!selectedDateISO) selectedDateISO = state.today;
   renderDateNav(state);
@@ -2854,18 +3043,23 @@ function renderTasksView(state) {
     }
     if (t.parentTaskId) badges.push(`<span class="badge">${restoreIcon} from missed</span>`);
     const sub = badges.length ? `<div class="row-sub">${badges.join('')}</div>` : '';
+    const isOpen = analyticsOpen.has(t.id);
+    const analyticsBtn = t.recurrence
+      ? `<button class="icon-btn${isOpen ? ' active' : ''}" data-action="task-analytics" aria-label="View task data">${barChartIcon}</button>`
+      : '';
     const editBtn = `<button class="icon-btn" data-action="task-edit" aria-label="Edit task">${pencilIcon}</button>`;
     const deleteBtn = `<button class="icon-btn danger" data-action="task-delete" aria-label="Delete task">${trashIcon}</button>`;
-    return `
+    const row = `
       <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
         <button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
         <div class="row-body">
           <div class="row-text">${esc(t.text)}</div>
           ${sub}
         </div>
-        ${editBtn}
-        ${deleteBtn}
+        ${analyticsBtn}${editBtn}${deleteBtn}
       </li>`;
+    const panel = isOpen ? renderAnalyticsPanel(t, state.today) : '';
+    return row + panel;
   };
 
   let html = uncategorized.map(renderRow).join('');
@@ -3353,6 +3547,27 @@ els.views.todo.addEventListener('click', (e) => {
     openDock();
     setTopAction();
     setTimeout(() => els.taskInput.focus(), 300);
+  }
+  if (action === 'task-analytics') {
+    if (analyticsOpen.has(id)) {
+      analyticsOpen.delete(id);
+    } else {
+      analyticsOpen.set(id, { monthOffset: 0 });
+    }
+    render(Store.get());
+    return;
+  }
+  if (action === 'analytics-prev') {
+    const cur = analyticsOpen.get(id) || { monthOffset: 0 };
+    analyticsOpen.set(id, { monthOffset: cur.monthOffset - 1 });
+    render(Store.get());
+    return;
+  }
+  if (action === 'analytics-next') {
+    const cur = analyticsOpen.get(id) || { monthOffset: 0 };
+    analyticsOpen.set(id, { monthOffset: cur.monthOffset + 1 });
+    render(Store.get());
+    return;
   }
 });
 
