@@ -12,6 +12,11 @@ function sanitizeCategory(v) {
       return typeof v === 'string' && VALID_CATEGORIES.has(v) ? v : null;
 }
 
+function sanitizeTime(v) {
+  // Accept HH:MM in 24-hour format only
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+}
+
 function shape(t) {
       return {
               id: t.id,
@@ -22,6 +27,7 @@ function shape(t) {
               recurrence: t.recurrence,
               trackStreak: t.trackStreak,
               category: t.category,
+              scheduledTime: t.scheduledTime || null,
               done: t.done,
               completedDates: t.completedDates,
               createdAt: t.createdAt.getTime ? t.createdAt.getTime() : t.createdAt,
@@ -84,7 +90,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-      const { text, startedAt, recurrence, trackStreak, category, scheduledDate } = req.body || {};
+      const { text, startedAt, recurrence, trackStreak, category, scheduledDate, scheduledTime } = req.body || {};
       const trimmed = typeof text === 'string' ? text.trim() : '';
       if (!trimmed) return res.status(400).json({ error: 'text required' });
 
@@ -107,6 +113,7 @@ router.post('/', async (req, res) => {
                         recurrence: recurrence || null,
                         trackStreak: !!(isDaily && trackStreak),
                         category: sanitizeCategory(category),
+                        scheduledTime: sanitizeTime(scheduledTime),
                         done: false,
                         completedDates: [],
               },
@@ -120,12 +127,15 @@ router.patch('/:id', async (req, res) => {
       if (!existing || existing.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
 
                const data = {};
-      const allowed = ['text', 'startedAt', 'recurrence', 'trackStreak', 'done', 'completedDates', 'category', 'scheduledDate'];
+      const allowed = ['text', 'startedAt', 'recurrence', 'trackStreak', 'done', 'completedDates', 'category', 'scheduledDate', 'scheduledTime'];
       for (const key of allowed) {
               if (Object.prototype.hasOwnProperty.call(req.body || {}, key)) data[key] = req.body[key];
       }
       if (Object.prototype.hasOwnProperty.call(data, 'category')) {
               data.category = sanitizeCategory(data.category);
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'scheduledTime')) {
+              data.scheduledTime = sanitizeTime(data.scheduledTime);
       }
 
                const onlyCompletionFields = Object.keys(data).every(k => k === 'done' || k === 'completedDates');
