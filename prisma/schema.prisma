@@ -59,6 +59,8 @@ model Task {
   trackStreak     Boolean  @default(false)
   // One of: Family, Fitness, Career, Self-Improvement, Other. Drives analytics breakdown.
   category        String?
+  // Preferred time of day (24-hour "HH:MM"). Used for Chronological view grouping.
+  scheduledTime   String?
   // DEPRECATED — left in schema so `prisma db push` doesn't have to drop the
   // column on deploy (which requires --accept-data-loss). Never read or
   // written by application code; safe to remove in a future migration window.
