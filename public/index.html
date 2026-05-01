@@ -434,7 +434,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    margin: 4px 0 4px;
+    margin: 4px 0 0;
   }
   .stat-strip[hidden] { display: none; }
   .stat-ring {
@@ -565,16 +565,22 @@
     padding-right: 40px;
   }
 
-  /* Task list category section headers */
-  .task-category-header {
-    list-style: none;
-    padding: 10px 16px 5px;
+  /* Stack of per-group task cards (one card per category / time-of-day) */
+  .tasks-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  /* Header inside each category / time-of-day card */
+  .task-card-header {
+    padding: 12px 16px 4px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--text-dim);
-    border-top: 1px solid var(--border);
   }
 
   /* Recurring-delete confirmation sheet */
@@ -745,17 +751,6 @@
     border-color: var(--accent);
   }
 
-  /* Time-of-day group headers (Chronological mode, same look as category headers) */
-  .task-time-header {
-    list-style: none;
-    padding: 10px 16px 5px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    border-top: 1px solid var(--border);
-  }
 
   /* Drag handle for Custom sort mode */
   .drag-handle {
@@ -1730,12 +1725,10 @@
         </div>
 
         <div class="section-title" id="tasks-title">Tasks</div>
-        <div class="card">
-          <ul class="list" id="tasks-list"></ul>
-          <div class="empty" id="tasks-empty">
-            <div class="empty-title">Nothing on the list</div>
-            <div id="tasks-empty-sub">Add a task below to get moving.</div>
-          </div>
+        <div id="tasks-list" class="tasks-stack"></div>
+        <div class="empty card" id="tasks-empty" style="display:none">
+          <div class="empty-title">Nothing on the list</div>
+          <div id="tasks-empty-sub">Add a task below to get moving.</div>
         </div>
       </section>
 
@@ -3257,6 +3250,15 @@ function renderTasksView(state) {
     });
   }
 
+  // Wrap a sorted task array in a card. Optional header label appears above
+  // the rows; pass null/'' for an unlabeled card (used by recent/custom).
+  const cardHTML = (label, tasks) => {
+    if (!tasks.length) return '';
+    const rows = tasks.map(renderRow).join('');
+    const header = label ? `<div class="task-card-header">${esc(label)}</div>` : '';
+    return `<div class="card">${header}<ul class="list">${rows}</ul></div>`;
+  };
+
   let html = '';
 
   if (taskViewMode === 'category') {
@@ -3267,22 +3269,24 @@ function renderTasksView(state) {
         (grouped[t.category] = grouped[t.category] || []).push(t);
       } else { uncategorized.push(t); }
     }
-    html = sortGroup(uncategorized, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+    const byCreated = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+    // Uncategorized tasks (legacy data) go in their own unlabeled card on top.
+    html += cardHTML('', sortGroup(uncategorized, byCreated));
     for (const cat of CATEGORY_ORDER) {
       const grp = grouped[cat];
       if (!grp || !grp.length) continue;
-      html += `<li class="task-category-header">${esc(cat)}</li>`;
-      html += sortGroup(grp, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+      html += cardHTML(cat, sortGroup(grp, byCreated));
     }
 
   } else if (taskViewMode === 'recent') {
-    html = sortGroup(allTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
+    const sorted = sortGroup(allTasks, (a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    html = cardHTML('', sorted);
 
   } else if (taskViewMode === 'chronological') {
     const morning = [], afternoon = [], evening = [], anyTime = [];
     for (const t of allTasks) {
       const tm = t.scheduledTime;
-      if (!tm)             anyTime.push(t);
+      if (!tm)               anyTime.push(t);
       else if (tm < '12:00') morning.push(t);
       else if (tm < '17:00') afternoon.push(t);
       else                   evening.push(t);
@@ -3295,9 +3299,7 @@ function renderTasksView(state) {
       { label: 'Any Time',  tasks: anyTime },
     ];
     for (const { label, tasks } of groups) {
-      if (!tasks.length) continue;
-      html += `<li class="task-time-header">${label}</li>`;
-      html += sortGroup(tasks, timeSort).map(renderRow).join('');
+      html += cardHTML(label, sortGroup(tasks, timeSort));
     }
 
   } else if (taskViewMode === 'custom') {
@@ -3305,13 +3307,13 @@ function renderTasksView(state) {
     const sorted = [...allTasks].sort((a, b) => {
       const ai = order.indexOf(a.id);
       const bi = order.indexOf(b.id);
-      if (ai === -1 && bi === -1) return (a.createdAt||0)-(b.createdAt||0);
+      if (ai === -1 && bi === -1) return (a.createdAt || 0) - (b.createdAt || 0);
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
     });
-    // In custom mode we respect the user's order even for done tasks
-    html = sorted.map(renderRow).join('');
+    // Custom mode keeps user-chosen order even for completed tasks.
+    html = cardHTML('', sorted);
   }
 
   els.tasksList.innerHTML = html;
