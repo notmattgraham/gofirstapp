@@ -2811,8 +2811,11 @@ function taskScheduledFor(t, dayISO) {
     const days = (t.recurrence.daysOfWeek) || [];
     return days.includes(new Date(dayISO + 'T00:00:00').getDay());
   }
-  const sched = t.scheduledDate || dayISO;
-  return sched === dayISO;
+  const sched = t.scheduledDate;
+  if (!sched) return true; // no scheduled date → always visible
+  if (sched > dayISO) return false; // scheduled for a future day relative to selected date
+  if (t.done && sched < dayISO) return false; // completed on a past day → don't roll forward
+  return true; // incomplete past tasks roll forward into today and beyond
 }
 
 function isTaskDoneOn(t, dayISO) {
