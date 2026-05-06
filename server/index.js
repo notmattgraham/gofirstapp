@@ -135,10 +135,37 @@ global.wsBroadcast = wsBroadcast;
 
 const wss = new WebSocketServer({ noServer: true });
 
-wss.on('connection', (ws, userId) => {
+wss.on('connection', (ws, userId, info) => {
   // Register the socket.
   if (!wsClients.has(userId)) wsClients.set(userId, new Set());
   wsClients.get(userId).add(ws);
+
+  // Cache role on the socket so per-message lookups don't hit the DB.
+  ws._userId = userId;
+  ws._isCoach = !!info?.isCoach;
+  ws._isClient = !!info?.coachingClient;
+  ws._coachId = info?.coachId || null;
+
+  ws.on('message', async (raw) => {
+    let msg;
+    try { msg = JSON.parse(String(raw)); } catch { return; }
+    if (!msg || msg.type !== 'typing') return;
+
+    // Resolve recipient based on the sender's role:
+    //   coach   → typing to msg.to (a coaching client they're chatting with)
+    //   client  → typing to the coach
+    let to = null;
+    if (ws._isCoach) {
+      to = typeof msg.to === 'string' ? msg.to : null;
+    } else if (ws._isClient) {
+      to = ws._coachId;
+    }
+    if (!to || to === userId) return;
+
+    // Forward — recipient's UI shows the indicator until the trailing
+    // timeout expires. We don't store anything; this is fire-and-forget.
+    wsBroadcast(to, { type: 'typing', from: userId });
+  });
 
   ws.on('close', () => {
     const set = wsClients.get(userId);
@@ -186,8 +213,17 @@ server.on('upgrade', async (request, socket, head) => {
       socket.destroy(); return;
     }
 
+    // Resolve the coach id once at upgrade time so client-side typing events
+    // can be forwarded without an extra DB hit per keystroke.
+    let coachId = null;
+    if (user.coachingClient && !isCoach) {
+      const coach = await prisma.user.findFirst({ where: { isCoach: true } })
+        || await prisma.user.findFirst({ where: { email: { equals: COACH_EMAIL, mode: 'insensitive' } } });
+      coachId = coach?.id || null;
+    }
+
     wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, userId);
+      wss.emit('connection', ws, userId, { isCoach, coachingClient: user.coachingClient, coachId });
     });
   } catch (e) {
     console.error('[ws upgrade error]', e);

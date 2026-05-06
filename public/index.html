@@ -1871,6 +1871,36 @@
     padding: 0 4px;
   }
 
+  /* Typing indicator — three animated dots in an iMessage-style bubble */
+  .typing-indicator {
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin: 4px 14px 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    padding: 11px 14px;
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    width: fit-content;
+  }
+  .typing-indicator[hidden] { display: none !important; }
+  .typing-indicator span {
+    width: 7px;
+    height: 7px;
+    background: var(--text-faint);
+    border-radius: 50%;
+    animation: typingBounce 1.2s infinite;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
   /* Chat input bar */
   .chat-input-wrap {
     flex-shrink: 0;
@@ -2279,6 +2309,9 @@
               <div class="chat-empty-sub">Your coach will see your tasks and analytics to give you the best guidance.</div>
             </div>
           </div>
+          <div class="typing-indicator" id="chat-typing" hidden aria-label="Coach is typing">
+            <span></span><span></span><span></span>
+          </div>
           <div class="chat-input-wrap">
             <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
             <button class="chat-send" id="chat-send" disabled aria-label="Send">
@@ -2574,6 +2607,9 @@
         <div class="client-summary-body" id="client-summary-body">Loading…</div>
       </details>
       <div class="chat-messages" id="coach-chat-messages"></div>
+      <div class="typing-indicator" id="coach-typing" hidden aria-label="Client is typing">
+        <span></span><span></span><span></span>
+      </div>
       <div class="chat-input-wrap">
         <textarea class="chat-input" id="coach-chat-input" placeholder="Reply to client..." maxlength="4000" rows="1"></textarea>
         <button class="chat-send" id="coach-chat-send" disabled aria-label="Send">
@@ -4927,6 +4963,7 @@ const Coaching = (() => {
       try {
         const ev = JSON.parse(e.data);
         if (ev.type === 'message') onIncoming(ev.message);
+        else if (ev.type === 'typing') handleTyping(ev.from);
       } catch {}
     });
     ws.addEventListener('close', () => {
@@ -4945,7 +4982,11 @@ const Coaching = (() => {
       if (!coachMessages[cid]) coachMessages[cid] = [];
       if (coachMessages[cid].some(m => m.id === message.id)) return;
       coachMessages[cid].push(message);
-      if (currentClientId === cid) renderCoachMessages(cid);
+      if (currentClientId === cid) {
+        renderCoachMessages(cid);
+        // The message is here, so the client is no longer typing.
+        if (message.fromUserId === cid) hideTyping('coach');
+      }
       loadCoachThreads();
       if (message.fromUserId !== me.id) {
         const convoOpen = currentClientId === cid &&
@@ -4956,6 +4997,7 @@ const Coaching = (() => {
       if (clientMessages.some(m => m.id === message.id)) return;
       clientMessages.push(message);
       renderClientMessages();
+      if (message.fromUserId !== me.id) hideTyping('client');
       if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
     }
   }
@@ -5012,8 +5054,13 @@ const Coaching = (() => {
     document.getElementById('chat-send').disabled = true;
     try {
       const { message } = await api('POST', '/api/messages', { content });
-      clientMessages.push(message);
-      renderClientMessages();
+      // The server also echoes this message back over the WebSocket. If the
+      // WS event raced ahead and onIncoming already pushed it, skip the
+      // optimistic push here so we don't render two bubbles.
+      if (!clientMessages.some(m => m.id === message.id)) {
+        clientMessages.push(message);
+        renderClientMessages();
+      }
     } catch { banner('Could not send message', true); }
   }
 
@@ -5066,6 +5113,7 @@ const Coaching = (() => {
 
   async function openClientConvo(clientId) {
     currentClientId = clientId;
+    hideTyping('coach'); // clear any stale indicator from a previous thread
     const thread = coachThreads.find(t => t.client.id === clientId);
     if (!thread) return;
     const name    = thread.client.name || thread.client.email || 'Client';
@@ -5129,8 +5177,11 @@ const Coaching = (() => {
     try {
       const { message } = await api('POST', '/api/messages', { content, toUserId: currentClientId });
       if (!coachMessages[currentClientId]) coachMessages[currentClientId] = [];
-      coachMessages[currentClientId].push(message);
-      renderCoachMessages(currentClientId);
+      // Skip the optimistic push if the WS echo already raced in and added it.
+      if (!coachMessages[currentClientId].some(m => m.id === message.id)) {
+        coachMessages[currentClientId].push(message);
+        renderCoachMessages(currentClientId);
+      }
     } catch { banner('Could not send message', true); }
   }
 
@@ -5178,6 +5229,59 @@ const Coaching = (() => {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px';
   }
 
+  /* ── Typing indicator ─────────────────────────────────────
+     Send a `typing` event over the WS while the user is editing,
+     throttled to once every 2s so we don't flood. The receiving side
+     auto-hides 3.5s after the last event, or as soon as a message
+     arrives (because then they're clearly done typing). */
+  let _typingThrottle = 0;
+  function emitTyping(toId) {
+    const now = Date.now();
+    if (now - _typingThrottle < 2000) return;
+    _typingThrottle = now;
+    if (!ws || ws.readyState !== 1) return;
+    const payload = { type: 'typing' };
+    if (toId) payload.to = toId;
+    try { ws.send(JSON.stringify(payload)); } catch {}
+  }
+
+  let _clientTypingHide = null;
+  let _coachTypingHide  = null;
+  function handleTyping(fromId) {
+    const me = Auth.user;
+    if (!me) return;
+    if (me.isCoach) {
+      // Only show in the convo overlay if it's the open thread.
+      if (fromId !== currentClientId) return;
+      const el = document.getElementById('coach-typing');
+      if (!el) return;
+      el.hidden = false;
+      const c = document.getElementById('coach-chat-messages');
+      if (c) c.scrollTop = c.scrollHeight;
+      clearTimeout(_coachTypingHide);
+      _coachTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
+    } else if (me.coachingClient) {
+      const el = document.getElementById('chat-typing');
+      if (!el) return;
+      el.hidden = false;
+      const c = document.getElementById('chat-messages');
+      if (c) c.scrollTop = c.scrollHeight;
+      clearTimeout(_clientTypingHide);
+      _clientTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
+    }
+  }
+  function hideTyping(forSide /* 'client' | 'coach' */) {
+    if (forSide === 'client') {
+      const el = document.getElementById('chat-typing');
+      if (el) el.hidden = true;
+      clearTimeout(_clientTypingHide);
+    } else if (forSide === 'coach') {
+      const el = document.getElementById('coach-typing');
+      if (el) el.hidden = true;
+      clearTimeout(_coachTypingHide);
+    }
+  }
+
   /* ── Public event wiring (called once from boot) ─────────── */
   function wireEvents() {
     // Client chat send
@@ -5187,6 +5291,8 @@ const Coaching = (() => {
       chatInput.addEventListener('input', () => {
         autoResizeTextarea(chatInput);
         if (chatSend) chatSend.disabled = !chatInput.value.trim();
+        // Notify the coach the client is typing (server resolves the recipient).
+        if (chatInput.value.trim()) emitTyping();
       });
       chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendClientMessage(); }
@@ -5201,6 +5307,8 @@ const Coaching = (() => {
       coachInput.addEventListener('input', () => {
         autoResizeTextarea(coachInput);
         if (coachSend) coachSend.disabled = !coachInput.value.trim();
+        // Notify the open client thread the coach is typing.
+        if (coachInput.value.trim() && currentClientId) emitTyping(currentClientId);
       });
       coachInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCoachMessage(); }
