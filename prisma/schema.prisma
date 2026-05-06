@@ -40,6 +40,11 @@ model User {
   // the original coach account works before anyone is flagged in the DB.
   isCoach             Boolean  @default(false)
 
+  // Updated by the trackLastSeen middleware on authenticated requests
+  // (throttled to 1 write/min/user). Drives the "Active now / 5m ago"
+  // presence display in the chat header.
+  lastSeenAt          DateTime?
+
   tasks          Task[]
   quitStreaks    QuitStreak[]
   sentMessages   Message[] @relation("SentMessages")
