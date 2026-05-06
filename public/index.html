@@ -6189,6 +6189,8 @@ const Coaching = (() => {
       || 'Client';
     const titleEl = document.getElementById('client-summary-title');
     if (titleEl) titleEl.textContent = `${firstName}'s data`;
+    const replyInput = document.getElementById('coach-chat-input');
+    if (replyInput) replyInput.placeholder = `Reply to ${firstName}...`;
     const av = document.getElementById('coach-client-avatar');
     if (av) {
       av.innerHTML = thread.client.picture
@@ -6360,7 +6362,9 @@ const Coaching = (() => {
     const streakEls = [...scope.querySelectorAll('[data-animate-streak]')];
     const ringEls   = [...scope.querySelectorAll('[data-animate-ring]')];
     const start = performance.now();
-    const dur = 700;
+    // Match the Analytics tab's 900ms runner so the convo panel doesn't
+    // feel snappier-than-expected when both are visible in the same flow.
+    const dur = 900;
     function step(now) {
       const t = Math.min(1, (now - start) / dur);
       const eased = 1 - Math.pow(1 - t, 3);
@@ -6724,6 +6728,77 @@ async function boot() {
 }
 
 boot();
+
+/* Smooth open/close animation for every <details> in the app.
+   Native <details> snaps; we hijack the summary click, animate the body
+   wrapper's height, and toggle the open attribute at the right moment.
+   Wrapping the body in a `.details-content` div lets us animate height
+   without measuring individual children. Idempotent: marked via dataset
+   so a re-call is a no-op. */
+function smoothDetails(detailsEl) {
+  if (detailsEl.dataset.smoothWired === '1') return;
+  const summary = detailsEl.querySelector(':scope > summary');
+  if (!summary) return;
+  detailsEl.dataset.smoothWired = '1';
+
+  // Move every non-summary child into a wrapper we can animate.
+  let body = detailsEl.querySelector(':scope > .details-content');
+  if (!body) {
+    body = document.createElement('div');
+    body.className = 'details-content';
+    while (detailsEl.children.length > 1) body.appendChild(detailsEl.children[1]);
+    detailsEl.appendChild(body);
+  }
+
+  let animating = false;
+  summary.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (animating) return;
+    animating = true;
+
+    if (detailsEl.open) {
+      // Close: animate from current height down to 0, THEN clear `open`.
+      const startH = body.scrollHeight;
+      body.style.overflow = 'hidden';
+      body.style.height = startH + 'px';
+      // Force reflow so the next height change actually transitions.
+      void body.offsetHeight;
+      body.style.transition = 'height 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+      body.style.height = '0px';
+      const onEnd = () => {
+        body.removeEventListener('transitionend', onEnd);
+        detailsEl.open = false;
+        body.style.transition = '';
+        body.style.height = '';
+        body.style.overflow = '';
+        animating = false;
+      };
+      body.addEventListener('transitionend', onEnd);
+    } else {
+      // Open: set `open` first so we can measure scrollHeight, then
+      // animate from 0 → measured height.
+      detailsEl.open = true;
+      const targetH = body.scrollHeight;
+      body.style.overflow = 'hidden';
+      body.style.height = '0px';
+      void body.offsetHeight;
+      body.style.transition = 'height 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+      body.style.height = targetH + 'px';
+      const onEnd = () => {
+        body.removeEventListener('transitionend', onEnd);
+        body.style.transition = '';
+        body.style.height = '';
+        body.style.overflow = '';
+        animating = false;
+      };
+      body.addEventListener('transitionend', onEnd);
+    }
+  });
+}
+
+// Wire every existing details on first paint. Our app has no dynamic
+// <details> elements, so a single pass at boot covers them all.
+document.querySelectorAll('details').forEach(smoothDetails);
 
 // Client-side keepalive: ping the server every 4 minutes while this tab is
 // open, preventing Railway from sleeping mid-session.
