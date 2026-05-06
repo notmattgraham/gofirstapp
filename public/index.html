@@ -537,6 +537,113 @@
   .week-day.is-today .week-day-label { color: var(--accent); }
   .week-day.is-future .week-day-letter { color: var(--text-faint); }
 
+  /* Month calendar dropdown — same conic-ring + circle aesthetic as the
+     week bar, but a 7-col grid showing every day of any month. */
+  .month-cal-wrap {
+    margin-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .month-cal-toggle {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 4px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .month-cal-toggle::-webkit-details-marker { display: none; }
+  .month-cal-toggle::after {
+    content: '';
+    margin-left: auto;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(45deg);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details[open] > .month-cal-toggle::after { transform: rotate(-135deg); }
+  .month-cal {
+    padding: 4px 4px 8px;
+  }
+  .month-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px 10px;
+  }
+  .month-cal-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .month-cal-nav {
+    appearance: none;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .month-cal-nav:active { background: var(--border); }
+  .month-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    text-align: center;
+    padding: 0 2px 6px;
+  }
+  .month-cal-weekdays span {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .month-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    padding: 0 2px;
+  }
+  .month-cal-day {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    position: relative;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+  }
+  .month-cal-day-num {
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .month-cal-day.is-today .month-cal-day-num {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .month-cal-day.is-other-month { opacity: 0.32; }
+  .month-cal-day.is-future .month-cal-day-num { color: var(--text-faint); }
+
   /* Best / Needs Work / Longest Streaks list rows */
   .rank-list {
     list-style: none;
@@ -722,6 +829,79 @@
     display: flex;
     align-items: flex-end;
   }
+
+  /* Profile-picture crop modal — drag to pan, pinch (or wheel) to zoom. */
+  .crop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px calc(24px + var(--safe-bottom));
+    gap: 18px;
+  }
+  .crop-stage {
+    position: relative;
+    width: min(86vw, 320px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+    user-select: none;
+    cursor: grab;
+  }
+  .crop-stage:active { cursor: grabbing; }
+  .crop-stage img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+    max-width: none;
+  }
+  .crop-stage-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+  }
+  .crop-hint {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    text-align: center;
+    max-width: 320px;
+  }
+  .crop-actions {
+    display: flex;
+    gap: 10px;
+    width: min(86vw, 320px);
+  }
+  .crop-actions button {
+    flex: 1;
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    height: 44px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .crop-actions button.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+  }
+  .crop-actions button:active { opacity: 0.85; }
   .confirm-sheet {
     width: 100%;
     background: var(--bg-elev);
@@ -2784,6 +2964,26 @@
         <div class="section-title">This week</div>
         <div class="card week-bar-card">
           <div id="analytics-week-bar" class="week-bar"></div>
+          <details class="month-cal-wrap" id="month-cal-wrap">
+            <summary class="month-cal-toggle">
+              <span class="month-cal-toggle-label">View month</span>
+            </summary>
+            <div class="month-cal" id="month-cal">
+              <div class="month-cal-header">
+                <button class="month-cal-nav" id="month-cal-prev" aria-label="Previous month">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="month-cal-label" id="month-cal-label">—</span>
+                <button class="month-cal-nav" id="month-cal-next" aria-label="Next month">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+              <div class="month-cal-weekdays">
+                <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+              </div>
+              <div class="month-cal-grid" id="month-cal-grid"></div>
+            </div>
+          </details>
         </div>
 
         <div class="section-title">Period</div>
@@ -3031,7 +3231,7 @@
         </div>
 
         <div class="field" id="time-field-task">
-          <span class="field-label">Time <span class="field-opt">(optional)</span></span>
+          <span class="field-label">Deadline <span class="field-opt">(optional)</span></span>
           <input type="time" class="field-input" id="task-time-input" />
         </div>
 
@@ -4223,6 +4423,10 @@ function closeCalendar() {
 // One-shots use their scheduledDate field.
 function taskScheduledFor(t, dayISO) {
   if (t.recurrence) {
+    // If the user chose "stop repeating going forward" the recurrence
+    // carries an exclusive end date — anything on or after that day is
+    // no longer scheduled, but past completions stay intact in analytics.
+    if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return false;
     // If the user chose "skip today" the date is stored as 'skip:YYYY-MM-DD'
     if ((t.completedDates || []).includes('skip:' + dayISO)) return false;
     // Don't show recurring tasks before their creation date
@@ -4770,8 +4974,15 @@ function countTaskInRange(t, start, end) {
     if (days.length) {
       const doneSet = new Set(t.completedDates || []);
       const startCursor = createdISO > start ? createdISO : start;
+      // If the user "stopped repeating" the task, recurrence ends before
+      // recurrence.endsBefore — clamp the end of the count window.
+      const endsBefore = t.recurrence.endsBefore;
+      let cursorEnd = effectiveEnd;
+      if (endsBefore && endsBefore <= cursorEnd) {
+        cursorEnd = addDaysISO(endsBefore, -1);
+      }
       let cursor = startCursor;
-      while (cursor <= effectiveEnd) {
+      while (cursor <= cursorEnd) {
         const dow = new Date(cursor + 'T00:00:00').getDay();
         if (days.includes(dow)) {
           scheduled++;
@@ -4838,6 +5049,18 @@ function paintTinyRing(el, rate) {
   }
   const color = rateColor(rate);
   el.style.background = `conic-gradient(${color} ${rate * 3.6}deg, var(--surface-2) 0deg)`;
+}
+
+/* Per-day execution rate for an arbitrary YYYY-MM-DD. Future dates
+   return null (countTaskInRange won't traverse past today). */
+function dayExecutionRate(state, iso) {
+  let scheduled = 0, completed = 0;
+  for (const t of state.tasks) {
+    const c = countTaskInRange(t, iso, iso);
+    scheduled += c.scheduled;
+    completed += c.completed;
+  }
+  return scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
 }
 
 /* Rate per day for the current Sun-Sat week. Future days return rate=null
@@ -4945,6 +5168,72 @@ function runAnalyticsAnimation() {
   _analyticsRaf = requestAnimationFrame(step);
 }
 
+/* Month-calendar state: which month the user is currently viewing inside
+   the "View month" dropdown. Defaults to the current month. */
+let _monthCalState = null;
+
+function ensureMonthCalState() {
+  if (_monthCalState) return;
+  const now = new Date();
+  _monthCalState = { year: now.getFullYear(), month: now.getMonth() };
+}
+
+function renderMonthCal(state) {
+  ensureMonthCalState();
+  const { year, month } = _monthCalState;
+  const labelEl = document.getElementById('month-cal-label');
+  const grid    = document.getElementById('month-cal-grid');
+  if (!labelEl || !grid) return;
+
+  const monthNames = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+  labelEl.textContent = `${monthNames[month]} ${year}`;
+
+  const todayStr = todayISO();
+  const first = new Date(year, month, 1);
+  const startDow = first.getDay();              // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // Pad with the tail of the previous month so the grid starts on Sunday.
+  const prevDays = new Date(year, month, 0).getDate();
+
+  const cells = [];
+  // Leading days (other-month, faded)
+  for (let i = startDow - 1; i >= 0; i--) {
+    const d = new Date(year, month - 1, prevDays - i);
+    cells.push({ d, otherMonth: true });
+  }
+  // Days in the displayed month
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ d: new Date(year, month, d), otherMonth: false });
+  }
+  // Trailing days to fill the final row
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].d;
+    const next = new Date(last);
+    next.setDate(last.getDate() + 1);
+    cells.push({ d: next, otherMonth: true });
+  }
+
+  grid.innerHTML = cells.map(({ d, otherMonth }) => {
+    const iso = toISO(d);
+    const isToday = iso === todayStr;
+    const isFuture = iso > todayStr;
+    const rate = isFuture ? null : dayExecutionRate(state, iso);
+    const cls = `month-cal-day${isToday ? ' is-today' : ''}${otherMonth ? ' is-other-month' : ''}${isFuture ? ' is-future' : ''}`;
+    return `
+      <div class="${cls}" data-month-cal-day data-rate="${rate == null ? '' : rate}">
+        <div class="month-cal-day-num">${d.getDate()}</div>
+      </div>`;
+  }).join('');
+
+  // Paint each ring with the same color tier as the week bar.
+  grid.querySelectorAll('[data-month-cal-day]').forEach(el => {
+    const raw = el.dataset.rate;
+    if (raw === '' || raw == null) { paintTinyRing(el, null); return; }
+    paintTinyRing(el, Number(raw));
+  });
+}
+
 function renderAnalyticsView(state) {
   // Off-tab? Skip entirely. We don't want to update the snapshot or fire
   // animations the user can't see — when they come back, setTab calls
@@ -5022,6 +5311,9 @@ function renderAnalyticsView(state) {
       weekEl.querySelectorAll('.week-day-ring').forEach(r => paintTinyRing(r, null));
     }
   }
+
+  // === Month calendar (dropdown under the week bar) ===
+  renderMonthCal(state);
 
   // === By Category ===
   const catList = document.getElementById('analytics-categories');
@@ -5192,6 +5484,23 @@ document.getElementById('analytics-period').addEventListener('change', (e) => {
   analyticsPeriod = e.target.value;
   renderAnalyticsView(Store.get());
 });
+
+// --- Month-calendar prev/next navigation ---
+(() => {
+  function step(dir) {
+    ensureMonthCalState();
+    let { year, month } = _monthCalState;
+    month += dir;
+    if (month < 0) { month = 11; year--; }
+    if (month > 11) { month = 0; year++; }
+    _monthCalState = { year, month };
+    renderMonthCal(Store.get());
+  }
+  const prev = document.getElementById('month-cal-prev');
+  const next = document.getElementById('month-cal-next');
+  if (prev) prev.addEventListener('click', () => step(-1));
+  if (next) next.addEventListener('click', () => step(1));
+})();
 
 // --- Dismiss the dock by swiping down on it, or tapping anywhere above it. ---
 (() => {
@@ -5438,6 +5747,13 @@ els.views.todo.addEventListener('click', (e) => {
           const today = Store.get().today;
           const nextDates = [...(task.completedDates || []), 'skip:' + today];
           Store.updateTask(id, { completedDates: nextDates });
+        } else if (choice === 'stop') {
+          // End the recurrence at the currently-viewed date. Past completions
+          // (and skip:* entries) are preserved so analytics keeps the user's
+          // history intact; only future occurrences disappear from the list.
+          const cutoff = selectedDateISO || Store.get().today;
+          const nextRecurrence = { ...task.recurrence, endsBefore: cutoff };
+          Store.updateTask(id, { recurrence: nextRecurrence });
         } else if (choice === 'all') {
           Store.removeTask(id);
         }
@@ -5782,7 +6098,8 @@ document.getElementById('edit-avatar-btn').addEventListener('click', () => {
     const file = input.files && input.files[0];
     if (!file) return;
     try {
-      const dataUrl = await fileToSquareDataURL(file, 256);
+      const dataUrl = await cropImageInteractive(file, 256);
+      if (!dataUrl) return; // user cancelled
       banner('Uploading…', false, 4000);
       await Auth.updateMe({ picture: dataUrl });
       renderProfile();
@@ -5821,6 +6138,195 @@ function fileToSquareDataURL(file, size) {
   });
 }
 
+/* Interactive crop modal for profile pictures.
+   Returns a Promise resolving to a `size`×`size` JPEG data URL, or null if
+   the user cancelled. The user can drag (one finger / mouse) to pan and
+   pinch (two fingers / wheel) to zoom; the visible circle defines the
+   crop. Initial scale is "cover" so the entire stage is filled. */
+function cropImageInteractive(file, size) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.onload = () => openCropUI(img, size, resolve);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function openCropUI(img, size, done) {
+  const overlay = document.createElement('div');
+  overlay.className = 'crop-overlay';
+  overlay.innerHTML = `
+    <div class="crop-stage" id="crop-stage">
+      <img alt="" />
+      <div class="crop-stage-ring"></div>
+    </div>
+    <div class="crop-hint">Drag to reposition · pinch (or scroll) to zoom</div>
+    <div class="crop-actions">
+      <button data-act="cancel">Cancel</button>
+      <button class="primary" data-act="save">Use photo</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const stage = overlay.querySelector('.crop-stage');
+  const imgEl = stage.querySelector('img');
+  imgEl.src = img.src;
+
+  // Stage size (square, in CSS px). Clamp to a sane minimum.
+  const stageRect = stage.getBoundingClientRect();
+  const stageW = stageRect.width || 280;
+  const stageH = stageW;
+
+  // Initial "cover" scale so the image fills the circle.
+  const minScale = Math.max(stageW / img.naturalWidth, stageH / img.naturalHeight);
+  const maxScale = minScale * 5;
+  let scale = minScale;
+  // Center the image inside the stage.
+  let offX = (stageW - img.naturalWidth * scale) / 2;
+  let offY = (stageH - img.naturalHeight * scale) / 2;
+
+  function clampOffsets() {
+    const dispW = img.naturalWidth * scale;
+    const dispH = img.naturalHeight * scale;
+    // Ensure the image still covers the stage (no gaps).
+    const minX = stageW - dispW;
+    const minY = stageH - dispH;
+    if (offX > 0) offX = 0;
+    if (offY > 0) offY = 0;
+    if (offX < minX) offX = minX;
+    if (offY < minY) offY = minY;
+  }
+
+  function paint() {
+    imgEl.style.width  = img.naturalWidth + 'px';
+    imgEl.style.height = img.naturalHeight + 'px';
+    imgEl.style.transform = `translate(${offX}px, ${offY}px) scale(${scale})`;
+  }
+  paint();
+
+  // --- Pan + pinch tracking ---
+  let active = null; // { kind: 'pan'|'pinch', ... }
+
+  function pointFromEvent(e) {
+    const t = e.touches && e.touches[0];
+    return t
+      ? { x: t.clientX, y: t.clientY }
+      : { x: e.clientX, y: e.clientY };
+  }
+  function pinchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+  function pinchCenter(touches, rect) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
+      y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top,
+    };
+  }
+  function applyZoomAt(newScale, anchor) {
+    newScale = Math.max(minScale, Math.min(maxScale, newScale));
+    // Keep the image point under `anchor` fixed across the zoom.
+    const imgX = (anchor.x - offX) / scale;
+    const imgY = (anchor.y - offY) / scale;
+    scale = newScale;
+    offX = anchor.x - imgX * scale;
+    offY = anchor.y - imgY * scale;
+    clampOffsets();
+    paint();
+  }
+
+  stage.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      active = { kind: 'pan', startX: e.touches[0].clientX, startY: e.touches[0].clientY, baseX: offX, baseY: offY };
+    } else if (e.touches.length === 2) {
+      active = {
+        kind: 'pinch',
+        baseDist: pinchDistance(e.touches),
+        baseScale: scale,
+        center: pinchCenter(e.touches, stage.getBoundingClientRect()),
+      };
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchmove', (e) => {
+    if (!active) return;
+    e.preventDefault();
+    if (active.kind === 'pan' && e.touches.length === 1) {
+      offX = active.baseX + (e.touches[0].clientX - active.startX);
+      offY = active.baseY + (e.touches[0].clientY - active.startY);
+      clampOffsets();
+      paint();
+    } else if (active.kind === 'pinch' && e.touches.length === 2) {
+      const ratio = pinchDistance(e.touches) / active.baseDist;
+      applyZoomAt(active.baseScale * ratio, active.center);
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchend', () => { active = null; });
+  stage.addEventListener('touchcancel', () => { active = null; });
+
+  // Mouse / wheel for desktop browsers.
+  stage.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    active = { kind: 'pan', startX: e.clientX, startY: e.clientY, baseX: offX, baseY: offY };
+    function onMove(ev) {
+      if (!active) return;
+      offX = active.baseX + (ev.clientX - active.startX);
+      offY = active.baseY + (ev.clientY - active.startY);
+      clampOffsets();
+      paint();
+    }
+    function onUp() {
+      active = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const factor = e.deltaY < 0 ? 1.08 : 0.93;
+    applyZoomAt(scale * factor, anchor);
+  }, { passive: false });
+
+  function close(result) {
+    document.body.removeChild(overlay);
+    done(result);
+  }
+
+  overlay.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    if (btn.dataset.act === 'cancel') return close(null);
+    if (btn.dataset.act === 'save') {
+      // Render the current viewport at `size`×`size`.
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, size, size);
+      // Source rect on the original image that maps to the visible stage.
+      const sx = -offX / scale;
+      const sy = -offY / scale;
+      const sw = stageW / scale;
+      const sh = stageH / scale;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
+      close(canvas.toDataURL('image/jpeg', 0.85));
+    }
+  });
+}
+
 // Theme toggle — stored locally, applies via data-theme on <html>.
 (() => {
   const THEME_KEY = 'gofirst:theme';
@@ -5841,7 +6347,10 @@ function fileToSquareDataURL(file, size) {
 
 // Replay tasks that were written to the pending queue but never confirmed by
 // Bottom-sheet confirmation dialog for recurring-task deletion.
-// Returns a Promise that resolves to 'skip' | 'all' | 'cancel'.
+// Returns a Promise that resolves to 'skip' | 'stop' | 'all' | 'cancel'.
+//   skip → just today (one-off skip)
+//   stop → end recurrence going forward; preserves all past completions
+//   all  → wipe the task and its history entirely
 function showRecurringDeleteDialog(task) {
   return new Promise(resolve => {
     const el = document.createElement('div');
@@ -5852,7 +6361,8 @@ function showRecurringDeleteDialog(task) {
         <div class="confirm-msg">${esc(task.text)}</div>
         <div class="confirm-actions">
           <button class="confirm-btn" data-choice="skip">Skip today only</button>
-          <button class="confirm-btn danger" data-choice="all">Delete this task</button>
+          <button class="confirm-btn" data-choice="stop">Stop repeating going forward</button>
+          <button class="confirm-btn danger" data-choice="all">Delete entire task &amp; history</button>
           <button class="confirm-btn muted" data-choice="cancel">Cancel</button>
         </div>
       </div>`;
