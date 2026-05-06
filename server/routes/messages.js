@@ -137,9 +137,11 @@ router.get('/:clientId', wrap(async (req, res) => {
       id: true, email: true, name: true, picture: true, coachingClient: true,
       timezone: true,
       tasks: {
-        where: { scheduledDate: { not: null } },
+        // Pull every task — frontend filters for today's view. Filtering on
+        // scheduledDate here would drop every recurring task (those have
+        // scheduledDate: null by design) and the coach would see nothing.
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: 100,
         select: { id: true, text: true, scheduledDate: true, done: true, completedDates: true, category: true, recurrence: true },
       },
     },
