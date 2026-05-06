@@ -99,58 +99,50 @@ function summarizeTasks(tasks) {
 router.get('/stats', wrap(async (_req, res) => {
   const now = new Date();
   const day = 24 * 60 * 60 * 1000;
-  const sevenDaysAgo = new Date(now.getTime() - 7 * day);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * day);
 
-  // Fetch every task's recurrence + completedDates and partition in JS.
-  // Prisma 5 rejects `{ recurrence: { not: null } }` for Json? fields — the
-  // proper API is Prisma.DbNull, but partitioning client-side keeps the
-  // route portable across Prisma versions and avoids a sneaky 500 here.
-  const [userCount, taskCount, streakCount, newUsers7, newUsers30, activeUsers7, doneOneShots, allRecurrenceRows] = await Promise.all([
+  const [userCount, paidCount, activeUserIds30, allUsers] = await Promise.all([
     prisma.user.count(),
-    prisma.task.count(),
-    prisma.quitStreak.count(),
-    prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
-    prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-    // "Active" = touched a task in the last 7 days. Cheaper than scanning sessions.
+    // "Paid" = anyone on the coaching subscription (coachingClient flag).
+    prisma.user.count({ where: { coachingClient: true } }),
+    // "Active" = created a task in the last 30 days. Distinct user ids.
     prisma.task.findMany({
-      where: { updatedAt: { gte: sevenDaysAgo } },
+      where: { createdAt: { gte: thirtyDaysAgo } },
       select: { userId: true },
       distinct: ['userId'],
     }),
-    prisma.task.count({ where: { recurrence: null, done: true } }),
-    prisma.task.findMany({ select: { recurrence: true, completedDates: true } }),
+    // Per-user execution rate, computed via summarizeTasks for consistency
+    // with the per-row column. Pulling task fields once and bucketing in JS.
+    prisma.user.findMany({
+      select: {
+        id: true,
+        tasks: {
+          select: {
+            recurrence: true, scheduledDate: true, done: true,
+            completedDates: true, createdAt: true,
+          },
+        },
+      },
+    }),
   ]);
 
-  const recurringCompletions = allRecurrenceRows.reduce(
-    (acc, t) => acc + (t.recurrence ? (t.completedDates || []).length : 0),
-    0,
-  );
-
-  // Override usage across all users — small table, fine to load.
-  const usersForOverrides = await prisma.user.findMany({
-    select: { overridesUsed: true },
-  });
-  const totalOverrides = usersForOverrides.reduce((a, u) => a + (u.overridesUsed || 0), 0);
+  // App-wide execution rate = average of per-user rates (equal weight per
+  // user). Users who have no scheduled tasks are excluded so a freshly
+  // created account doesn't drag the average to 0.
+  let rateSum = 0, rateCount = 0;
+  for (const u of allUsers) {
+    const r = summarizeTasks(u.tasks).executionRate;
+    if (r != null) { rateSum += r; rateCount++; }
+  }
+  const appExecutionRate = rateCount > 0 ? rateSum / rateCount : null;
 
   res.json({
     users: {
       total: userCount,
-      newLast7Days: newUsers7,
-      newLast30Days: newUsers30,
-      activeLast7Days: activeUsers7.length,
+      active30d: activeUserIds30.length,
+      paid: paidCount,
     },
-    tasks: {
-      total: taskCount,
-      oneShotCompletions: doneOneShots,
-      recurringCompletions,
-    },
-    streaks: {
-      total: streakCount,
-    },
-    overrides: {
-      totalUsed: totalOverrides,
-    },
+    appExecutionRate,
     serverDate: dateInTz(now, 'UTC'),
   });
 }));
