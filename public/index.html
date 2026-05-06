@@ -487,6 +487,101 @@
     margin-top: 2px;
   }
 
+  /* Analytics tab — "This week" mini-rings */
+  .week-bar-card {
+    padding: 12px 8px;
+  }
+  .week-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .week-day {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .week-day-ring {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    position: relative;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+  }
+  .week-day-letter {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .week-day-label {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .week-day.is-today .week-day-letter {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .week-day.is-today .week-day-label { color: var(--accent); }
+  .week-day.is-future .week-day-letter { color: var(--text-faint); }
+
+  /* Best / Needs Work / Longest Streaks list rows */
+  .rank-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .rank-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .rank-row-meta {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+  .rank-row-value {
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    text-align: right;
+  }
+  .rank-empty {
+    padding: 18px 14px;
+    color: var(--text-faint);
+    font-size: 13px;
+    text-align: center;
+  }
+
   /* Analytics tab */
   .analytics-hero {
     padding: 24px 20px 22px;
@@ -2510,6 +2605,11 @@
 
       <!-- Analytics view -->
       <section id="view-analytics" class="view">
+        <div class="section-title">This week</div>
+        <div class="card week-bar-card">
+          <div id="analytics-week-bar" class="week-bar"></div>
+        </div>
+
         <div class="section-title">Period</div>
         <div class="select-wrap">
           <select id="analytics-period" class="field-input">
@@ -2531,6 +2631,21 @@
         <div class="section-title">By category</div>
         <div class="card" id="analytics-categories-card">
           <ul class="category-list" id="analytics-categories"></ul>
+        </div>
+
+        <div class="section-title">Best executed</div>
+        <div class="card">
+          <ul class="rank-list" id="analytics-best"></ul>
+        </div>
+
+        <div class="section-title">Needs work</div>
+        <div class="card">
+          <ul class="rank-list" id="analytics-worst"></ul>
+        </div>
+
+        <div class="section-title">Longest streaks</div>
+        <div class="card">
+          <ul class="rank-list" id="analytics-streaks"></ul>
         </div>
       </section>
 
@@ -4509,6 +4624,76 @@ function paintAnalyticsRing(rate, ringEl) {
   const color = rateColor(rate);
   ringEl.style.background = `conic-gradient(${color} ${rate * 3.6}deg, var(--surface-2) 0deg)`;
 }
+// Tiny week-bar rings — null rate or 0 renders as an empty surface-2 ring.
+function paintTinyRing(el, rate) {
+  if (!el) return;
+  if (rate == null) {
+    el.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
+    return;
+  }
+  const color = rateColor(rate);
+  el.style.background = `conic-gradient(${color} ${rate * 3.6}deg, var(--surface-2) 0deg)`;
+}
+
+/* Rate per day for the current Sun-Sat week. Future days return rate=null
+   (the underlying countTaskInRange won't traverse past today). */
+function computeWeekDays(state) {
+  const today = todayISO();
+  const dow = new Date(today + 'T00:00:00').getDay();
+  const sunday = addDaysISO(today, -dow);
+  const letters = ['S','M','T','W','T','F','S'];
+  return Array.from({ length: 7 }, (_, i) => {
+    const iso = addDaysISO(sunday, i);
+    let scheduled = 0, completed = 0;
+    for (const t of state.tasks) {
+      const c = countTaskInRange(t, iso, iso);
+      scheduled += c.scheduled;
+      completed += c.completed;
+    }
+    const rate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
+    return { iso, letter: letters[i], isToday: iso === today, isFuture: iso > today, rate };
+  });
+}
+
+/* Recurring tasks ranked by completion rate over the selected period.
+   mode='best' descending, mode='worst' ascending. Top/bottom 5. */
+function computeTaskRanking(state, mode) {
+  const { start, end } = periodRange(analyticsPeriod);
+  const rows = state.tasks
+    .filter(t => t.recurrence)
+    .map(t => {
+      const { scheduled, completed } = countTaskInRange(t, start, end);
+      return {
+        id: t.id,
+        text: t.text,
+        scheduled,
+        completed,
+        rate: scheduled > 0 ? Math.round((completed / scheduled) * 100) : null,
+      };
+    })
+    .filter(r => r.scheduled > 0);
+  rows.sort((a, b) =>
+    mode === 'best'
+      ? (b.rate - a.rate) || (b.scheduled - a.scheduled)
+      : (a.rate - b.rate) || (b.scheduled - a.scheduled)
+  );
+  return rows.slice(0, 5);
+}
+
+/* Top 5 recurring tasks by current consecutive-day streak (skip:* dates
+   excluded so an "I'm sick today, skip it" doesn't extend a streak). */
+function computeStreakRanking(state) {
+  return state.tasks
+    .filter(t => t.recurrence)
+    .map(t => ({
+      id: t.id,
+      text: t.text,
+      streak: doingStreak((t.completedDates || []).filter(d => !d.startsWith('skip:'))),
+    }))
+    .filter(r => r.streak > 0)
+    .sort((a, b) => b.streak - a.streak)
+    .slice(0, 5);
+}
 
 let _analyticsRaf = null;
 // Snapshot of the last data we showed to the user (only updated while the
@@ -4516,22 +4701,38 @@ let _analyticsRaf = null;
 // different snapshot, the count-up animation fires from 0.
 let _lastShownAnalytics = null;
 
-function runAnalyticsAnimation(targetRate, finalCategoryRates) {
+/* Generic raf-driven count-up. Reads final values from data-* attributes
+   set by the renderer, so any element tagged with data-animate-rate (text
+   percentage), data-animate-streak (text integer), or data-animate-ring
+   (tiny ring background) joins the animation automatically. */
+function runAnalyticsAnimation() {
   if (_analyticsRaf) cancelAnimationFrame(_analyticsRaf);
-  const ringEl = document.getElementById('analytics-ring');
-  const rateEl = document.getElementById('analytics-rate');
-  const catEls = document.querySelectorAll('#analytics-categories .category-rate');
+  const heroRing = document.getElementById('analytics-ring');
+  const heroText = document.getElementById('analytics-rate');
+  const heroFinal = Number((heroText && heroText.dataset.animateRate) || 0);
+  const rateEls   = [...document.querySelectorAll('[data-animate-rate]')].filter(el => el !== heroText);
+  const streakEls = [...document.querySelectorAll('[data-animate-streak]')];
+  const ringEls   = [...document.querySelectorAll('[data-animate-ring]')];
   const start = performance.now();
   const dur = 900;
   function step(now) {
     const t = Math.min(1, (now - start) / dur);
     const eased = 1 - Math.pow(1 - t, 3);
-    const r = targetRate * eased;
-    paintAnalyticsRing(r, ringEl);
-    if (rateEl) rateEl.textContent = Math.round(r) + '%';
-    catEls.forEach((el, i) => {
-      const final = finalCategoryRates[i] || 0;
-      el.textContent = Math.round(final * eased) + '%';
+    if (heroRing) paintAnalyticsRing(heroFinal * eased, heroRing);
+    if (heroText) heroText.textContent = Math.round(heroFinal * eased) + '%';
+    rateEls.forEach(el => {
+      const f = Number(el.dataset.animateRate) || 0;
+      el.textContent = Math.round(f * eased) + '%';
+    });
+    streakEls.forEach(el => {
+      const f = Number(el.dataset.animateStreak) || 0;
+      el.textContent = String(Math.round(f * eased));
+    });
+    ringEls.forEach(el => {
+      const raw = el.dataset.animateRing;
+      if (raw === '' || raw == null) { paintTinyRing(el, null); return; }
+      const f = Number(raw);
+      paintTinyRing(el, isFinite(f) ? f * eased : null);
     });
     if (t < 1) _analyticsRaf = requestAnimationFrame(step);
     else _analyticsRaf = null;
@@ -4545,73 +4746,135 @@ function renderAnalyticsView(state) {
   // renderAnalyticsView and the snapshot mismatch triggers the count-up.
   if (currentTab !== 'analytics') return;
 
+  // === Compute every section's data ===
   const { completed, scheduled } = computePeriodRate(state, analyticsPeriod);
   const { label } = periodRange(analyticsPeriod);
-  const rate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
-  const rateEl = document.getElementById('analytics-rate');
-  const subEl = document.getElementById('analytics-sub');
-  const ringEl = document.getElementById('analytics-ring');
-  const list   = document.getElementById('analytics-categories');
+  const heroRate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
+  const weekDays = computeWeekDays(state);
+  const buckets = computeCategoryBreakdown(state, analyticsPeriod);
+  const catRows = Object.entries(buckets)
+    .filter(([, v]) => v.scheduled > 0)
+    .map(([name, v]) => ({
+      name, scheduled: v.scheduled, completed: v.completed,
+      rate: Math.round((v.completed / v.scheduled) * 100),
+    }))
+    .sort((a, b) => b.rate - a.rate);
+  const bestRows  = computeTaskRanking(state, 'best');
+  const worstRows = computeTaskRanking(state, 'worst');
+  const streakRows = computeStreakRanking(state);
 
-  if (scheduled === 0) {
-    if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
-    rateEl.textContent = '—';
+  // Snapshot key — animation replays whenever any displayed number differs.
+  const dataKey = JSON.stringify({
+    period: analyticsPeriod,
+    hero: heroRate,
+    week: weekDays.map(d => d.rate),
+    cat:  catRows.map(c => c.rate),
+    best: bestRows.map(r => `${r.id}:${r.rate}`),
+    worst: worstRows.map(r => `${r.id}:${r.rate}`),
+    streak: streakRows.map(r => `${r.id}:${r.streak}`),
+  });
+  const dataChanged = dataKey !== _lastShownAnalytics;
+  _lastShownAnalytics = dataKey;
+
+  // === Hero ring + percentage ===
+  const heroRing = document.getElementById('analytics-ring');
+  const heroText = document.getElementById('analytics-rate');
+  const subEl    = document.getElementById('analytics-sub');
+  if (heroRate == null) {
+    heroText.textContent = '—';
+    heroText.dataset.animateRate = '0';
     subEl.textContent = `No tasks scheduled ${label} yet`;
-    if (ringEl) ringEl.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
-    list.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
-    _lastShownAnalytics = { period: analyticsPeriod, rate: null, catRates: [] };
-    return;
+    heroRing.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
+  } else {
+    subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
+    heroText.dataset.animateRate = String(heroRate);
+    if (!dataChanged) {
+      paintAnalyticsRing(heroRate, heroRing);
+      heroText.textContent = heroRate + '%';
+    } else {
+      heroRing.style.background = `conic-gradient(${rateColor(0)} 0deg, var(--surface-2) 0deg)`;
+      heroText.textContent = '0%';
+    }
   }
 
-  subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
+  // === Week bar (Sun-Sat) ===
+  const weekEl = document.getElementById('analytics-week-bar');
+  if (weekEl) {
+    weekEl.innerHTML = weekDays.map(d => {
+      const cls = `week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`;
+      const ringAttr = d.rate == null ? '' : String(d.rate);
+      return `
+        <div class="${cls}">
+          <div class="week-day-ring" data-animate-ring="${ringAttr}">
+            <div class="week-day-letter">${d.letter}</div>
+          </div>
+        </div>`;
+    }).join('');
+    if (!dataChanged) {
+      const rings = weekEl.querySelectorAll('.week-day-ring');
+      weekDays.forEach((d, i) => paintTinyRing(rings[i], d.rate));
+    } else {
+      weekEl.querySelectorAll('.week-day-ring').forEach(r => paintTinyRing(r, null));
+    }
+  }
 
-  // Category breakdown
-  const buckets = computeCategoryBreakdown(state, analyticsPeriod);
-  const active = Object.entries(buckets).filter(([, v]) => v.scheduled > 0);
-  const sorted = active.sort((a, b) =>
-    (b[1].completed / (b[1].scheduled || 1)) - (a[1].completed / (a[1].scheduled || 1))
-  );
-  const finalRates = sorted.map(([, v]) => v.scheduled ? Math.round((v.completed / v.scheduled) * 100) : 0);
-
-  // Did anything change since the user last saw this view?
-  const prev = _lastShownAnalytics;
-  const dataChanged = !prev
-    || prev.period !== analyticsPeriod
-    || prev.rate !== rate
-    || prev.catRates.length !== finalRates.length
-    || prev.catRates.some((r, i) => r !== finalRates[i]);
-
-  // Render the category list. If we're about to animate, seed the rate
-  // text at 0% so the count-up starts cleanly.
-  if (!sorted.length) {
-    list.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
+  // === By Category ===
+  const catList = document.getElementById('analytics-categories');
+  if (!catRows.length) {
+    catList.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
   } else {
-    list.innerHTML = sorted.map(([name, v], i) => {
-      const r = finalRates[i];
-      const shown = dataChanged ? '0%' : r + '%';
+    catList.innerHTML = catRows.map(c => {
+      const shown = dataChanged ? '0%' : c.rate + '%';
       return `
         <li class="category-row">
-          <span class="category-name">${name}</span>
-          <span class="category-sub">${v.completed}/${v.scheduled}</span>
-          <span class="category-rate">${shown}</span>
+          <span class="category-name">${esc(c.name)}</span>
+          <span class="category-sub">${c.completed}/${c.scheduled}</span>
+          <span class="category-rate" data-animate-rate="${c.rate}">${shown}</span>
         </li>`;
     }).join('');
   }
 
-  if (dataChanged) {
-    // Reset hero ring + percentage to 0 synchronously, then start the
-    // raf-driven count-up on the next frame so the user sees a clean
-    // 0 → final transition (not a flash of stale values).
-    ringEl.style.background = `conic-gradient(${rateColor(0)} 0deg, var(--surface-2) 0deg)`;
-    rateEl.textContent = '0%';
-    requestAnimationFrame(() => runAnalyticsAnimation(rate, finalRates));
-  } else {
-    if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
-    paintAnalyticsRing(rate, ringEl);
-    rateEl.textContent = rate + '%';
+  // === Best executed / Needs work / Longest streaks ===
+  function rankRowHtml(r) {
+    const shown = dataChanged ? '0%' : r.rate + '%';
+    return `
+      <li class="rank-row">
+        <span class="rank-row-name">${esc(r.text)}</span>
+        <span class="rank-row-meta">${r.completed}/${r.scheduled}</span>
+        <span class="rank-row-value" data-animate-rate="${r.rate}">${shown}</span>
+      </li>`;
   }
+  const bestList = document.getElementById('analytics-best');
+  bestList.innerHTML = bestRows.length
+    ? bestRows.map(rankRowHtml).join('')
+    : '<li class="rank-empty">Add some recurring tasks to see your top performers.</li>';
 
-  _lastShownAnalytics = { period: analyticsPeriod, rate, catRates: finalRates };
+  const worstList = document.getElementById('analytics-worst');
+  worstList.innerHTML = worstRows.length
+    ? worstRows.map(rankRowHtml).join('')
+    : '<li class="rank-empty">Nothing chronic — keep it up.</li>';
+
+  const streakList = document.getElementById('analytics-streaks');
+  streakList.innerHTML = streakRows.length
+    ? streakRows.map(r => {
+        const shown = dataChanged ? '0' : String(r.streak);
+        const unit = r.streak === 1 ? 'day' : 'days';
+        return `
+          <li class="rank-row">
+            <span class="rank-row-name">${esc(r.text)}</span>
+            <span class="rank-row-value">
+              <span data-animate-streak="${r.streak}">${shown}</span> ${unit}
+            </span>
+          </li>`;
+      }).join('')
+    : '<li class="rank-empty">Check off a recurring task today to start a streak.</li>';
+
+  // === Animate or finalize ===
+  if (dataChanged) {
+    requestAnimationFrame(() => runAnalyticsAnimation());
+  } else if (_analyticsRaf) {
+    cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null;
+  }
 }
 
 /* ============================================================
