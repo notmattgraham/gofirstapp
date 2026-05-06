@@ -1789,8 +1789,7 @@
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    padding: 8px 12px;
-    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+    padding: 8px 12px calc(var(--safe-bottom) + 10px);
     border-top: 1px solid var(--border);
     background: var(--bg);
   }
@@ -1854,29 +1853,21 @@
   }
 
   /* ── Coach overlay panels ────────────────────────────────────
-     Slide in from the right on top of the main app. z-index just
-     above content but below any modals/toasts. */
+     Live INSIDE .app so they inherit the centered 480px shell, then
+     slide in from the right on top of every other in-app content. */
   .coach-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    z-index: 12;
+    z-index: 20;
     background: var(--bg);
-    max-width: 480px;
-    left: 50%;
-    transform: translateX(-50%) translateX(100%);
+    transform: translateX(100%);
     transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.28, 1);
     will-change: transform;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-  @media (min-width: 520px) {
-    .coach-overlay {
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-    }
-  }
-  .coach-overlay.open { transform: translateX(-50%) translateX(0%); }
+  .coach-overlay.open { transform: translateX(0%); }
   .coach-overlay[hidden] { display: none; }
 
   .coach-overlay-header {
@@ -4801,8 +4792,10 @@ const Coaching = (() => {
 
   /* ── Apply tab layout based on user type ─────────────────── */
   function applyUserTabs(user) {
-    const isClient = !!(user && user.coachingClient);
+    // Coach takes precedence: even if the coach account is also tagged as a
+    // coachingClient (e.g. self-toggled in admin), they get the coach UI only.
     const isCoach  = !!(user && user.isCoach);
+    const isClient = !isCoach && !!(user && user.coachingClient);
 
     // Streaks tab is permanently retired — keep it hidden regardless of role.
     const tabStreaks  = document.getElementById('tab-streaks');
@@ -4852,23 +4845,24 @@ const Coaching = (() => {
   function onIncoming(message) {
     const me = Auth.user;
     if (!me) return;
-    if (me.coachingClient) {
-      if (clientMessages.some(m => m.id === message.id)) return;
-      clientMessages.push(message);
-      renderClientMessages();
-      if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
-    } else if (me.isCoach) {
+    // isCoach wins over coachingClient (matches applyUserTabs precedence).
+    if (me.isCoach) {
       const cid = message.fromUserId === me.id ? message.toUserId : message.fromUserId;
       if (!coachMessages[cid]) coachMessages[cid] = [];
       if (coachMessages[cid].some(m => m.id === message.id)) return;
       coachMessages[cid].push(message);
       if (currentClientId === cid) renderCoachMessages(cid);
-      loadCoachThreads(); // refresh preview + unread count
+      loadCoachThreads();
       if (message.fromUserId !== me.id) {
         const convoOpen = currentClientId === cid &&
           !document.getElementById('coach-convo-overlay').hidden;
         if (!convoOpen) setTabBadge('profile', true);
       }
+    } else if (me.coachingClient) {
+      if (clientMessages.some(m => m.id === message.id)) return;
+      clientMessages.push(message);
+      renderClientMessages();
+      if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
     }
   }
 
@@ -5208,9 +5202,11 @@ async function boot() {
   }
 
   // Wire up real-time WebSocket and load initial chat data.
+  // isCoach takes precedence — even if also tagged coachingClient, run the
+  // coach inbox loader, not the client conversation loader.
   Coaching.connect(Auth.user);
-  if (Auth.user && Auth.user.coachingClient) Coaching.loadClientChat();
   if (Auth.user && Auth.user.isCoach) Coaching.loadCoachThreads();
+  else if (Auth.user && Auth.user.coachingClient) Coaching.loadClientChat();
 }
 
 boot();
