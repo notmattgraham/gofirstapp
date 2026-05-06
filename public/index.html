@@ -1809,6 +1809,29 @@
   .chat-header-name { font-size: 15px; font-weight: 600; color: var(--text); }
   .chat-header-status { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
 
+  /* Presence column on the right side of the chat header. Shows a small
+     status dot + text ("Active now" / "5m ago" / "Last seen yesterday"). */
+  .chat-header-presence {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+  }
+  .presence-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .presence-dot.active { background: var(--success); }
+  .presence-text {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
   /* Scrollable message area */
   .chat-messages {
     flex: 1;
@@ -2297,10 +2320,14 @@
         <!-- Mode: coaching client — direct conversation with their coach -->
         <div class="chat-mode" data-mode="client" hidden>
           <div class="chat-header">
-            <div class="chat-header-avatar" id="chat-coach-avatar">M</div>
+            <div class="chat-header-avatar" id="chat-coach-avatar">?</div>
             <div class="chat-header-info">
-              <div class="chat-header-name">Coach</div>
-              <div class="chat-header-status" id="chat-status">GoFirst Coaching</div>
+              <div class="chat-header-name" id="chat-coach-name">Coach</div>
+              <div class="chat-header-status" id="chat-status">Loading…</div>
+            </div>
+            <div class="chat-header-presence">
+              <span class="presence-dot" id="chat-presence-dot"></span>
+              <span class="presence-text" id="chat-presence-text"></span>
             </div>
           </div>
           <div class="chat-messages" id="chat-messages">
@@ -4997,7 +5024,11 @@ const Coaching = (() => {
       if (clientMessages.some(m => m.id === message.id)) return;
       clientMessages.push(message);
       renderClientMessages();
-      if (message.fromUserId !== me.id) hideTyping('client');
+      if (message.fromUserId !== me.id) {
+        hideTyping('client');
+        // The coach just sent a message — they're active right now.
+        if (coachInfo) { coachInfo.lastSeenAt = message.createdAt; updateCoachHeader(); }
+      }
       if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
     }
   }
@@ -5009,18 +5040,62 @@ const Coaching = (() => {
   }
 
   /* ── Client chat ─────────────────────────────────────────── */
+  let coachInfo = null; // { id, name, picture, lastSeenAt }
+
   async function loadClientChat() {
     try {
       const data = await api('GET', '/api/messages');
       clientMessages = data.messages || [];
+      if (data.coach) {
+        coachInfo = data.coach;
+        updateCoachHeader();
+      }
       renderClientMessages();
-      updateCoachHeader(data.coachId);
     } catch (e) { console.warn('[chat]', e); }
   }
 
-  function updateCoachHeader(coachId) {
-    // Optionally fetch coach picture — skip for now; initials are fine
+  function updateCoachHeader() {
+    if (!coachInfo) return;
+    const av     = document.getElementById('chat-coach-avatar');
+    const nameEl = document.getElementById('chat-coach-name');
+    const dot    = document.getElementById('chat-presence-dot');
+    const txt    = document.getElementById('chat-presence-text');
+    const status = document.getElementById('chat-status');
+    const name = coachInfo.name || 'Coach';
+    if (av) {
+      av.innerHTML = coachInfo.picture
+        ? `<img src="${esc(coachInfo.picture)}" alt="" referrerpolicy="no-referrer" />`
+        : esc(name.trim().charAt(0).toUpperCase());
+    }
+    if (nameEl) nameEl.textContent = name;
+    // Status line below the name stays as a tagline.
+    if (status) status.textContent = 'GoFirst coach';
+    // Right-side presence: dot turns green if active in last 90s.
+    const ms = coachInfo.lastSeenAt ? Date.now() - new Date(coachInfo.lastSeenAt).getTime() : Infinity;
+    if (dot) dot.classList.toggle('active', ms < 90_000);
+    if (txt) txt.textContent = presenceText(coachInfo.lastSeenAt);
   }
+
+  function presenceText(iso) {
+    if (!iso) return 'Last seen —';
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 90_000) return 'Active now';
+    const m = Math.floor(ms / 60_000);
+    if (m < 60) return `Active ${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `Active ${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 7)  return `Active ${d}d ago`;
+    const date = new Date(iso);
+    return `Last seen ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  }
+
+  // Refresh the presence text every 30s so "5m ago" rolls forward without
+  // a server hit. The actual lastSeenAt is refreshed when loadClientChat
+  // re-fires, when a new message arrives, or on a typing event.
+  setInterval(() => {
+    if (Auth.user && Auth.user.coachingClient && coachInfo) updateCoachHeader();
+  }, 30_000);
 
   function renderClientMessages() {
     const container = document.getElementById('chat-messages');
@@ -5268,6 +5343,8 @@ const Coaching = (() => {
       if (c) c.scrollTop = c.scrollHeight;
       clearTimeout(_clientTypingHide);
       _clientTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
+      // The coach is typing right now — bump presence to "Active now".
+      if (coachInfo) { coachInfo.lastSeenAt = new Date().toISOString(); updateCoachHeader(); }
     }
   }
   function hideTyping(forSide /* 'client' | 'coach' */) {
@@ -5338,7 +5415,13 @@ const Coaching = (() => {
     // Clear chat badge when switching to chat tab.
     document.querySelectorAll('.tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'chat') setTabBadge('chat', false);
+        if (btn.dataset.tab === 'chat') {
+          setTabBadge('chat', false);
+          // Refresh coach data each time the user enters the chat tab so
+          // presence and last-seen reflect the current state.
+          if (Auth.user && Auth.user.coachingClient) loadClientChat();
+          else if (Auth.user && Auth.user.isCoach) loadCoachThreads();
+        }
       });
     });
   }

@@ -53,6 +53,10 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Bump lastSeenAt on every authenticated /api/* hit (throttled to 1/min/user).
+// Fire-and-forget — never blocks the response.
+app.use('/api', require('./middleware').trackLastSeen);
+
 // Health probe for Railway.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 

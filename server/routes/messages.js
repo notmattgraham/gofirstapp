@@ -111,7 +111,16 @@ router.get('/', wrap(async (req, res) => {
     });
   }
 
-  res.json({ messages, coachId: coach.id });
+  res.json({
+    messages,
+    coachId: coach.id,
+    coach: {
+      id: coach.id,
+      name: coach.name,
+      picture: coach.picture,
+      lastSeenAt: coach.lastSeenAt,
+    },
+  });
 }));
 
 // GET /api/messages/:clientId  (coach only)
