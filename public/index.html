@@ -99,7 +99,15 @@
 
   .app {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    /* Height is driven from window.visualViewport.height (see syncAppHeight
+       below). On iOS, opening the keyboard shrinks the visual viewport;
+       binding to it keeps the entire app within the visible area instead
+       of letting iOS scroll the whole fixed element upward to reach the
+       focused input — which was hiding the chat header and conversation. */
+    height: var(--app-h, 100vh);
     display: flex;
     flex-direction: column;
     max-width: 480px;
@@ -4707,12 +4715,17 @@ document.getElementById('analytics-period').addEventListener('change', (e) => {
     }
   }, { passive: true });
 
-  // Tap anywhere on the main content area (above the dock) closes it.
+  // Tap anywhere on the main content area (above the dock) closes it —
+  // BUT only when the dock is empty. If the user has typed anything or is
+  // editing an existing task, leave the dock open so an accidental tap
+  // (e.g. while reaching for the keyboard) doesn't wipe their input.
+  // Drag-to-close still works for intentional dismissal.
   els.main.addEventListener('pointerdown', () => {
-    if (!isDockClosed()) {
-      closeDock();
-      setTopAction();
-    }
+    if (isDockClosed()) return;
+    const hasDraft = (els.taskInput.value || '').trim().length > 0;
+    if (hasDraft || TaskForm.editingId) return;
+    closeDock();
+    setTopAction();
   });
 })();
 
@@ -5962,6 +5975,22 @@ async function boot() {
 }
 
 boot();
+
+/* Keep .app sized to the visible viewport so opening the iOS keyboard
+   shrinks the app box (header, messages, input all stay in place above
+   the keyboard) instead of pushing the whole fixed-positioned app upward
+   off the screen. visualViewport reports the same dimensions on Android
+   Chrome, so this is harmless cross-platform. */
+(function syncAppHeight() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  function update() {
+    document.documentElement.style.setProperty('--app-h', vv.height + 'px');
+  }
+  vv.addEventListener('resize', update);
+  vv.addEventListener('scroll', update);
+  update();
+})();
 
 // Client-side keepalive: ping the server every 4 minutes while this tab is
 // open, preventing Railway from sleeping mid-session.
