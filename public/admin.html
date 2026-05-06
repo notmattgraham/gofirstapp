@@ -204,6 +204,34 @@
     color: var(--text);
     border-color: transparent;
   }
+  .badge.role-coach { background: var(--warn); color: #1a1d25; border-color: transparent; }
+  .badge.role-client { background: var(--accent-dim); color: var(--text); border-color: transparent; }
+
+  /* Role picker — three-segment toggle (User / Client / Coach) */
+  .role-picker {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .role-picker button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .role-picker button + button { border-left: 1px solid var(--border); }
+  .role-picker button.active {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .role-picker button:disabled { opacity: 0.5; cursor: default; }
 
   .btn {
     display: inline-flex;
@@ -526,13 +554,20 @@
       body.innerHTML = `<tr><td colspan="8" class="center">No users match.</td></tr>`;
       return;
     }
-    body.innerHTML = rows.map(u => `
+    body.innerHTML = rows.map(u => {
+      const role = u.isCoach ? 'coach' : (u.coachingClient ? 'client' : 'user');
+      const roleBadge = role === 'coach'
+        ? '<span class="badge role-coach">Coach</span>'
+        : role === 'client'
+          ? '<span class="badge role-client">Client</span>'
+          : '';
+      return `
       <tr data-id="${escapeHtml(u.id)}">
         <td>
           <div class="user-cell">
             ${avatarHtml(u)}
             <div>
-              <div class="name">${escapeHtml(u.name || '—')} ${u.coachingClient ? '<span class="badge coach">Coach</span>' : ''}</div>
+              <div class="name">${escapeHtml(u.name || '—')} ${roleBadge}</div>
               <div class="email">${escapeHtml(u.email || '')}</div>
             </div>
           </div>
@@ -544,43 +579,52 @@
         <td class="num">${fmt.pct(u.executionRate)}</td>
         <td class="num hide-sm">${fmt.int(u.overridesUsed)}</td>
         <td>
-          <button class="btn ${u.coachingClient ? 'danger' : 'primary'}" data-coach data-id="${escapeHtml(u.id)}" data-on="${u.coachingClient ? '1' : '0'}">
-            ${u.coachingClient ? 'Unmark' : 'Coach'}
-          </button>
+          <div class="role-picker" data-role-picker data-id="${escapeHtml(u.id)}">
+            <button data-role="user"   class="${role === 'user'   ? 'active' : ''}">User</button>
+            <button data-role="client" class="${role === 'client' ? 'active' : ''}">Client</button>
+            <button data-role="coach"  class="${role === 'coach'  ? 'active' : ''}">Coach</button>
+          </div>
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
   }
 
   $('user-filter').addEventListener('input', applyUserFilter);
 
-  // Click handler for the coach toggle. Optimistic-ish: disable the button
-  // while the request runs, then refresh both the users table and the
-  // coaching clients section.
+  // Click handler for the role picker. Disable the segment while the
+  // request runs, then refresh both the users table and the coaching
+  // clients section. Selecting "coach" demotes any existing coach.
   $('users-body').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-coach]');
+    const btn = e.target.closest('[data-role-picker] button');
     if (!btn) return;
-    const id = btn.dataset.id;
-    const on = btn.dataset.on === '1';
-    btn.disabled = true;
-    btn.textContent = on ? 'Removing…' : 'Adding…';
+    const picker = btn.closest('[data-role-picker]');
+    const id = picker.dataset.id;
+    const role = btn.dataset.role; // 'user' | 'client' | 'coach'
+    if (btn.classList.contains('active')) return; // no-op
+    [...picker.querySelectorAll('button')].forEach(b => b.disabled = true);
     try {
-      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/coaching`, {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/role`, {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coachingClient: !on }),
+        body: JSON.stringify({ role }),
       });
       if (!r.ok) throw new Error('bad status ' + r.status);
-      // Update in-memory state and refresh the affected sections.
+      // Update in-memory state.
       const u = allUsers.find(x => x.id === id);
-      if (u) u.coachingClient = !on;
+      if (u) {
+        u.coachingClient = role === 'client';
+        u.isCoach = role === 'coach';
+      }
+      // If we just promoted someone to coach, demote any other in-memory coach.
+      if (role === 'coach') {
+        for (const x of allUsers) if (x.id !== id) x.isCoach = false;
+      }
       applyUserFilter();
       reloadClients();
     } catch (err) {
-      btn.disabled = false;
-      btn.textContent = on ? 'Unmark' : 'Coach';
-      alert('Could not update coaching status. ' + err.message);
+      [...picker.querySelectorAll('button')].forEach(b => b.disabled = false);
+      alert('Could not update role. ' + err.message);
     }
   });
 

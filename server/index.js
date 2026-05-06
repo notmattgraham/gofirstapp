@@ -78,10 +78,11 @@ app.use(express.static(publicDir, {
   },
 }));
 
-// Hidden admin dashboard. Served as a separate page so it never appears in the
-// main SPA bundle. The page itself calls /api/admin/me to confirm the user is
-// the allow-listed admin; non-admin sessions just see a 404-style screen.
-app.get(['/admin', '/admin/'], (_req, res) => {
+// Hidden admin / developer dashboard. Served as a separate page so it never
+// appears in the main SPA bundle. The page itself calls /api/admin/me to
+// confirm the user is the allow-listed admin; non-admin sessions just see
+// a 404-style screen. Reachable at both /admin and /dev for convenience.
+app.get(['/admin', '/admin/', '/dev', '/dev/'], (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(publicDir, 'admin.html'));
 });
@@ -178,9 +179,10 @@ server.on('upgrade', async (request, socket, head) => {
 
     // Only coaching clients and the coach get a WS connection — everyone else
     // can't use the chat feature, so there's no point keeping a socket open.
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, coachingClient: true } });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, coachingClient: true, isCoach: true } });
     const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
-    if (!user || (!user.coachingClient && user.email.toLowerCase() !== COACH_EMAIL)) {
+    const isCoach = !!user?.isCoach || (user?.email || '').toLowerCase() === COACH_EMAIL;
+    if (!user || (!user.coachingClient && !isCoach)) {
       socket.destroy(); return;
     }
 

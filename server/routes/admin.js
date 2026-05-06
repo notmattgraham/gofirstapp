@@ -181,6 +181,7 @@ router.get('/users', wrap(async (_req, res) => {
       lastActivityAt: lastTaskTouch ? new Date(lastTaskTouch).toISOString() : null,
       overridesUsed: u.overridesUsed,
       coachingClient: u.coachingClient,
+      isCoach: u.isCoach,
       taskCount: summary.totalTasks,
       streakCount: u.quitStreaks.length,
       executionRate: summary.executionRate,
@@ -204,6 +205,41 @@ router.patch('/users/:id/coaching', wrap(async (req, res) => {
       where: { id: req.params.id },
       data: { coachingClient },
       select: { id: true, email: true, name: true, coachingClient: true },
+    });
+    res.json({ user: updated });
+  } catch (e) {
+    if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
+    throw e;
+  }
+}));
+
+// PATCH /api/admin/users/:id/role — set a user's role.
+// Body: { role: 'user' | 'client' | 'coach' }
+//   user   → coachingClient=false, isCoach=false
+//   client → coachingClient=true,  isCoach=false
+//   coach  → coachingClient=false, isCoach=true   (and demote any other coach)
+router.patch('/users/:id/role', wrap(async (req, res) => {
+  const role = (req.body && req.body.role) || '';
+  if (!['user', 'client', 'coach'].includes(role)) {
+    return res.status(400).json({ error: 'invalid_role' });
+  }
+  try {
+    if (role === 'coach') {
+      // Only one coach at a time — demote anyone else flagged.
+      await prisma.user.updateMany({
+        where: { isCoach: true, NOT: { id: req.params.id } },
+        data: { isCoach: false },
+      });
+    }
+    const data = role === 'coach'
+      ? { coachingClient: false, isCoach: true }
+      : role === 'client'
+        ? { coachingClient: true, isCoach: false }
+        : { coachingClient: false, isCoach: false };
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data,
+      select: { id: true, email: true, name: true, coachingClient: true, isCoach: true },
     });
     res.json({ user: updated });
   } catch (e) {
