@@ -2579,6 +2579,65 @@
   .client-summary-body .week-day-ring { width: 32px; height: 32px; }
   .client-summary-body .week-day-letter { font-size: 11px; inset: 3px; }
 
+  /* Nested "Today's tasks" dropdown inside the at-a-glance panel. */
+  .client-glance-tasks-wrap {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .client-glance-tasks-toggle {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .client-glance-tasks-toggle::-webkit-details-marker { display: none; }
+  .client-glance-tasks-toggle::after {
+    content: '';
+    margin-left: auto;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(45deg);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details[open] > .client-glance-tasks-toggle::after { transform: rotate(-135deg); }
+  .client-glance-tasks-count {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .client-glance-tasks-list .rank-row {
+    gap: 10px;
+    padding: 6px 0;
+  }
+  .client-glance-tasks-list .rank-row .check {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+  .client-glance-tasks-list .rank-row .check.done::after {
+    width: 8px;
+    height: 4px;
+    border-left-width: 2px;
+    border-bottom-width: 2px;
+    transform: rotate(-45deg) translate(0px, -1px);
+  }
+  .client-glance-tasks-list .rank-row.done .rank-row-name {
+    text-decoration: line-through;
+    color: var(--text-faint);
+  }
+
   /* --- Animations --------------------------------------------- */
   .row, .streak-card {
     animation: slideIn 0.18s ease-out;
@@ -3098,7 +3157,7 @@
         </div>
       </div>
       <details class="client-summary-wrap" id="client-summary-wrap">
-        <summary class="client-summary-toggle">At a glance</summary>
+        <summary class="client-summary-toggle"><span id="client-summary-title">Client's data</span></summary>
         <div class="client-summary-body" id="client-summary-body">
           <div class="client-glance-period">
             <select id="client-glance-period-sel" class="field-input">
@@ -3115,18 +3174,13 @@
             </div>
             <div class="client-glance-sub" id="client-glance-sub">Loading…</div>
           </div>
-          <div class="client-glance-section">
-            <div class="client-glance-label">Best executed</div>
-            <ul class="rank-list" id="client-glance-best"></ul>
-          </div>
-          <div class="client-glance-section">
-            <div class="client-glance-label">Needs work</div>
-            <ul class="rank-list" id="client-glance-worst"></ul>
-          </div>
-          <div class="client-glance-section">
-            <div class="client-glance-label">Longest streaks</div>
-            <ul class="rank-list" id="client-glance-streaks"></ul>
-          </div>
+          <details class="client-glance-tasks-wrap">
+            <summary class="client-glance-tasks-toggle">
+              Today's tasks
+              <span class="client-glance-tasks-count" id="client-glance-tasks-count"></span>
+            </summary>
+            <ul class="rank-list client-glance-tasks-list" id="client-glance-tasks-list"></ul>
+          </details>
         </div>
       </details>
       <div class="chat-messages" id="coach-chat-messages"></div>
@@ -6127,6 +6181,14 @@ const Coaching = (() => {
     const initial = name.trim().charAt(0).toUpperCase();
     document.getElementById('coach-client-name').textContent  = name;
     document.getElementById('coach-client-email').textContent = thread.client.email || '';
+
+    // Personalize the at-a-glance panel title with the client's first name
+    // (falls back to the local part of the email, then a generic "Client").
+    const firstName = (thread.client.name || '').trim().split(/\s+/)[0]
+      || (thread.client.email || '').split('@')[0]
+      || 'Client';
+    const titleEl = document.getElementById('client-summary-title');
+    if (titleEl) titleEl.textContent = `${firstName}'s data`;
     const av = document.getElementById('coach-client-avatar');
     if (av) {
       av.innerHTML = thread.client.picture
@@ -6196,17 +6258,24 @@ const Coaching = (() => {
     const { label } = periodRange(period);
     const heroRate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
     const weekDays = computeWeekDays(fakeState);
-    const bestRows  = computeTaskRanking(fakeState, 'best',  period).slice(0, 3);
-    const worstRows = computeTaskRanking(fakeState, 'worst', period).slice(0, 3);
-    const streakRows = computeStreakRanking(fakeState).slice(0, 3);
+
+    // Today's tasks for the nested dropdown — recurring tasks scheduled
+    // for today's day-of-week + one-shots scheduled for today.
+    const today = todayISO();
+    const dow = new Date().getDay();
+    const todayTasks = (_clientGlanceTasks || []).filter(t =>
+      t.scheduledDate === today
+        || (t.recurrence && (t.recurrence.daysOfWeek || []).includes(dow))
+    );
 
     const dataKey = JSON.stringify({
       period,
       hero: heroRate,
       week: weekDays.map(d => d.rate),
-      best: bestRows.map(r => `${r.id}:${r.rate}`),
-      worst: worstRows.map(r => `${r.id}:${r.rate}`),
-      streak: streakRows.map(r => `${r.id}:${r.streak}`),
+      today: todayTasks.map(t => {
+        const done = t.done || (Array.isArray(t.completedDates) && t.completedDates.includes(today));
+        return `${t.id}:${done ? 1 : 0}`;
+      }),
     });
     const dataChanged = dataKey !== _lastClientGlanceKey;
     _lastClientGlanceKey = dataKey;
@@ -6250,38 +6319,29 @@ const Coaching = (() => {
       else rings.forEach(r => paintTinyRing(r, null));
     }
 
-    // Rank lists
-    function rankRowHtml(r) {
-      const shown = dataChanged ? '0%' : r.rate + '%';
-      return `
-        <li class="rank-row">
-          <span class="rank-row-name">${esc(r.text)}</span>
-          <span class="rank-row-meta">${r.completed}/${r.scheduled}</span>
-          <span class="rank-row-value" data-animate-rate="${r.rate}">${shown}</span>
-        </li>`;
+    // Today's tasks (nested dropdown).
+    const tasksList  = document.getElementById('client-glance-tasks-list');
+    const tasksCount = document.getElementById('client-glance-tasks-count');
+    if (tasksCount) {
+      const doneCount = todayTasks.filter(t =>
+        t.done || (Array.isArray(t.completedDates) && t.completedDates.includes(today))
+      ).length;
+      tasksCount.textContent = todayTasks.length
+        ? `${doneCount}/${todayTasks.length}`
+        : '';
     }
-    const bestList = document.getElementById('client-glance-best');
-    bestList.innerHTML = bestRows.length
-      ? bestRows.map(rankRowHtml).join('')
-      : '<li class="rank-empty">Need a few recurring tasks to compare.</li>';
-    const worstList = document.getElementById('client-glance-worst');
-    worstList.innerHTML = worstRows.length
-      ? worstRows.map(rankRowHtml).join('')
-      : '<li class="rank-empty">Nothing chronic — keep it up.</li>';
-    const streakList = document.getElementById('client-glance-streaks');
-    streakList.innerHTML = streakRows.length
-      ? streakRows.map(r => {
-          const shown = dataChanged ? '0' : String(r.streak);
-          const unit = r.streak === 1 ? 'day' : 'days';
-          return `
-            <li class="rank-row">
-              <span class="rank-row-name">${esc(r.text)}</span>
-              <span class="rank-row-value">
-                <span data-animate-streak="${r.streak}">${shown}</span> ${unit}
-              </span>
-            </li>`;
-        }).join('')
-      : '<li class="rank-empty">No active streaks yet.</li>';
+    if (tasksList) {
+      tasksList.innerHTML = todayTasks.length
+        ? todayTasks.map(t => {
+            const done = t.done || (Array.isArray(t.completedDates) && t.completedDates.includes(today));
+            return `
+              <li class="rank-row${done ? ' done' : ''}">
+                <span class="check ${done ? 'done' : ''}"></span>
+                <span class="rank-row-name">${esc(t.text)}</span>
+              </li>`;
+          }).join('')
+        : '<li class="rank-empty">No tasks scheduled today.</li>';
+    }
 
     if (dataChanged) requestAnimationFrame(() => runClientGlanceAnimation());
     else if (_clientGlanceRaf) { cancelAnimationFrame(_clientGlanceRaf); _clientGlanceRaf = null; }
