@@ -2532,17 +2532,6 @@
         <div class="card" id="analytics-categories-card">
           <ul class="category-list" id="analytics-categories"></ul>
         </div>
-
-        <div class="section-title">Notes</div>
-        <div class="card">
-          <textarea
-            id="notes-text"
-            class="notes-textarea"
-            placeholder="Persistent scratch pad — captures thoughts that don't belong on today's locked list. Saves automatically."
-            maxlength="4000"
-          ></textarea>
-          <div class="notes-status" id="notes-status">Saved</div>
-        </div>
       </section>
 
       <!-- Chat view — visible to everyone, content varies by role:
@@ -2619,23 +2608,6 @@
           <div class="profile-email" id="profile-email"></div>
         </div>
 
-        <div class="section-title">Appearance</div>
-        <div class="card">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <div class="setting-title">Theme</div>
-              <div class="setting-sub">Match system, force dark, or force light.</div>
-            </div>
-            <div class="select-wrap setting-select-wrap">
-              <select id="theme-select" class="field-input setting-select">
-                <option value="system">System</option>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
         <div class="section-title">Account</div>
         <div class="card">
           <div class="setting-row">
@@ -2654,6 +2626,23 @@
           </div>
         </div>
 
+        <div class="section-title">Appearance</div>
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <div class="setting-title">Theme</div>
+              <div class="setting-sub">Match system, force dark, or force light.</div>
+            </div>
+            <div class="select-wrap setting-select-wrap">
+              <select id="theme-select" class="field-input setting-select">
+                <option value="system">System</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Overrides</div>
         <div class="card">
           <div class="setting-row">
@@ -2663,6 +2652,17 @@
             </div>
             <button class="action-btn primary setting-btn" id="use-override">Use</button>
           </div>
+        </div>
+
+        <div class="section-title">Notes</div>
+        <div class="card">
+          <textarea
+            id="notes-text"
+            class="notes-textarea"
+            placeholder="Persistent scratch pad — captures thoughts that don't belong on today's locked list. Saves automatically."
+            maxlength="4000"
+          ></textarea>
+          <div class="notes-status" id="notes-status">Saved</div>
         </div>
 
         <div class="section-title">Missed tasks</div>

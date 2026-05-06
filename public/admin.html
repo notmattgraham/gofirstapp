@@ -233,6 +233,38 @@
   }
   .role-picker button:disabled { opacity: 0.5; cursor: default; }
 
+  /* Override editor — compact [-] N [+] [Reset] control. */
+  .override-editor {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .override-editor button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .override-editor button:disabled { opacity: 0.5; cursor: default; }
+  .override-editor button.reset {
+    width: auto;
+    padding: 0 8px;
+  }
+  .override-editor .count {
+    min-width: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
   .btn {
     display: inline-flex;
     align-items: center;
@@ -601,7 +633,14 @@
         <td class="num">${fmt.int(u.taskCount)}</td>
         <td class="num hide-sm">${fmt.int(u.streakCount)}</td>
         <td class="num">${fmt.pct(u.executionRate)}</td>
-        <td class="num hide-sm">${fmt.int(u.overridesUsed)}</td>
+        <td class="num hide-sm">
+          <div class="override-editor" data-override-editor data-id="${escapeHtml(u.id)}">
+            <button data-step="-1" aria-label="Give back one override">&minus;</button>
+            <span class="count">${fmt.int(u.overridesUsed)}</span>
+            <button data-step="1" aria-label="Use one override">+</button>
+            <button class="reset" data-step="0" title="Reset to 0">Reset</button>
+          </div>
+        </td>
         <td>
           <div class="role-picker" data-role-picker data-id="${escapeHtml(u.id)}">
             <button data-role="user"   class="${role === 'user'   ? 'active' : ''}">User</button>
@@ -649,6 +688,41 @@
     } catch (err) {
       [...picker.querySelectorAll('button')].forEach(b => b.disabled = false);
       alert('Could not update role. ' + err.message);
+    }
+  });
+
+  // Click handler for the override editor. step="-1"/"1"/"0":
+  //   -1 → give the user one back   (overridesUsed - 1)
+  //    1 → consume one on their behalf (overridesUsed + 1)
+  //    0 → reset to 0
+  // Server clamps to 0..3.
+  $('users-body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-override-editor] button');
+    if (!btn) return;
+    const editor = btn.closest('[data-override-editor]');
+    const id = editor.dataset.id;
+    const step = Number(btn.dataset.step);
+    const u = allUsers.find(x => x.id === id);
+    if (!u) return;
+    const current = u.overridesUsed || 0;
+    let next;
+    if (step === 0) next = 0;
+    else next = Math.max(0, Math.min(3, current + step));
+    if (next === current) return; // already at boundary
+    [...editor.querySelectorAll('button')].forEach(b => b.disabled = true);
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/overrides`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overridesUsed: next }),
+      });
+      if (!r.ok) throw new Error('bad status ' + r.status);
+      u.overridesUsed = next;
+      applyUserFilter();
+    } catch (err) {
+      [...editor.querySelectorAll('button')].forEach(b => b.disabled = false);
+      alert('Could not update overrides. ' + err.message);
     }
   });
 
