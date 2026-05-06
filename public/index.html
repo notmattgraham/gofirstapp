@@ -2046,6 +2046,18 @@
   }
   .msg-group.mine { align-items: flex-end; align-self: flex-end; }
   .msg-group.theirs { align-items: flex-start; align-self: flex-start; }
+  /* iMessage-style enter animation — applied only to bubbles whose ids
+     haven't been rendered before, so existing history doesn't replay
+     the animation on every render. */
+  .msg-group.enter {
+    animation: bubbleEnter 0.32s cubic-bezier(0.32, 1.45, 0.5, 1);
+  }
+  .msg-group.mine.enter   { transform-origin: bottom right; }
+  .msg-group.theirs.enter { transform-origin: bottom left; }
+  @keyframes bubbleEnter {
+    from { opacity: 0; transform: scale(0.7) translateY(14px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
   .msg-bubble {
     padding: 9px 13px;
     border-radius: 18px;
@@ -5369,6 +5381,14 @@ const Coaching = (() => {
   let coachMessages = {};   // coach's view: clientId → messages[]
   let coachThreads = [];    // coach's thread list
 
+  // Track which message ids have been rendered already so initial history
+  // doesn't replay the bubbleEnter animation. Only NEW ids (arriving via
+  // WebSocket or a fresh send) animate in.
+  let _seenClientMsgIds = new Set();
+  let _hasLoadedClientChat = false;
+  const _seenCoachMsgIds = new Map();      // clientId → Set<msgId>
+  const _hasLoadedCoachConvo = new Map();  // clientId → boolean
+
   /* ── Apply tab layout based on user type ─────────────────── */
   function applyUserTabs(user) {
     // Coach takes precedence: even if the coach account is also tagged as a
@@ -5449,7 +5469,11 @@ const Coaching = (() => {
     } else if (me.coachingClient) {
       if (clientMessages.some(m => m.id === message.id)) return;
       clientMessages.push(message);
-      renderClientMessages();
+      // Only re-render when the chat tab is actually visible. Off-tab,
+      // we keep the message in the array but skip rendering — that way
+      // the bubbleEnter animation still plays on the user's first paint
+      // when they switch to the chat tab (the seen set is untouched).
+      if (currentTab === 'chat') renderClientMessages();
       if (message.fromUserId !== me.id) {
         hideTyping('client');
         // The coach just sent a message — they're active right now.
@@ -5475,6 +5499,14 @@ const Coaching = (() => {
       if (data.coach) {
         coachInfo = data.coach;
         updateCoachHeader();
+      }
+      // First load of the session: seed the seen set with the entire
+      // history so we don't animate every bubble at once. Subsequent
+      // loads (e.g., re-entering the chat tab) leave the seen set alone
+      // so messages that arrived while off-tab still animate in.
+      if (!_hasLoadedClientChat) {
+        _seenClientMsgIds = new Set(clientMessages.map(m => m.id));
+        _hasLoadedClientChat = true;
       }
       renderClientMessages();
     } catch (e) { console.warn('[chat]', e); }
@@ -5534,12 +5566,13 @@ const Coaching = (() => {
       return;
     }
     if (empty) empty.hidden = true;
-    // Replace all bubble content (keep empty div in place)
-    const html = clientMessages.map(m => buildBubble(m, me.id)).join('');
-    // Insert before empty div if it exists, else set innerHTML
+    const html = clientMessages.map(m => {
+      const isNew = !_seenClientMsgIds.has(m.id);
+      if (isNew) _seenClientMsgIds.add(m.id);
+      return buildBubble(m, me.id, isNew);
+    }).join('');
     container.innerHTML = (empty ? empty.outerHTML : '') + html;
     if (empty) {
-      // Re-grab reference after innerHTML reset
       const newEmpty = container.querySelector('.chat-empty');
       if (newEmpty) newEmpty.hidden = true;
     }
@@ -5631,6 +5664,14 @@ const Coaching = (() => {
     try {
       const data = await api('GET', `/api/messages/${clientId}`);
       coachMessages[clientId] = data.messages || [];
+      // First time opening this thread in the session: seed the seen set
+      // with the loaded history so we don't animate every bubble. Re-opens
+      // leave it alone so messages that arrived while the thread was
+      // closed still animate in.
+      if (!_hasLoadedCoachConvo.get(clientId)) {
+        _seenCoachMsgIds.set(clientId, new Set((data.messages || []).map(m => m.id)));
+        _hasLoadedCoachConvo.set(clientId, true);
+      }
       renderCoachMessages(clientId);
       if (data.tasks) renderClientSummary(data.tasks);
     } catch (e) { console.warn('[coach convo]', e); }
@@ -5642,7 +5683,13 @@ const Coaching = (() => {
     if (!container) return;
     const me   = Auth.user;
     const msgs = coachMessages[clientId] || [];
-    container.innerHTML = msgs.map(m => buildBubble(m, me.id)).join('');
+    let seen = _seenCoachMsgIds.get(clientId);
+    if (!seen) { seen = new Set(); _seenCoachMsgIds.set(clientId, seen); }
+    container.innerHTML = msgs.map(m => {
+      const isNew = !seen.has(m.id);
+      if (isNew) seen.add(m.id);
+      return buildBubble(m, me.id, isNew);
+    }).join('');
     container.scrollTop = container.scrollHeight;
   }
 
@@ -5705,10 +5752,11 @@ const Coaching = (() => {
   }
 
   /* ── Helpers ─────────────────────────────────────────────── */
-  function buildBubble(m, myId) {
+  function buildBubble(m, myId, isNew) {
     const mine = m.fromUserId === myId;
     const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return `<div class="msg-group ${mine ? 'mine' : 'theirs'}">
+    const enterCls = isNew ? ' enter' : '';
+    return `<div class="msg-group ${mine ? 'mine' : 'theirs'}${enterCls}">
       <div class="msg-bubble">${esc(m.content)}</div>
       <div class="msg-time">${esc(time)}</div>
     </div>`;
