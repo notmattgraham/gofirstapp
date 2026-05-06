@@ -960,6 +960,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
+    position: relative;
     transition: background 0.15s, border-color 0.15s;
   }
   .check.done {
@@ -973,6 +974,164 @@
     border-left: 2px solid white;
     border-bottom: 2px solid white;
     transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* ── Task-check animation ────────────────────────────────────
+     Fires when a row goes from undone → done. The check pops with
+     a spring, a green ring ripples outward, and the row collapses
+     to the right while fading. After the animation finishes the
+     state has already updated, so the next render naturally moves
+     the task into the "Completed" dropdown. */
+  .check.checking {
+    animation: checkPop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .check.checking::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid var(--success);
+    animation: checkRipple 0.55s ease-out;
+    pointer-events: none;
+  }
+  @keyframes checkPop {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+  @keyframes checkRipple {
+    from { transform: scale(1); opacity: 0.7; }
+    to   { transform: scale(2.6); opacity: 0; }
+  }
+  .row.checking-out {
+    animation: rowOut 0.42s 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+    pointer-events: none;
+  }
+  @keyframes rowOut {
+    to {
+      transform: translateX(28px);
+      opacity: 0;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      margin-top: 0;
+      margin-bottom: 0;
+      border-color: transparent;
+    }
+  }
+
+  /* ── Completed-tasks dropdown ────────────────────────────────
+     Sits below the active task list. Collapsed by default; shows
+     count and an iMessage-style chevron. */
+  .completed-section {
+    margin: 12px 0 0;
+  }
+  .completed-section[hidden] { display: none; }
+  .completed-summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .completed-summary::-webkit-details-marker { display: none; }
+  .completed-summary-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .completed-summary-icon::after {
+    content: "";
+    position: absolute;
+    top: 4px; left: 3px;
+    width: 8px;
+    height: 4px;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg);
+  }
+  .completed-summary-label { flex: 1; }
+  .completed-summary-count {
+    font-size: 12px;
+    color: var(--text-faint);
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .completed-summary::after {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(45deg);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details[open] > .completed-summary::after { transform: rotate(-135deg); }
+  .completed-list {
+    margin-top: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .completed-list .row {
+    opacity: 0.62;
+    border-bottom: 1px solid var(--border);
+  }
+  .completed-list .row:last-child { border-bottom: none; }
+  .completed-list .row .row-text { text-decoration: line-through; color: var(--text-dim); }
+
+  /* ── Celebration overlay (100% execution) ────────────────────
+     Sits absolutely over the stat-strip when all tasks complete.
+     Spring-scales in, holds, then fades. */
+  .stat-strip { position: relative; }
+  .celebration {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, var(--accent-dim), transparent 70%);
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: celebrateBg 0.4s ease-out;
+  }
+  .celebration[hidden] { display: none; }
+  .celebration.fade-out { animation: celebrateBgOut 0.4s ease-in forwards; }
+  .celebration-text {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.01em;
+    animation: celebrateText 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  @keyframes celebrateBg  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes celebrateBgOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes celebrateText {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  /* Subtle pulse on the strip border when celebrating */
+  .stat-strip.celebrating {
+    animation: stripPulse 1.2s ease-out;
+  }
+  @keyframes stripPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+    30%  { box-shadow: 0 0 0 8px rgba(16,185,129,0.18); }
+    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
   }
 
   .row-body {
@@ -2228,6 +2387,10 @@
             <div class="stat-title" id="stat-title">Today's execution</div>
             <div class="stat-sub" id="stat-sub">0 of 0 complete</div>
           </div>
+          <!-- Celebration overlay — appears when execution rate hits 100% -->
+          <div class="celebration" id="celebration" hidden aria-hidden="true">
+            <div class="celebration-text">You crushed it!</div>
+          </div>
         </div>
 
         <div id="habits-wrap" hidden>
@@ -2243,6 +2406,17 @@
             <div id="tasks-empty-sub">Add a task below to get moving.</div>
           </div>
         </div>
+
+        <!-- Completed-tasks dropdown — populated by renderTasksView when any
+             task on the current day is done. Hidden when there are none. -->
+        <details class="completed-section" id="completed-section" hidden>
+          <summary class="completed-summary">
+            <span class="completed-summary-icon" aria-hidden="true"></span>
+            <span class="completed-summary-label">Completed</span>
+            <span class="completed-summary-count" id="completed-count">0</span>
+          </summary>
+          <ul class="list completed-list" id="completed-list"></ul>
+        </details>
       </section>
 
       <!-- Streaks view (retired — habits/streaks now live on the Tasks view) -->
@@ -3462,6 +3636,98 @@ function setTab(name) {
   setTopAction();
 }
 
+/* ---- Task-check animation ----
+   Tasks currently mid-exit-animation. Renders keep them in the
+   active list with the .checking-out class so they animate out
+   in place; once the timer fires we drop them from the set and
+   the next render moves them to the Completed dropdown. */
+const _exitingTasks = new Set();
+
+function handleTaskToggle(id, rowEl) {
+  if (isTemp(id)) return;
+  const task = Store.get().tasks.find(t => t.id === id);
+  if (!task) return;
+  const wasDone = isTaskDoneOn(task, todayISO());
+
+  if (wasDone) {
+    // Going done → undone (from the Completed dropdown). No animation,
+    // just toggle and let the row reappear at the top of the active list.
+    Store.toggleTaskToday(id);
+    return;
+  }
+
+  // Going undone → done. Optimistically apply the .checking class to the
+  // check button so the pop + ripple play immediately, mark the task as
+  // exiting so it stays in the active list during the animation, then
+  // let Store.toggleTaskToday update state. The next render will keep
+  // the row in place (with .checking-out from the renderer) until the
+  // timer expires and we drop the id from _exitingTasks.
+  if (rowEl) {
+    const btn = rowEl.querySelector('.check');
+    if (btn) {
+      btn.classList.add('checking', 'done');
+      // Strip the checking class after the bounce so re-renders don't
+      // restart it (rendered HTML doesn't include it anyway).
+      setTimeout(() => btn.classList.remove('checking'), 400);
+    }
+  }
+  _exitingTasks.add(id);
+  Store.toggleTaskToday(id);
+  setTimeout(() => {
+    _exitingTasks.delete(id);
+    render(Store.get());
+  }, 600);
+}
+
+/* ---- Stat ring animation ----
+   The conic-gradient angle interpolates over ~600ms via raf so the
+   "ring filling" feels smooth instead of jumping in discrete steps. */
+let _ringRaf = null;
+let _ringRate = 0;
+// First render seeds _ringRate without firing the celebration so that
+// reopening the app on a day that's already complete doesn't re-celebrate.
+let _ringSeeded = false;
+function animateRingTo(targetRate) {
+  const ring = document.getElementById('stat-ring');
+  const pct  = document.getElementById('stat-ring-pct');
+  if (!ring) return;
+  if (_ringRaf) cancelAnimationFrame(_ringRaf);
+  const start = performance.now();
+  const from  = _ringRate;
+  const dur   = 600;
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const cur = from + (targetRate - from) * eased;
+    ring.style.background = `conic-gradient(var(--accent) ${cur * 3.6}deg, var(--surface-2) 0deg)`;
+    if (pct) pct.textContent = Math.round(cur) + '%';
+    if (t < 1) _ringRaf = requestAnimationFrame(step);
+    else { _ringRaf = null; _ringRate = targetRate; }
+  }
+  _ringRaf = requestAnimationFrame(step);
+}
+
+function triggerCelebration() {
+  const strip = document.getElementById('stat-strip');
+  const cel   = document.getElementById('celebration');
+  if (!strip || !cel) return;
+  // Restart the spring + bg animation each time by toggling hidden + reflow.
+  cel.hidden = false;
+  cel.classList.remove('fade-out');
+  cel.style.animation = 'none';
+  void cel.offsetWidth;
+  cel.style.animation = '';
+  strip.classList.remove('celebrating');
+  void strip.offsetWidth;
+  strip.classList.add('celebrating');
+  // Hold for a beat, then fade out.
+  clearTimeout(triggerCelebration._t);
+  triggerCelebration._t = setTimeout(() => {
+    cel.classList.add('fade-out');
+    setTimeout(() => { cel.hidden = true; }, 400);
+  }, 1800);
+}
+
 /* ---- Rendering ---- */
 function renderStatStrip(state) {
   // Count exactly the tasks visible in today's list — uses taskScheduledFor so
@@ -3471,8 +3737,6 @@ function renderStatStrip(state) {
   const total = eligible.length;
   const done = eligible.filter(t => isTaskDoneOn(t, today)).length;
   const strip = document.getElementById('stat-strip');
-  const ring = document.getElementById('stat-ring');
-  const pct = document.getElementById('stat-ring-pct');
   const sub = document.getElementById('stat-sub');
   if (total === 0) {
     strip.hidden = true;
@@ -3480,9 +3744,14 @@ function renderStatStrip(state) {
   }
   strip.hidden = false;
   const rate = Math.round((done / total) * 100);
-  ring.style.background = `conic-gradient(var(--accent) ${rate * 3.6}deg, var(--surface-2) 0deg)`;
-  pct.textContent = rate + '%';
+  const prevRate = _ringRate;
+  animateRingTo(rate);
   sub.textContent = `${done} of ${total} complete`;
+  // Celebrate the first time the bar tips into 100% on a non-empty list.
+  // Skip on the very first render so reopening the app on an already-100%
+  // day doesn't fire a stale celebration.
+  if (_ringSeeded && rate === 100 && prevRate < 100) triggerCelebration();
+  _ringSeeded = true;
 }
 
 // Currently-selected date ISO string (YYYY-MM-DD). Empty until first render.
@@ -3826,11 +4095,24 @@ function renderTasksView(state) {
 
   const allTasks = state.tasks.filter(t => taskScheduledFor(t, dayISO));
 
+  // Split into pending (or mid-animation) and done. Tasks currently
+  // animating out stay in the active list with the .checking-out class
+  // so the user sees them slide away in place.
+  const activeTasks = [];
+  const doneTasks   = [];
+  for (const t of allTasks) {
+    const isDone   = isTaskDoneOn(t, dayISO);
+    const exiting  = _exitingTasks.has(t.id);
+    if (!isDone || exiting) activeTasks.push(t);
+    else doneTasks.push(t);
+  }
+
   if (allTasks.length === 0) {
     els.tasksList.innerHTML = '';
     els.tasksEmpty.style.display = 'block';
     const sub = document.getElementById('tasks-empty-sub');
     if (sub) sub.textContent = 'No tasks for this day. Tap "+ New task" to add one.';
+    renderCompletedSection([], dayISO);
     return;
   }
   els.tasksEmpty.style.display = 'none';
@@ -3838,6 +4120,7 @@ function renderTasksView(state) {
   // ---- Shared row renderer ----
   const renderRow = (t) => {
     const done = isTaskDoneOn(t, dayISO);
+    const exiting = _exitingTasks.has(t.id);
     const schedule = scheduleLabel(t.recurrence);
     const badges = [];
     if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
@@ -3864,7 +4147,7 @@ function renderTasksView(state) {
       ? `<button class="drag-handle" data-action="drag-handle" aria-label="Drag to reorder">${gripIcon}</button>`
       : '';
     const row = `
-      <li class="row ${done ? 'done' : ''}" data-task-id="${t.id}">
+      <li class="row ${done ? 'done' : ''} ${exiting ? 'checking-out' : ''}" data-task-id="${t.id}">
         ${dragHandle}<button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
         <div class="row-body">
           <div class="row-text">${esc(t.text)}</div>
@@ -3891,7 +4174,7 @@ function renderTasksView(state) {
   if (taskViewMode === 'category') {
     const CATEGORY_ORDER = ['Family', 'Fitness', 'Career', 'Self-Improvement', 'Other'];
     const grouped = {}, uncategorized = [];
-    for (const t of allTasks) {
+    for (const t of activeTasks) {
       if (t.category && CATEGORY_ORDER.includes(t.category)) {
         (grouped[t.category] = grouped[t.category] || []).push(t);
       } else { uncategorized.push(t); }
@@ -3905,11 +4188,11 @@ function renderTasksView(state) {
     }
 
   } else if (taskViewMode === 'recent') {
-    html = sortGroup(allTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
+    html = sortGroup(activeTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
 
   } else if (taskViewMode === 'chronological') {
     const morning = [], afternoon = [], evening = [], anyTime = [];
-    for (const t of allTasks) {
+    for (const t of activeTasks) {
       const tm = t.scheduledTime;
       if (!tm)             anyTime.push(t);
       else if (tm < '12:00') morning.push(t);
@@ -3931,7 +4214,7 @@ function renderTasksView(state) {
 
   } else if (taskViewMode === 'custom') {
     const order = getCustomOrder(dayISO);
-    const sorted = [...allTasks].sort((a, b) => {
+    const sorted = [...activeTasks].sort((a, b) => {
       const ai = order.indexOf(a.id);
       const bi = order.indexOf(b.id);
       if (ai === -1 && bi === -1) return (a.createdAt||0)-(b.createdAt||0);
@@ -3939,11 +4222,35 @@ function renderTasksView(state) {
       if (bi === -1) return -1;
       return ai - bi;
     });
-    // In custom mode we respect the user's order even for done tasks
     html = sorted.map(renderRow).join('');
   }
 
   els.tasksList.innerHTML = html;
+  renderCompletedSection(doneTasks, dayISO);
+}
+
+/* Bottom dropdown showing completed tasks for the current day. Hidden when
+   nothing's done yet. Tapping a row's check uncrosses the task. */
+function renderCompletedSection(doneTasks, dayISO) {
+  const wrap = document.getElementById('completed-section');
+  const list = document.getElementById('completed-list');
+  const count = document.getElementById('completed-count');
+  if (!wrap || !list) return;
+  if (!doneTasks.length) {
+    wrap.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+  wrap.hidden = false;
+  if (count) count.textContent = doneTasks.length;
+  // Sort newest-first by creation; we don't track per-day completion timestamps.
+  const sorted = [...doneTasks].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  list.innerHTML = sorted.map(t => `
+    <li class="row done" data-task-id="${t.id}">
+      <button class="check done" data-action="task-toggle" aria-label="Mark not done"></button>
+      <div class="row-body"><div class="row-text">${esc(t.text)}</div></div>
+    </li>
+  `).join('');
 }
 
 function renderStreaksView(state) {
@@ -4469,7 +4776,10 @@ els.views.todo.addEventListener('click', (e) => {
   const row = btn.closest('[data-task-id]');
   if (!row) return;
   const id = row.dataset.taskId;
-  if (action === 'task-toggle') Store.toggleTaskToday(id);
+  if (action === 'task-toggle') {
+    handleTaskToggle(id, row);
+    return;
+  }
   if (action === 'task-delete') {
     const task = Store.get().tasks.find(t => t.id === id);
     if (!task) return;
