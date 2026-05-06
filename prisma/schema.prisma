@@ -34,6 +34,12 @@ model User {
   // by the admin account; has no effect on the user's own experience.
   coachingClient      Boolean  @default(false)
 
+  // Marks a user as the coach. The coach sees the iMessage-style inbox of
+  // every coaching client in the chat tab and can reply to them. Toggled
+  // by the admin via /dev. Falls back to env COACH_EMAIL match in code so
+  // the original coach account works before anyone is flagged in the DB.
+  isCoach             Boolean  @default(false)
+
   tasks          Task[]
   quitStreaks    QuitStreak[]
   sentMessages   Message[] @relation("SentMessages")

@@ -14,13 +14,17 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Helper: is the given user the coach?
+// DB flag wins; the env-email fallback bootstraps the very first coach
+// before anyone has been flagged via /dev.
 function isCoach(user) {
-  return (user.email || '').toLowerCase() === COACH_EMAIL;
+  return !!user.isCoach || (user.email || '').toLowerCase() === COACH_EMAIL;
 }
 
-// Helper: fetch the coach user record (cached per-request would be nice but
-// the route is infrequent enough that a fresh DB hit is fine).
+// Helper: fetch the coach user record. Prefer a user explicitly flagged in
+// the DB; fall back to the env-configured email.
 async function fetchCoach() {
+  const flagged = await prisma.user.findFirst({ where: { isCoach: true } });
+  if (flagged) return flagged;
   return prisma.user.findFirst({ where: { email: { equals: COACH_EMAIL, mode: 'insensitive' } } });
 }
 

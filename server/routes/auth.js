@@ -28,7 +28,9 @@ function shape(u) {
     overrideActiveDate: u.overrideActiveDate,
     // Coaching fields — frontend uses these to switch tab layout + show chat.
     coachingClient: u.coachingClient || false,
-    isCoach: (u.email || '').toLowerCase() === COACH_EMAIL,
+    // DB flag wins; the env-email fallback bootstraps the very first coach
+    // before anyone has been flagged via /dev.
+    isCoach: !!u.isCoach || (u.email || '').toLowerCase() === COACH_EMAIL,
   };
 }
 

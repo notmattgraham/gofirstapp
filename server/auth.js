@@ -31,11 +31,19 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
       if (!email) return done(new Error('Google account has no email'));
 
-      const user = await prisma.user.upsert({
-        where: { googleId: profile.id },
-        update: { email, name, picture },
-        create: { googleId: profile.id, email, name, picture },
-      });
+      // First sign-in: seed everything from Google. Subsequent sign-ins:
+      // only refresh email (in case the user changed their primary Google
+      // address). Never overwrite name or picture — those are user-editable
+      // in the profile and must survive future logins.
+      const existing = await prisma.user.findUnique({ where: { googleId: profile.id } });
+      const user = existing
+        ? await prisma.user.update({
+            where: { id: existing.id },
+            data: { email },
+          })
+        : await prisma.user.create({
+            data: { googleId: profile.id, email, name, picture },
+          });
       done(null, user);
     } catch (e) {
       done(e);
