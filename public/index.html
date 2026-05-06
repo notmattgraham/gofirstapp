@@ -205,6 +205,9 @@
   /* [hidden] must beat per-id `display:flex` rules (e.g. #view-chat) so
      hidden views collapse out of the flex slider and tab indices line up. */
   .view[hidden] { display: none !important; }
+  /* Same fix for the bottom-nav tabs — `.tab` declares `display:flex`,
+     which would otherwise mask the [hidden] attribute on retired tabs. */
+  .tab[hidden] { display: none !important; }
   /* Every view starts with the same top padding so switching tabs
      never shifts the first content line up or down. */
   .view > :first-child { margin-top: 4px !important; }
@@ -1692,6 +1695,91 @@
     overflow: hidden;
   }
 
+  /* The chat tab carries one of three modes (client/coach/paywall).
+     Only one is visible at a time; each fills the chat-view height. */
+  .chat-mode {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .chat-mode[hidden] { display: none !important; }
+
+  /* Coach inbox header — flat iMessage-style title bar */
+  .chat-inbox-header {
+    flex-shrink: 0;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .chat-inbox-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .chat-inbox-list {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Paywall mode — non-coaching clients see this when they tap Chat. */
+  .chat-paywall {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px 28px;
+    gap: 18px;
+  }
+  .chat-paywall-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-paywall-icon svg {
+    width: 30px; height: 30px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .chat-paywall-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .chat-paywall-sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    max-width: 320px;
+  }
+  .chat-paywall-cta {
+    margin-top: 4px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chat-paywall-cta:active { background: var(--accent-hover); }
+  .chat-paywall-foot {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 6px;
+  }
+
   .chat-header {
     flex-shrink: 0;
     display: flex;
@@ -2171,30 +2259,63 @@
         </div>
       </section>
 
-      <!-- Chat view (coaching clients only — hidden until auth confirms coachingClient) -->
-      <section id="view-chat" class="view" hidden>
-        <!-- Coach header -->
-        <div class="chat-header">
-          <div class="chat-header-avatar" id="chat-coach-avatar">M</div>
-          <div class="chat-header-info">
-            <div class="chat-header-name">Coach</div>
-            <div class="chat-header-status" id="chat-status">GoFirst Coaching</div>
+      <!-- Chat view — visible to everyone, content varies by role:
+           coach → iMessage-style inbox; coaching client → conversation
+           with the coach; non-client → upgrade paywall. -->
+      <section id="view-chat" class="view">
+
+        <!-- Mode: coaching client — direct conversation with their coach -->
+        <div class="chat-mode" data-mode="client" hidden>
+          <div class="chat-header">
+            <div class="chat-header-avatar" id="chat-coach-avatar">M</div>
+            <div class="chat-header-info">
+              <div class="chat-header-name">Coach</div>
+              <div class="chat-header-status" id="chat-status">GoFirst Coaching</div>
+            </div>
+          </div>
+          <div class="chat-messages" id="chat-messages">
+            <div class="chat-empty" id="chat-empty">
+              <div class="chat-empty-title">Start the conversation</div>
+              <div class="chat-empty-sub">Your coach will see your tasks and analytics to give you the best guidance.</div>
+            </div>
+          </div>
+          <div class="chat-input-wrap">
+            <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
+            <button class="chat-send" id="chat-send" disabled aria-label="Send">
+              <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+            </button>
           </div>
         </div>
-        <!-- Message list -->
-        <div class="chat-messages" id="chat-messages">
-          <div class="chat-empty" id="chat-empty">
-            <div class="chat-empty-title">Start the conversation</div>
-            <div class="chat-empty-sub">Your coach will see your tasks and analytics to give you the best guidance.</div>
+
+        <!-- Mode: coach — iMessage-style inbox of every coaching client -->
+        <div class="chat-mode" data-mode="coach" hidden>
+          <div class="chat-inbox-header">
+            <div class="chat-inbox-title">Messages</div>
+          </div>
+          <div id="chat-coach-thread-list" class="chat-inbox-list coach-thread-list">
+            <div class="empty" id="chat-coach-inbox-empty">
+              <div class="empty-title">No messages yet</div>
+              <div>Coaching clients will appear here once you activate them.</div>
+            </div>
           </div>
         </div>
-        <!-- Input area -->
-        <div class="chat-input-wrap">
-          <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
-          <button class="chat-send" id="chat-send" disabled aria-label="Send">
-            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-          </button>
+
+        <!-- Mode: non-client — locked, upgrade paywall -->
+        <div class="chat-mode" data-mode="paywall" hidden>
+          <div class="chat-paywall">
+            <div class="chat-paywall-icon">
+              <svg viewBox="0 0 24 24">
+                <rect x="4" y="11" width="16" height="10" rx="2"/>
+                <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+              </svg>
+            </div>
+            <div class="chat-paywall-title">Unlock 1-on-1 coaching</div>
+            <div class="chat-paywall-sub">Get a coach who reviews your tasks, helps you stay accountable, and messages with you anytime — right inside the app.</div>
+            <button class="chat-paywall-cta" id="chat-paywall-cta">Upgrade</button>
+            <div class="chat-paywall-foot">Coming soon — tap Upgrade to join the waitlist.</div>
+          </div>
         </div>
+
       </section>
 
       <!-- Profile view -->
@@ -2269,20 +2390,6 @@
                 <div class="setting-title">Active coaching client</div>
                 <div class="setting-sub">Your coach can see your tasks and analytics. Use the Chat tab to message them.</div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Coach inbox link (shown only for the coach account) -->
-        <div id="coach-profile-section" hidden>
-          <div class="section-title">Coaching</div>
-          <div class="card">
-            <div class="setting-row" id="coach-messages-row" style="cursor:pointer">
-              <div class="setting-copy">
-                <div class="setting-title">Messages</div>
-                <div class="setting-sub">View conversations with your coaching clients.</div>
-              </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-faint);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
             </div>
           </div>
         </div>
@@ -2427,8 +2534,8 @@
         </svg>
         Analytics
       </button>
-      <!-- Visible only for coaching clients -->
-      <button class="tab" data-tab="chat" id="tab-chat" hidden>
+      <!-- Chat tab — always visible; content per role (coach/client/paywall). -->
+      <button class="tab" data-tab="chat" id="tab-chat">
         <span class="tab-icon-wrap">
           <svg viewBox="0 0 24 24">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -2449,25 +2556,8 @@
       </button>
     </nav>
 
-    <!-- Coach inbox overlay (slides in from right, coach account only) -->
-    <div id="coach-inbox-overlay" class="coach-overlay" hidden>
-      <div class="coach-overlay-header">
-        <button class="back-btn" id="coach-inbox-back">
-          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-        </button>
-        <span class="coach-overlay-title">Messages</span>
-      </div>
-      <div class="coach-overlay-body">
-        <div id="coach-thread-list" class="coach-thread-list">
-          <div class="empty" id="coach-inbox-empty">
-            <div class="empty-title">No messages yet</div>
-            <div>Coaching clients will appear here once you activate them.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Coach conversation overlay (slides in on top of inbox) -->
+    <!-- Coach conversation overlay (slides in over the chat tab when the
+         coach taps a thread row in the inbox) -->
     <div id="coach-convo-overlay" class="coach-overlay" hidden>
       <div class="coach-convo-header">
         <button class="back-btn" id="coach-convo-back">
@@ -4803,22 +4893,26 @@ const Coaching = (() => {
     if (tabStreaks)  tabStreaks.hidden  = true;
     if (viewStreaks) viewStreaks.hidden = true;
 
-    // Chat tab is visible only for coaching clients (the coach uses Profile → Messages).
+    // Chat tab is now visible for every signed-in user. Content varies:
+    //   coach   → iMessage-style inbox of every coaching client
+    //   client  → direct conversation with their coach
+    //   neither → upgrade paywall
     const tabChat  = document.getElementById('tab-chat');
     const viewChat = document.getElementById('view-chat');
-    if (tabChat)  tabChat.hidden  = !isClient;
-    if (viewChat) viewChat.hidden = !isClient;
+    if (tabChat)  tabChat.hidden  = false;
+    if (viewChat) viewChat.hidden = false;
 
-    // Update the global tab order used by setTab + swipe.
-    _tabOrder = isClient
-      ? ['todo', 'analytics', 'chat', 'profile']
-      : ['todo', 'analytics', 'profile'];
+    const activeMode = isCoach ? 'coach' : (isClient ? 'client' : 'paywall');
+    document.querySelectorAll('#view-chat .chat-mode').forEach(el => {
+      el.hidden = el.dataset.mode !== activeMode;
+    });
 
-    // Show coaching profile sections.
+    // Tab order is the same for everyone now — chat is always present.
+    _tabOrder = ['todo', 'analytics', 'chat', 'profile'];
+
+    // Coaching profile section (status card on the client's profile).
     const coachingSection = document.getElementById('coaching-profile-section');
-    const coachSection    = document.getElementById('coach-profile-section');
     if (coachingSection) coachingSection.hidden = !isClient;
-    if (coachSection)    coachSection.hidden    = !isCoach;
   }
 
   /* ── WebSocket ───────────────────────────────────────────── */
@@ -4856,7 +4950,7 @@ const Coaching = (() => {
       if (message.fromUserId !== me.id) {
         const convoOpen = currentClientId === cid &&
           !document.getElementById('coach-convo-overlay').hidden;
-        if (!convoOpen) setTabBadge('profile', true);
+        if (!convoOpen) setTabBadge('chat', true);
       }
     } else if (me.coachingClient) {
       if (clientMessages.some(m => m.id === message.id)) return;
@@ -4930,19 +5024,20 @@ const Coaching = (() => {
       coachThreads = data.threads || [];
       renderThreadList();
       const unread = coachThreads.reduce((s, t) => s + (t.unread || 0), 0);
-      setTabBadge('profile', unread > 0);
+      setTabBadge('chat', unread > 0);
     } catch (e) { console.warn('[coach inbox]', e); }
   }
 
   function renderThreadList() {
-    const list  = document.getElementById('coach-thread-list');
-    const empty = document.getElementById('coach-inbox-empty');
+    const list = document.getElementById('chat-coach-thread-list');
     if (!list) return;
     if (!coachThreads.length) {
-      if (empty) empty.hidden = false;
+      list.innerHTML = `<div class="empty" id="chat-coach-inbox-empty">
+        <div class="empty-title">No messages yet</div>
+        <div>Coaching clients will appear here once you activate them.</div>
+      </div>`;
       return;
     }
-    if (empty) empty.hidden = true;
     list.innerHTML = coachThreads.map(t => {
       const name    = t.client.name || t.client.email || 'Client';
       const initial = name.trim().charAt(0).toUpperCase();
@@ -5052,11 +5147,6 @@ const Coaching = (() => {
     el.classList.remove('open');
     setTimeout(() => { el.hidden = true; }, 300);
   }
-  function openInbox() {
-    openOverlay('coach-inbox-overlay');
-    loadCoachThreads();
-  }
-  function closeInbox() { closeOverlay('coach-inbox-overlay'); }
   function closeConvo() {
     closeOverlay('coach-convo-overlay');
     setTimeout(() => { currentClientId = null; }, 300);
@@ -5118,16 +5208,12 @@ const Coaching = (() => {
     }
     if (coachSend) coachSend.addEventListener('click', sendCoachMessage);
 
-    // Coach inbox back
-    const inboxBack = document.getElementById('coach-inbox-back');
-    if (inboxBack) inboxBack.addEventListener('click', closeInbox);
-
-    // Coach convo back
+    // Coach convo back (still slides over the chat tab when a thread is opened)
     const convoBack = document.getElementById('coach-convo-back');
     if (convoBack) convoBack.addEventListener('click', closeConvo);
 
-    // Thread list tap (event delegation)
-    const threadList = document.getElementById('coach-thread-list');
+    // Thread list tap (event delegation, lives inside #view-chat now)
+    const threadList = document.getElementById('chat-coach-thread-list');
     if (threadList) {
       threadList.addEventListener('click', (e) => {
         const row = e.target.closest('[data-client-id]');
@@ -5135,11 +5221,13 @@ const Coaching = (() => {
       });
     }
 
-    // Profile → Messages row (coach)
-    const messagesRow = document.getElementById('coach-messages-row');
-    if (messagesRow) messagesRow.addEventListener('click', openInbox);
+    // Paywall CTA — placeholder until upgrade flow exists.
+    const paywallCta = document.getElementById('chat-paywall-cta');
+    if (paywallCta) paywallCta.addEventListener('click', () => {
+      banner('Coaching is invite-only right now. Email mattgraham15@gmail.com to join.', false, 4000);
+    });
 
-    // Clear chat badge when switching to chat tab
+    // Clear chat badge when switching to chat tab.
     document.querySelectorAll('.tab').forEach(btn => {
       btn.addEventListener('click', () => {
         if (btn.dataset.tab === 'chat') setTabBadge('chat', false);
@@ -5153,7 +5241,6 @@ const Coaching = (() => {
     loadClientChat,
     loadCoachThreads,
     wireEvents,
-    openInbox,
     openOverlay,
     closeOverlay,
   };
