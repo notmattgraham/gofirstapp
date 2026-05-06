@@ -1,10 +1,13 @@
 require('dotenv').config();
 
 const path = require('path');
+const http = require('http');
 const express = require('express');
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const passport = require('./auth');
+const { WebSocketServer } = require('ws');
+const prisma = require('./db');
 
 // Keep the Node process alive on unhandled async errors. Express 4 doesn't
 // catch errors thrown inside async route handlers; without these listeners
@@ -62,6 +65,7 @@ app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/streaks', require('./routes/streaks'));
 app.use('/api/overrides', require('./routes/overrides'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/messages', require('./routes/messages'));
 
 // Static assets — the SPA lives in /public.
 const publicDir = path.join(__dirname, '..', 'public');
@@ -94,8 +98,102 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'internal_error' });
 });
 
+// ─── WebSocket server for real-time coaching chat ──────────────────────────
+// Parses the gofirst.sid cookie from the WS upgrade request, looks the
+// session up in Postgres, and resolves it to a user. If the session is invalid
+// the socket is destroyed immediately.
+
+function parseCookies(str) {
+  const out = {};
+  (str || '').split(';').forEach(part => {
+    const eq = part.indexOf('=');
+    if (eq < 0) return;
+    const k = part.slice(0, eq).trim();
+    const v = part.slice(eq + 1).trim();
+    out[k] = decodeURIComponent(v);
+  });
+  return out;
+}
+
+// userId → Set of open WebSocket connections (supports multiple tabs).
+const wsClients = new Map();
+
+// Broadcast a JSON payload to every open connection for a given userId.
+function wsBroadcast(userId, payload) {
+  const sockets = wsClients.get(userId);
+  if (!sockets) return;
+  const json = JSON.stringify(payload);
+  for (const ws of sockets) {
+    if (ws.readyState === 1 /* OPEN */) {
+      try { ws.send(json); } catch (_) {}
+    }
+  }
+}
+// Expose on global so messages.js can call it without a circular import.
+global.wsBroadcast = wsBroadcast;
+
+const wss = new WebSocketServer({ noServer: true });
+
+wss.on('connection', (ws, userId) => {
+  // Register the socket.
+  if (!wsClients.has(userId)) wsClients.set(userId, new Set());
+  wsClients.get(userId).add(ws);
+
+  ws.on('close', () => {
+    const set = wsClients.get(userId);
+    if (set) {
+      set.delete(ws);
+      if (set.size === 0) wsClients.delete(userId);
+    }
+  });
+
+  ws.on('error', () => {});
+});
+
+// ─── HTTP server ────────────────────────────────────────────────────────────
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => {
+const server = http.createServer(app);
+
+// Intercept WebSocket upgrade requests. Auth is done here by reading the
+// session cookie, looking up the Postgres session, and checking passport.user.
+server.on('upgrade', async (request, socket, head) => {
+  try {
+    const cookies = parseCookies(request.headers.cookie || '');
+    const rawSid = cookies['gofirst.sid'] || '';
+    if (!rawSid) { socket.destroy(); return; }
+
+    // express-session prefixes the SID with "s:" and appends an HMAC.
+    // Strip both to get the bare session ID stored in Postgres.
+    const sid = rawSid.replace(/^s:/, '').split('.')[0];
+
+    const sessionRow = await prisma.session.findUnique({ where: { sid } });
+    if (!sessionRow || sessionRow.expire < new Date()) { socket.destroy(); return; }
+
+    const sess = typeof sessionRow.sess === 'string'
+      ? JSON.parse(sessionRow.sess)
+      : sessionRow.sess;
+
+    const userId = sess?.passport?.user;
+    if (!userId) { socket.destroy(); return; }
+
+    // Only coaching clients and the coach get a WS connection — everyone else
+    // can't use the chat feature, so there's no point keeping a socket open.
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, coachingClient: true } });
+    const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
+    if (!user || (!user.coachingClient && user.email.toLowerCase() !== COACH_EMAIL)) {
+      socket.destroy(); return;
+    }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, userId);
+    });
+  } catch (e) {
+    console.error('[ws upgrade error]', e);
+    socket.destroy();
+  }
+});
+
+server.listen(port, () => {
   console.log(`GoFirst listening on :${port}  (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
 
   // Server-side keepalive: ping ourselves every 5 minutes so Railway never

@@ -34,8 +34,25 @@ model User {
   // by the admin account; has no effect on the user's own experience.
   coachingClient      Boolean  @default(false)
 
-  tasks       Task[]
-  quitStreaks QuitStreak[]
+  tasks          Task[]
+  quitStreaks    QuitStreak[]
+  sentMessages   Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User      @relation("SentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User      @relation("ReceivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
+  content    String
+  // Null = unread. Set to the time the recipient first opened the message.
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([fromUserId])
+  @@index([toUserId])
 }
 
 model Task {

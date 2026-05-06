@@ -4,6 +4,10 @@ const prisma = require('../db');
 
 const router = express.Router();
 
+// The one coach account. Hardcoded as an env-var default so the whole
+// coaching feature can be ripped out by deleting COACH_EMAIL.
+const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
+
 // Kick off Google OAuth.
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
@@ -22,6 +26,9 @@ function shape(u) {
     timezone: u.timezone,
     overridesUsed: u.overridesUsed,
     overrideActiveDate: u.overrideActiveDate,
+    // Coaching fields — frontend uses these to switch tab layout + show chat.
+    coachingClient: u.coachingClient || false,
+    isCoach: (u.email || '').toLowerCase() === COACH_EMAIL,
   };
 }
 

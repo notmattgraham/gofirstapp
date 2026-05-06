@@ -434,7 +434,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    margin: 4px 0 0;
+    margin: 4px 0 4px;
   }
   .stat-strip[hidden] { display: none; }
   .stat-ring {
@@ -565,22 +565,16 @@
     padding-right: 40px;
   }
 
-  /* Stack of per-group task cards (one card per category / time-of-day) */
-  .tasks-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-top: 14px;
-  }
-
-  /* Header inside each category / time-of-day card */
-  .task-card-header {
-    padding: 12px 16px 4px;
+  /* Task list category section headers */
+  .task-category-header {
+    list-style: none;
+    padding: 10px 16px 5px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
     color: var(--text-dim);
+    border-top: 1px solid var(--border);
   }
 
   /* Recurring-delete confirmation sheet */
@@ -751,6 +745,17 @@
     border-color: var(--accent);
   }
 
+  /* Time-of-day group headers (Chronological mode, same look as category headers) */
+  .task-time-header {
+    list-style: none;
+    padding: 10px 16px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
 
   /* Drag handle for Custom sort mode */
   .drag-handle {
@@ -1650,6 +1655,377 @@
   .sync-banner.show { opacity: 1; }
   .sync-banner.error { background: var(--danger); }
 
+
+  /* ── Tab badge dots ─────────────────────────────────────────── */
+  .tab-icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+  }
+  .tab-icon-wrap svg { width: 22px; height: 22px; }
+  .tab-badge {
+    position: absolute;
+    top: -3px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+    border: 1.5px solid var(--bg-elev);
+    display: block;
+  }
+  .tab-badge[hidden] { display: none; }
+
+  /* ── Chat view — full-height flex column ─────────────────────
+     Overrides default .view padding; header is sticky at top,
+     messages scroll, input sticks above the nav bar. */
+  #view-chat {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .chat-header-avatar {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+  }
+  .chat-header-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .chat-header-info { flex: 1; min-width: 0; }
+  .chat-header-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .chat-header-status { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+
+  /* Scrollable message area */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .chat-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 36px 24px;
+  }
+  .chat-empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .chat-empty-sub { font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+
+  /* Message bubbles */
+  .msg-group {
+    display: flex;
+    flex-direction: column;
+    max-width: 78%;
+    margin-bottom: 4px;
+  }
+  .msg-group.mine { align-items: flex-end; align-self: flex-end; }
+  .msg-group.theirs { align-items: flex-start; align-self: flex-start; }
+  .msg-bubble {
+    padding: 9px 13px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .msg-group.mine .msg-bubble {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-bottom-right-radius: 4px;
+  }
+  .msg-group.theirs .msg-bubble {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-time {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 3px;
+    padding: 0 4px;
+  }
+
+  /* Chat input bar */
+  .chat-input-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 8px);
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .chat-input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.4;
+    display: block;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-send {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-fg);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-send:disabled { background: var(--surface-2); color: var(--text-faint); }
+  .chat-send:active:not(:disabled) { background: var(--accent-hover); }
+  .chat-send svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ── Back button (used in overlays) ─────────────────────────── */
+  .back-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .back-btn:active { background: var(--surface-2); }
+  .back-btn svg {
+    width: 20px; height: 20px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* ── Coach overlay panels ────────────────────────────────────
+     Slide in from the right on top of the main app. z-index just
+     above content but below any modals/toasts. */
+  .coach-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 12;
+    background: var(--bg);
+    max-width: 480px;
+    left: 50%;
+    transform: translateX(-50%) translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.28, 1);
+    will-change: transform;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  @media (min-width: 520px) {
+    .coach-overlay {
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+  }
+  .coach-overlay.open { transform: translateX(-50%) translateX(0%); }
+  .coach-overlay[hidden] { display: none; }
+
+  .coach-overlay-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: calc(var(--safe-top) + 14px) 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .coach-overlay-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .coach-overlay-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Coach convo overlay internal layout */
+  .coach-convo-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: calc(var(--safe-top) + 14px) 16px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  #coach-convo-overlay .chat-messages {
+    flex: 1;
+  }
+  #coach-convo-overlay .chat-input-wrap {
+    padding-bottom: calc(var(--safe-bottom) + 12px);
+  }
+
+  /* ── Coach thread list ───────────────────────────────────────── */
+  .coach-thread-list { padding: 0; }
+  .coach-thread {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .coach-thread:active { background: var(--surface-2); }
+  .coach-thread:last-child { border-bottom: none; }
+  .coach-thread-avatar {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+  }
+  .coach-thread-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .coach-thread-body { flex: 1; min-width: 0; }
+  .coach-thread-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .coach-thread-preview {
+    font-size: 13px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+  .coach-thread-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+  }
+  .coach-thread-time { font-size: 11px; color: var(--text-faint); }
+  .coach-thread-badge {
+    background: var(--danger);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+  }
+
+  /* ── Client task summary (collapsible) ──────────────────────── */
+  .client-summary-wrap {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .client-summary-toggle {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .client-summary-toggle::-webkit-details-marker { display: none; }
+  .client-summary-toggle::after {
+    content: '';
+    margin-left: auto;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid var(--text-faint);
+    border-bottom: 2px solid var(--text-faint);
+    transform: rotate(45deg);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  details[open] > .client-summary-toggle::after { transform: rotate(-135deg); }
+  .client-summary-body {
+    padding: 4px 16px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    max-height: 35vh;
+    overflow-y: auto;
+  }
+  .client-task-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .client-task-row:last-child { border-bottom: none; }
+  .client-task-done { text-decoration: line-through; color: var(--text-faint); }
+
   /* --- Animations --------------------------------------------- */
   .row, .streak-card {
     animation: slideIn 0.18s ease-out;
@@ -1725,10 +2101,12 @@
         </div>
 
         <div class="section-title" id="tasks-title">Tasks</div>
-        <div id="tasks-list" class="tasks-stack"></div>
-        <div class="empty card" id="tasks-empty" style="display:none">
-          <div class="empty-title">Nothing on the list</div>
-          <div id="tasks-empty-sub">Add a task below to get moving.</div>
+        <div class="card">
+          <ul class="list" id="tasks-list"></ul>
+          <div class="empty" id="tasks-empty">
+            <div class="empty-title">Nothing on the list</div>
+            <div id="tasks-empty-sub">Add a task below to get moving.</div>
+          </div>
         </div>
       </section>
 
@@ -1799,6 +2177,32 @@
         </div>
       </section>
 
+      <!-- Chat view (coaching clients only — hidden until auth confirms coachingClient) -->
+      <section id="view-chat" class="view" hidden>
+        <!-- Coach header -->
+        <div class="chat-header">
+          <div class="chat-header-avatar" id="chat-coach-avatar">M</div>
+          <div class="chat-header-info">
+            <div class="chat-header-name">Coach</div>
+            <div class="chat-header-status" id="chat-status">GoFirst Coaching</div>
+          </div>
+        </div>
+        <!-- Message list -->
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-empty" id="chat-empty">
+            <div class="chat-empty-title">Start the conversation</div>
+            <div class="chat-empty-sub">Your coach will see your tasks and analytics to give you the best guidance.</div>
+          </div>
+        </div>
+        <!-- Input area -->
+        <div class="chat-input-wrap">
+          <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
+          <button class="chat-send" id="chat-send" disabled aria-label="Send">
+            <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+          </button>
+        </div>
+      </section>
+
       <!-- Profile view -->
       <section id="view-profile" class="view">
         <div class="profile-head card">
@@ -1859,6 +2263,33 @@
           <div class="empty" id="missed-empty">
             <div class="empty-title">Nothing missed</div>
             <div>Anything you don't check off by midnight lands here.</div>
+          </div>
+        </div>
+
+        <!-- Coaching client status (shown only when coachingClient) -->
+        <div id="coaching-profile-section" hidden>
+          <div class="section-title">Coaching</div>
+          <div class="card">
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">Active coaching client</div>
+                <div class="setting-sub">Your coach can see your tasks and analytics. Use the Chat tab to message them.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coach inbox link (shown only for the coach account) -->
+        <div id="coach-profile-section" hidden>
+          <div class="section-title">Coaching</div>
+          <div class="card">
+            <div class="setting-row" id="coach-messages-row" style="cursor:pointer">
+              <div class="setting-copy">
+                <div class="setting-title">Messages</div>
+                <div class="setting-sub">View conversations with your coaching clients.</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-faint);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
           </div>
         </div>
 
@@ -1985,7 +2416,8 @@
         </svg>
         Tasks
       </button>
-      <button class="tab" data-tab="streaks">
+      <!-- Hidden for coaching clients; visible for everyone else -->
+      <button class="tab" data-tab="streaks" id="tab-streaks">
         <svg viewBox="0 0 24 24">
           <path d="M12 3c.5 2 2 3 2 5a2 2 0 1 1-4 0c0-.7.3-1.3.8-2"/>
           <path d="M12 22a7 7 0 0 0 7-7c0-3.3-2-5-3-7.5 0 2.5-1.2 3.7-3 4.5-1.8-.8-3-2-3-4.5-1 2.5-3 4.2-3 7.5a7 7 0 0 0 5 7z"/>
@@ -2001,14 +2433,70 @@
         </svg>
         Analytics
       </button>
+      <!-- Visible only for coaching clients -->
+      <button class="tab" data-tab="chat" id="tab-chat" hidden>
+        <span class="tab-icon-wrap">
+          <svg viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="tab-badge" id="chat-badge" hidden></span>
+        </span>
+        Chat
+      </button>
       <button class="tab" data-tab="profile">
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="8" r="4"/>
-          <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
-        </svg>
+        <span class="tab-icon-wrap">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
+          </svg>
+          <span class="tab-badge" id="profile-badge" hidden></span>
+        </span>
         Profile
       </button>
     </nav>
+
+    <!-- Coach inbox overlay (slides in from right, coach account only) -->
+    <div id="coach-inbox-overlay" class="coach-overlay" hidden>
+      <div class="coach-overlay-header">
+        <button class="back-btn" id="coach-inbox-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <span class="coach-overlay-title">Messages</span>
+      </div>
+      <div class="coach-overlay-body">
+        <div id="coach-thread-list" class="coach-thread-list">
+          <div class="empty" id="coach-inbox-empty">
+            <div class="empty-title">No messages yet</div>
+            <div>Coaching clients will appear here once you activate them.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coach conversation overlay (slides in on top of inbox) -->
+    <div id="coach-convo-overlay" class="coach-overlay" hidden>
+      <div class="coach-convo-header">
+        <button class="back-btn" id="coach-convo-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="chat-header-avatar" id="coach-client-avatar">?</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="coach-client-name">Client</div>
+          <div class="chat-header-status" id="coach-client-email"></div>
+        </div>
+      </div>
+      <details class="client-summary-wrap" id="client-summary-wrap">
+        <summary class="client-summary-toggle">Today's tasks</summary>
+        <div class="client-summary-body" id="client-summary-body">Loading…</div>
+      </details>
+      <div class="chat-messages" id="coach-chat-messages"></div>
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" id="coach-chat-input" placeholder="Reply to client..." maxlength="4000" rows="1"></textarea>
+        <button class="chat-send" id="coach-chat-send" disabled aria-label="Send">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -2572,6 +3060,7 @@ const els = {
     todo: document.getElementById('view-todo'),
     streaks: document.getElementById('view-streaks'),
     analytics: document.getElementById('view-analytics'),
+    chat: document.getElementById('view-chat'),
     profile: document.getElementById('view-profile'),
   },
   main: document.getElementById('main'),
@@ -2812,16 +3301,19 @@ function isDockClosed() {
   return els.dockWrap.classList.contains('closed');
 }
 
-const TAB_ORDER = ['todo', 'streaks', 'analytics', 'profile'];
+// Dynamic tab order depends on user type (set by applyUserTabs after auth).
+// Default is the standard non-coaching layout.
+let _tabOrder = ['todo', 'streaks', 'analytics', 'profile'];
+function getActiveTabOrder() { return _tabOrder; }
+
 function setTab(name) {
-  if (!TAB_ORDER.includes(name)) name = 'todo';
+  const order = getActiveTabOrder();
+  if (!order.includes(name)) name = order[0];
   currentTab = name;
   els.tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-  const idx = TAB_ORDER.indexOf(name);
+  const idx = order.indexOf(name);
   const slider = document.getElementById('view-slider');
   if (slider) slider.style.transform = `translateX(-${idx * 100}%)`;
-  // Dock only shows when the user has explicitly tapped "+ New task".
-  // Leaving the tab always closes it so it doesn't pop up on other tabs.
   if (name !== 'todo') closeDock();
   setTopAction();
 }
@@ -3250,15 +3742,6 @@ function renderTasksView(state) {
     });
   }
 
-  // Wrap a sorted task array in a card. Optional header label appears above
-  // the rows; pass null/'' for an unlabeled card (used by recent/custom).
-  const cardHTML = (label, tasks) => {
-    if (!tasks.length) return '';
-    const rows = tasks.map(renderRow).join('');
-    const header = label ? `<div class="task-card-header">${esc(label)}</div>` : '';
-    return `<div class="card">${header}<ul class="list">${rows}</ul></div>`;
-  };
-
   let html = '';
 
   if (taskViewMode === 'category') {
@@ -3269,24 +3752,22 @@ function renderTasksView(state) {
         (grouped[t.category] = grouped[t.category] || []).push(t);
       } else { uncategorized.push(t); }
     }
-    const byCreated = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
-    // Uncategorized tasks (legacy data) go in their own unlabeled card on top.
-    html += cardHTML('', sortGroup(uncategorized, byCreated));
+    html = sortGroup(uncategorized, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
     for (const cat of CATEGORY_ORDER) {
       const grp = grouped[cat];
       if (!grp || !grp.length) continue;
-      html += cardHTML(cat, sortGroup(grp, byCreated));
+      html += `<li class="task-category-header">${esc(cat)}</li>`;
+      html += sortGroup(grp, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
     }
 
   } else if (taskViewMode === 'recent') {
-    const sorted = sortGroup(allTasks, (a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    html = cardHTML('', sorted);
+    html = sortGroup(allTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
 
   } else if (taskViewMode === 'chronological') {
     const morning = [], afternoon = [], evening = [], anyTime = [];
     for (const t of allTasks) {
       const tm = t.scheduledTime;
-      if (!tm)               anyTime.push(t);
+      if (!tm)             anyTime.push(t);
       else if (tm < '12:00') morning.push(t);
       else if (tm < '17:00') afternoon.push(t);
       else                   evening.push(t);
@@ -3299,7 +3780,9 @@ function renderTasksView(state) {
       { label: 'Any Time',  tasks: anyTime },
     ];
     for (const { label, tasks } of groups) {
-      html += cardHTML(label, sortGroup(tasks, timeSort));
+      if (!tasks.length) continue;
+      html += `<li class="task-time-header">${label}</li>`;
+      html += sortGroup(tasks, timeSort).map(renderRow).join('');
     }
 
   } else if (taskViewMode === 'custom') {
@@ -3307,13 +3790,13 @@ function renderTasksView(state) {
     const sorted = [...allTasks].sort((a, b) => {
       const ai = order.indexOf(a.id);
       const bi = order.indexOf(b.id);
-      if (ai === -1 && bi === -1) return (a.createdAt || 0) - (b.createdAt || 0);
+      if (ai === -1 && bi === -1) return (a.createdAt||0)-(b.createdAt||0);
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
     });
-    // Custom mode keeps user-chosen order even for completed tasks.
-    html = cardHTML('', sorted);
+    // In custom mode we respect the user's order even for done tasks
+    html = sorted.map(renderRow).join('');
   }
 
   els.tasksList.innerHTML = html;
@@ -4042,7 +4525,6 @@ Store.subscribe(render);
 (() => {
   const mainEl = document.getElementById('main');
   if (!mainEl) return;
-  const TABS = ['todo', 'streaks', 'analytics', 'profile'];
   let start = null;
   mainEl.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { start = null; return; }
@@ -4059,6 +4541,7 @@ Store.subscribe(render);
     if (dt > 500) return;
     if (Math.abs(dx) < 60) return;
     if (Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    const TABS = getActiveTabOrder();
     const idx = TABS.indexOf(currentTab);
     if (dx < 0 && idx < TABS.length - 1) setTab(TABS[idx + 1]);
     else if (dx > 0 && idx > 0) setTab(TABS[idx - 1]);
@@ -4088,6 +4571,15 @@ function hideSplash() {
   elSplash.hidden = true;
   elSplashError.hidden = true;
 }
+
+// Explicit click handler for the Google auth button.
+// Using window.location.href instead of relying on default <a> behavior
+// ensures the navigation works correctly in iOS PWA standalone mode,
+// where default anchor navigation can silently fail on OAuth redirects.
+document.getElementById('btn-google').addEventListener('click', (e) => {
+  e.preventDefault();
+  window.location.href = '/api/auth/google';
+});
 
 function renderProfile() {
   const u = Auth.user;
@@ -4300,6 +4792,382 @@ async function replayPendingTasks() {
   }
 }
 
+/* ============================================================
+   Coaching module — tab routing, WebSocket chat, coach inbox.
+   Activated after auth confirms coachingClient or isCoach.
+   ============================================================ */
+const Coaching = (() => {
+  let ws = null;
+  let reconnectTimer = null;
+  let currentClientId = null;
+  let clientMessages = [];  // client's chat history
+  let coachMessages = {};   // coach's view: clientId → messages[]
+  let coachThreads = [];    // coach's thread list
+
+  /* ── Apply tab layout based on user type ─────────────────── */
+  function applyUserTabs(user) {
+    const isClient = !!(user && user.coachingClient);
+    const isCoach  = !!(user && user.isCoach);
+
+    // Swap streaks ↔ chat tab visibility
+    const tabStreaks = document.getElementById('tab-streaks');
+    const tabChat    = document.getElementById('tab-chat');
+    if (tabStreaks) tabStreaks.hidden = isClient;
+    if (tabChat)    tabChat.hidden   = !isClient;
+
+    // Swap the corresponding slider views so the flex-row slot order is correct
+    const viewStreaks = document.getElementById('view-streaks');
+    const viewChat   = document.getElementById('view-chat');
+    if (viewStreaks) viewStreaks.hidden = isClient;
+    if (viewChat)   viewChat.hidden   = !isClient;
+
+    // Update the global tab order used by setTab + swipe
+    _tabOrder = isClient
+      ? ['todo', 'analytics', 'chat', 'profile']
+      : ['todo', 'streaks', 'analytics', 'profile'];
+
+    // Show coaching profile sections
+    const coachingSection = document.getElementById('coaching-profile-section');
+    const coachSection    = document.getElementById('coach-profile-section');
+    if (coachingSection) coachingSection.hidden = !isClient;
+    if (coachSection)    coachSection.hidden    = !isCoach;
+  }
+
+  /* ── WebSocket ───────────────────────────────────────────── */
+  function connect(user) {
+    if (!(user && (user.coachingClient || user.isCoach))) return;
+    if (ws && ws.readyState <= 1) return;
+    clearTimeout(reconnectTimer);
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}`);
+    ws.addEventListener('open', () => { /* connected */ });
+    ws.addEventListener('message', (e) => {
+      try {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'message') onIncoming(ev.message);
+      } catch {}
+    });
+    ws.addEventListener('close', () => {
+      ws = null;
+      reconnectTimer = setTimeout(() => connect(Auth.user), 6000);
+    });
+    ws.addEventListener('error', () => { if (ws) ws.close(); });
+  }
+
+  function onIncoming(message) {
+    const me = Auth.user;
+    if (!me) return;
+    if (me.coachingClient) {
+      clientMessages.push(message);
+      renderClientMessages();
+      if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
+    } else if (me.isCoach) {
+      const cid = message.fromUserId === me.id ? message.toUserId : message.fromUserId;
+      if (!coachMessages[cid]) coachMessages[cid] = [];
+      coachMessages[cid].push(message);
+      if (currentClientId === cid) renderCoachMessages(cid);
+      loadCoachThreads(); // refresh preview + unread count
+      if (message.fromUserId !== me.id) {
+        const convoOpen = currentClientId === cid &&
+          !document.getElementById('coach-convo-overlay').hidden;
+        if (!convoOpen) setTabBadge('profile', true);
+      }
+    }
+  }
+
+  /* ── Badge helper ────────────────────────────────────────── */
+  function setTabBadge(tab, show) {
+    const el = document.getElementById(tab === 'chat' ? 'chat-badge' : 'profile-badge');
+    if (el) el.hidden = !show;
+  }
+
+  /* ── Client chat ─────────────────────────────────────────── */
+  async function loadClientChat() {
+    try {
+      const data = await api('GET', '/api/messages');
+      clientMessages = data.messages || [];
+      renderClientMessages();
+      updateCoachHeader(data.coachId);
+    } catch (e) { console.warn('[chat]', e); }
+  }
+
+  function updateCoachHeader(coachId) {
+    // Optionally fetch coach picture — skip for now; initials are fine
+  }
+
+  function renderClientMessages() {
+    const container = document.getElementById('chat-messages');
+    const empty     = document.getElementById('chat-empty');
+    if (!container) return;
+    const me = Auth.user;
+    if (!clientMessages.length) {
+      if (empty) empty.hidden = false;
+      container.querySelectorAll('.msg-group').forEach(el => el.remove());
+      return;
+    }
+    if (empty) empty.hidden = true;
+    // Replace all bubble content (keep empty div in place)
+    const html = clientMessages.map(m => buildBubble(m, me.id)).join('');
+    // Insert before empty div if it exists, else set innerHTML
+    container.innerHTML = (empty ? empty.outerHTML : '') + html;
+    if (empty) {
+      // Re-grab reference after innerHTML reset
+      const newEmpty = container.querySelector('.chat-empty');
+      if (newEmpty) newEmpty.hidden = true;
+    }
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function sendClientMessage() {
+    const input = document.getElementById('chat-input');
+    const content = (input && input.value.trim()) || '';
+    if (!content) return;
+    input.value = '';
+    autoResizeTextarea(input);
+    document.getElementById('chat-send').disabled = true;
+    try {
+      const { message } = await api('POST', '/api/messages', { content });
+      clientMessages.push(message);
+      renderClientMessages();
+    } catch { banner('Could not send message', true); }
+  }
+
+  /* ── Coach inbox ─────────────────────────────────────────── */
+  async function loadCoachThreads() {
+    try {
+      const data = await api('GET', '/api/messages');
+      coachThreads = data.threads || [];
+      renderThreadList();
+      const unread = coachThreads.reduce((s, t) => s + (t.unread || 0), 0);
+      setTabBadge('profile', unread > 0);
+    } catch (e) { console.warn('[coach inbox]', e); }
+  }
+
+  function renderThreadList() {
+    const list  = document.getElementById('coach-thread-list');
+    const empty = document.getElementById('coach-inbox-empty');
+    if (!list) return;
+    if (!coachThreads.length) {
+      if (empty) empty.hidden = false;
+      return;
+    }
+    if (empty) empty.hidden = true;
+    list.innerHTML = coachThreads.map(t => {
+      const name    = t.client.name || t.client.email || 'Client';
+      const initial = name.trim().charAt(0).toUpperCase();
+      const avatarHtml = t.client.picture
+        ? `<img src="${esc(t.client.picture)}" alt="" referrerpolicy="no-referrer" />`
+        : initial;
+      const preview = t.latest
+        ? (t.latest.fromMe ? 'You: ' : '') + t.latest.content.slice(0, 60)
+        : 'No messages yet';
+      const timeStr = t.latest ? fmtAgo(t.latest.createdAt) : '';
+      const badge   = t.unread > 0
+        ? `<span class="coach-thread-badge">${t.unread}</span>` : '';
+      return `<div class="coach-thread" data-client-id="${esc(t.client.id)}">
+        <div class="coach-thread-avatar">${avatarHtml}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)}</div>
+          <div class="coach-thread-preview">${esc(preview)}</div>
+        </div>
+        <div class="coach-thread-meta">
+          <span class="coach-thread-time">${esc(timeStr)}</span>
+          ${badge}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function openClientConvo(clientId) {
+    currentClientId = clientId;
+    const thread = coachThreads.find(t => t.client.id === clientId);
+    if (!thread) return;
+    const name    = thread.client.name || thread.client.email || 'Client';
+    const initial = name.trim().charAt(0).toUpperCase();
+    document.getElementById('coach-client-name').textContent  = name;
+    document.getElementById('coach-client-email').textContent = thread.client.email || '';
+    const av = document.getElementById('coach-client-avatar');
+    if (av) {
+      av.innerHTML = thread.client.picture
+        ? `<img src="${esc(thread.client.picture)}" alt="" referrerpolicy="no-referrer" />`
+        : initial;
+    }
+    // Load full conversation
+    try {
+      const data = await api('GET', `/api/messages/${clientId}`);
+      coachMessages[clientId] = data.messages || [];
+      renderCoachMessages(clientId);
+      if (data.tasks) renderClientSummary(data.tasks);
+    } catch (e) { console.warn('[coach convo]', e); }
+    openOverlay('coach-convo-overlay');
+  }
+
+  function renderCoachMessages(clientId) {
+    const container = document.getElementById('coach-chat-messages');
+    if (!container) return;
+    const me   = Auth.user;
+    const msgs = coachMessages[clientId] || [];
+    container.innerHTML = msgs.map(m => buildBubble(m, me.id)).join('');
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function renderClientSummary(tasks) {
+    const body = document.getElementById('client-summary-body');
+    if (!body) return;
+    const today = todayISO();
+    const dow   = new Date().getDay();
+    const visible = tasks.filter(t =>
+      t.scheduledDate === today ||
+      (t.recurrence && (t.recurrence.daysOfWeek || []).includes(dow))
+    );
+    if (!visible.length) {
+      body.innerHTML = '<div style="padding:6px 0;color:var(--text-faint)">No tasks scheduled today.</div>';
+      return;
+    }
+    body.innerHTML = visible.map(t => {
+      const done = t.done || (Array.isArray(t.completedDates) && t.completedDates.includes(today));
+      return `<div class="client-task-row">
+        <span class="check ${done ? 'done' : ''}"></span>
+        <span class="${done ? 'client-task-done' : ''}">${esc(t.text)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  async function sendCoachMessage() {
+    const input = document.getElementById('coach-chat-input');
+    const content = (input && input.value.trim()) || '';
+    if (!content || !currentClientId) return;
+    input.value = '';
+    autoResizeTextarea(input);
+    document.getElementById('coach-chat-send').disabled = true;
+    try {
+      const { message } = await api('POST', '/api/messages', { content, toUserId: currentClientId });
+      if (!coachMessages[currentClientId]) coachMessages[currentClientId] = [];
+      coachMessages[currentClientId].push(message);
+      renderCoachMessages(currentClientId);
+    } catch { banner('Could not send message', true); }
+  }
+
+  /* ── Overlay open/close ──────────────────────────────────── */
+  function openOverlay(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('open'));
+  }
+  function closeOverlay(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('open');
+    setTimeout(() => { el.hidden = true; }, 300);
+  }
+  function openInbox() {
+    openOverlay('coach-inbox-overlay');
+    loadCoachThreads();
+  }
+  function closeInbox() { closeOverlay('coach-inbox-overlay'); }
+  function closeConvo() {
+    closeOverlay('coach-convo-overlay');
+    setTimeout(() => { currentClientId = null; }, 300);
+  }
+
+  /* ── Helpers ─────────────────────────────────────────────── */
+  function buildBubble(m, myId) {
+    const mine = m.fromUserId === myId;
+    const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return `<div class="msg-group ${mine ? 'mine' : 'theirs'}">
+      <div class="msg-bubble">${esc(m.content)}</div>
+      <div class="msg-time">${esc(time)}</div>
+    </div>`;
+  }
+
+  function fmtAgo(iso) {
+    const ms = Date.now() - new Date(iso).getTime();
+    const m  = Math.floor(ms / 60000);
+    if (m < 1)  return 'now';
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  }
+
+  function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  /* ── Public event wiring (called once from boot) ─────────── */
+  function wireEvents() {
+    // Client chat send
+    const chatSend  = document.getElementById('chat-send');
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+      chatInput.addEventListener('input', () => {
+        autoResizeTextarea(chatInput);
+        if (chatSend) chatSend.disabled = !chatInput.value.trim();
+      });
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendClientMessage(); }
+      });
+    }
+    if (chatSend) chatSend.addEventListener('click', sendClientMessage);
+
+    // Coach chat send
+    const coachSend  = document.getElementById('coach-chat-send');
+    const coachInput = document.getElementById('coach-chat-input');
+    if (coachInput) {
+      coachInput.addEventListener('input', () => {
+        autoResizeTextarea(coachInput);
+        if (coachSend) coachSend.disabled = !coachInput.value.trim();
+      });
+      coachInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCoachMessage(); }
+      });
+    }
+    if (coachSend) coachSend.addEventListener('click', sendCoachMessage);
+
+    // Coach inbox back
+    const inboxBack = document.getElementById('coach-inbox-back');
+    if (inboxBack) inboxBack.addEventListener('click', closeInbox);
+
+    // Coach convo back
+    const convoBack = document.getElementById('coach-convo-back');
+    if (convoBack) convoBack.addEventListener('click', closeConvo);
+
+    // Thread list tap (event delegation)
+    const threadList = document.getElementById('coach-thread-list');
+    if (threadList) {
+      threadList.addEventListener('click', (e) => {
+        const row = e.target.closest('[data-client-id]');
+        if (row) openClientConvo(row.dataset.clientId);
+      });
+    }
+
+    // Profile → Messages row (coach)
+    const messagesRow = document.getElementById('coach-messages-row');
+    if (messagesRow) messagesRow.addEventListener('click', openInbox);
+
+    // Clear chat badge when switching to chat tab
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tab === 'chat') setTabBadge('chat', false);
+      });
+    });
+  }
+
+  return {
+    applyUserTabs,
+    connect,
+    loadClientChat,
+    loadCoachThreads,
+    wireEvents,
+    openInbox,
+    openOverlay,
+    closeOverlay,
+  };
+})();
+
 async function boot() {
   // Seed UI from cache immediately — before the auth round-trip completes —
   // so the app renders tasks right away on next open instead of blanking for 3s.
@@ -4323,6 +5191,12 @@ async function boot() {
   hideSplash();
   renderProfile();
   closeDock();
+  // Apply tab layout and coaching UI for this user's role.
+  // Must run before setTopAction/setTab so the correct tab order is in place.
+  Coaching.applyUserTabs(Auth.user);
+  Coaching.wireEvents();
+  // Go to correct default tab (coaching clients start on todo; same for everyone)
+  setTab('todo');
   setTopAction();
   render(Store.get()); // instant render from cache (or empty on first boot)
 
@@ -4335,6 +5209,11 @@ async function boot() {
   } catch (e) {
     console.warn('boot data load failed', e);
   }
+
+  // Wire up real-time WebSocket and load initial chat data.
+  Coaching.connect(Auth.user);
+  if (Auth.user && Auth.user.coachingClient) Coaching.loadClientChat();
+  if (Auth.user && Auth.user.isCoach) Coaching.loadCoachThreads();
 }
 
 boot();
