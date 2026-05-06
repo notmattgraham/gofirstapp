@@ -484,12 +484,33 @@
 
   /* Analytics tab */
   .analytics-hero {
-    padding: 22px 20px 18px;
+    padding: 24px 20px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
   }
+  .analytics-ring {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+  }
+  .analytics-ring::before {
+    content: "";
+    position: absolute;
+    inset: 11px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
   .analytics-big {
-    font-size: 56px;
-    font-weight: 700;
+    position: relative;
+    font-size: 36px;
+    font-weight: 800;
     letter-spacing: -0.02em;
     line-height: 1;
     color: var(--text);
@@ -497,21 +518,15 @@
   .analytics-sub {
     font-size: 14px;
     color: var(--text-dim);
-    margin-top: 6px;
+    margin-top: 14px;
   }
+  /* Vestigial bar styles kept off the page now — left no-op below to
+     match the existing CSS shape so nothing else accidentally ::before's. */
   .analytics-bar {
-    margin-top: 16px;
-    height: 6px;
-    background: var(--surface-2);
-    border-radius: 999px;
-    overflow: hidden;
+    display: none;
   }
   .analytics-bar span {
-    display: block;
-    height: 100%;
-    background: var(--accent);
-    border-radius: 999px;
-    transition: width 0.25s ease-out;
+    display: none;
   }
   .analytics-placeholder {
     padding: 18px 18px;
@@ -2467,9 +2482,10 @@
 
         <div class="section-title">Execution rate</div>
         <div class="analytics-hero card">
-          <div class="analytics-big" id="analytics-rate">—</div>
+          <div class="analytics-ring" id="analytics-ring">
+            <div class="analytics-big" id="analytics-rate">—</div>
+          </div>
           <div class="analytics-sub" id="analytics-sub">No data yet</div>
-          <div class="analytics-bar"><span id="analytics-bar-fill" style="width: 0%"></span></div>
         </div>
 
         <div class="section-title">By category</div>
@@ -3627,6 +3643,10 @@ function isDockClosed() {
 let _tabOrder = ['todo', 'analytics', 'profile'];
 function getActiveTabOrder() { return _tabOrder; }
 
+// Reset on each fresh page load — animation should fire on the first
+// analytics-tab visit per session, not on every visit.
+let _analyticsAnimatedThisSession = false;
+
 function setTab(name) {
   const order = getActiveTabOrder();
   if (!order.includes(name)) name = order[0];
@@ -3637,6 +3657,14 @@ function setTab(name) {
   if (slider) slider.style.transform = `translateX(-${idx * 100}%)`;
   if (name !== 'todo') closeDock();
   setTopAction();
+
+  // First analytics visit per session: replay the load animation so the
+  // numbers and ring count up from 0 to current values. Run on next frame
+  // so the slide-transform has started and the user sees the count-up.
+  if (name === 'analytics' && !_analyticsAnimatedThisSession) {
+    _analyticsAnimatedThisSession = true;
+    requestAnimationFrame(() => renderAnalyticsView(Store.get(), { animate: true }));
+  }
 }
 
 /* ---- Task-check animation ----
@@ -4416,21 +4444,70 @@ function computeCategoryBreakdown(state, period) {
   return buckets;
 }
 
-function renderAnalyticsView(state) {
+/* Analytics ring — color tiers based on execution rate.
+   < 51   → red   (#ef4444)
+   51-66  → orange(#f97316)
+   67-79  → yellow(#eab308)
+   80-100 → green (#10b981)
+*/
+function rateColor(rate) {
+  if (rate < 51) return '#ef4444';
+  if (rate < 67) return '#f97316';
+  if (rate < 80) return '#eab308';
+  return '#10b981';
+}
+function paintAnalyticsRing(rate, ringEl) {
+  ringEl = ringEl || document.getElementById('analytics-ring');
+  if (!ringEl) return;
+  const color = rateColor(rate);
+  ringEl.style.background = `conic-gradient(${color} ${rate * 3.6}deg, var(--surface-2) 0deg)`;
+}
+
+let _analyticsRaf = null;
+function runAnalyticsAnimation(targetRate, finalCategoryRates) {
+  if (_analyticsRaf) cancelAnimationFrame(_analyticsRaf);
+  const ringEl = document.getElementById('analytics-ring');
+  const rateEl = document.getElementById('analytics-rate');
+  const catEls = document.querySelectorAll('#analytics-categories .category-rate');
+  const start = performance.now();
+  const dur = 900;
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const r = targetRate * eased;
+    paintAnalyticsRing(r, ringEl);
+    if (rateEl) rateEl.textContent = Math.round(r) + '%';
+    catEls.forEach((el, i) => {
+      const final = finalCategoryRates[i] || 0;
+      el.textContent = Math.round(final * eased) + '%';
+    });
+    if (t < 1) _analyticsRaf = requestAnimationFrame(step);
+    else _analyticsRaf = null;
+  }
+  _analyticsRaf = requestAnimationFrame(step);
+}
+
+function renderAnalyticsView(state, opts) {
+  const animate = !!(opts && opts.animate);
   const { completed, scheduled } = computePeriodRate(state, analyticsPeriod);
   const { label } = periodRange(analyticsPeriod);
   const rate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
   const rateEl = document.getElementById('analytics-rate');
   const subEl = document.getElementById('analytics-sub');
-  const barEl = document.getElementById('analytics-bar-fill');
+  const ringEl = document.getElementById('analytics-ring');
+
   if (scheduled === 0) {
+    if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
     rateEl.textContent = '—';
     subEl.textContent = `No tasks scheduled ${label} yet`;
-    barEl.style.width = '0%';
+    if (ringEl) ringEl.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
   } else {
-    rateEl.textContent = rate + '%';
     subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
-    barEl.style.width = rate + '%';
+    if (!animate) {
+      if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
+      rateEl.textContent = rate + '%';
+      paintAnalyticsRing(rate, ringEl);
+    }
   }
 
   // Category breakdown — hide any bucket with no tasks in the period to keep the list compact.
@@ -4439,19 +4516,25 @@ function renderAnalyticsView(state) {
   const active = Object.entries(buckets).filter(([, v]) => v.scheduled > 0);
   if (!active.length) {
     list.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
+    if (animate && rate != null) runAnalyticsAnimation(rate, []);
     return;
   }
-  list.innerHTML = active
-    .sort((a, b) => (b[1].completed / (b[1].scheduled || 1)) - (a[1].completed / (a[1].scheduled || 1)))
-    .map(([name, v]) => {
-      const r = v.scheduled ? Math.round((v.completed / v.scheduled) * 100) : 0;
-      return `
-        <li class="category-row">
-          <span class="category-name">${name}</span>
-          <span class="category-sub">${v.completed}/${v.scheduled}</span>
-          <span class="category-rate">${r}%</span>
-        </li>`;
-    }).join('');
+  const sorted = active.sort((a, b) =>
+    (b[1].completed / (b[1].scheduled || 1)) - (a[1].completed / (a[1].scheduled || 1))
+  );
+  const finalRates = sorted.map(([, v]) => v.scheduled ? Math.round((v.completed / v.scheduled) * 100) : 0);
+  list.innerHTML = sorted.map(([name, v], i) => {
+    const r = finalRates[i];
+    const shown = animate ? '0%' : r + '%';
+    return `
+      <li class="category-row">
+        <span class="category-name">${name}</span>
+        <span class="category-sub">${v.completed}/${v.scheduled}</span>
+        <span class="category-rate">${shown}</span>
+      </li>`;
+  }).join('');
+
+  if (animate && rate != null) runAnalyticsAnimation(rate, finalRates);
 }
 
 /* ============================================================
