@@ -4763,7 +4763,13 @@ els.categoryToggle.addEventListener('click', (e) => {
 els.topAction.addEventListener('click', () => {
   if (currentTab === 'todo') {
     if (isDockClosed()) {
-      TaskForm.reset();
+      // Preserve the user's in-progress new-task draft across dock
+      // open/close cycles — only reset when switching out of edit mode
+      // (an unsaved edit shouldn't bleed into a fresh new-task open).
+      // The submit and edit-cancel handlers already reset, and a hard
+      // refresh wipes the in-memory form state, so those paths still
+      // give a clean slate exactly when the user expects it.
+      if (TaskForm.editingId) TaskForm.reset();
       openDock();
       setTimeout(() => els.taskInput.focus(), 300);
     } else {
