@@ -3643,10 +3643,6 @@ function isDockClosed() {
 let _tabOrder = ['todo', 'analytics', 'profile'];
 function getActiveTabOrder() { return _tabOrder; }
 
-// Reset on each fresh page load — animation should fire on the first
-// analytics-tab visit per session, not on every visit.
-let _analyticsAnimatedThisSession = false;
-
 function setTab(name) {
   const order = getActiveTabOrder();
   if (!order.includes(name)) name = order[0];
@@ -3658,12 +3654,12 @@ function setTab(name) {
   if (name !== 'todo') closeDock();
   setTopAction();
 
-  // First analytics visit per session: replay the load animation so the
-  // numbers and ring count up from 0 to current values. Run on next frame
-  // so the slide-transform has started and the user sees the count-up.
-  if (name === 'analytics' && !_analyticsAnimatedThisSession) {
-    _analyticsAnimatedThisSession = true;
-    requestAnimationFrame(() => renderAnalyticsView(Store.get(), { animate: true }));
+  // When entering analytics, render fresh — renderAnalyticsView itself
+  // decides whether to count up by comparing against _lastShownAnalytics,
+  // so this covers first visits AND visits where data has changed since
+  // the user was last on the tab.
+  if (name === 'analytics') {
+    requestAnimationFrame(() => renderAnalyticsView(Store.get()));
   }
 }
 
@@ -4464,6 +4460,11 @@ function paintAnalyticsRing(rate, ringEl) {
 }
 
 let _analyticsRaf = null;
+// Snapshot of the last data we showed to the user (only updated while the
+// analytics tab is actually visible). When the next render produces a
+// different snapshot, the count-up animation fires from 0.
+let _lastShownAnalytics = null;
+
 function runAnalyticsAnimation(targetRate, finalCategoryRates) {
   if (_analyticsRaf) cancelAnimationFrame(_analyticsRaf);
   const ringEl = document.getElementById('analytics-ring');
@@ -4487,54 +4488,79 @@ function runAnalyticsAnimation(targetRate, finalCategoryRates) {
   _analyticsRaf = requestAnimationFrame(step);
 }
 
-function renderAnalyticsView(state, opts) {
-  const animate = !!(opts && opts.animate);
+function renderAnalyticsView(state) {
+  // Off-tab? Skip entirely. We don't want to update the snapshot or fire
+  // animations the user can't see — when they come back, setTab calls
+  // renderAnalyticsView and the snapshot mismatch triggers the count-up.
+  if (currentTab !== 'analytics') return;
+
   const { completed, scheduled } = computePeriodRate(state, analyticsPeriod);
   const { label } = periodRange(analyticsPeriod);
   const rate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
   const rateEl = document.getElementById('analytics-rate');
   const subEl = document.getElementById('analytics-sub');
   const ringEl = document.getElementById('analytics-ring');
+  const list   = document.getElementById('analytics-categories');
 
   if (scheduled === 0) {
     if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
     rateEl.textContent = '—';
     subEl.textContent = `No tasks scheduled ${label} yet`;
     if (ringEl) ringEl.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
-  } else {
-    subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
-    if (!animate) {
-      if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
-      rateEl.textContent = rate + '%';
-      paintAnalyticsRing(rate, ringEl);
-    }
-  }
-
-  // Category breakdown — hide any bucket with no tasks in the period to keep the list compact.
-  const buckets = computeCategoryBreakdown(state, analyticsPeriod);
-  const list = document.getElementById('analytics-categories');
-  const active = Object.entries(buckets).filter(([, v]) => v.scheduled > 0);
-  if (!active.length) {
     list.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
-    if (animate && rate != null) runAnalyticsAnimation(rate, []);
+    _lastShownAnalytics = { period: analyticsPeriod, rate: null, catRates: [] };
     return;
   }
+
+  subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
+
+  // Category breakdown
+  const buckets = computeCategoryBreakdown(state, analyticsPeriod);
+  const active = Object.entries(buckets).filter(([, v]) => v.scheduled > 0);
   const sorted = active.sort((a, b) =>
     (b[1].completed / (b[1].scheduled || 1)) - (a[1].completed / (a[1].scheduled || 1))
   );
   const finalRates = sorted.map(([, v]) => v.scheduled ? Math.round((v.completed / v.scheduled) * 100) : 0);
-  list.innerHTML = sorted.map(([name, v], i) => {
-    const r = finalRates[i];
-    const shown = animate ? '0%' : r + '%';
-    return `
-      <li class="category-row">
-        <span class="category-name">${name}</span>
-        <span class="category-sub">${v.completed}/${v.scheduled}</span>
-        <span class="category-rate">${shown}</span>
-      </li>`;
-  }).join('');
 
-  if (animate && rate != null) runAnalyticsAnimation(rate, finalRates);
+  // Did anything change since the user last saw this view?
+  const prev = _lastShownAnalytics;
+  const dataChanged = !prev
+    || prev.period !== analyticsPeriod
+    || prev.rate !== rate
+    || prev.catRates.length !== finalRates.length
+    || prev.catRates.some((r, i) => r !== finalRates[i]);
+
+  // Render the category list. If we're about to animate, seed the rate
+  // text at 0% so the count-up starts cleanly.
+  if (!sorted.length) {
+    list.innerHTML = '<li class="category-empty">No categorized tasks in this period yet</li>';
+  } else {
+    list.innerHTML = sorted.map(([name, v], i) => {
+      const r = finalRates[i];
+      const shown = dataChanged ? '0%' : r + '%';
+      return `
+        <li class="category-row">
+          <span class="category-name">${name}</span>
+          <span class="category-sub">${v.completed}/${v.scheduled}</span>
+          <span class="category-rate">${shown}</span>
+        </li>`;
+    }).join('');
+  }
+
+  if (dataChanged) {
+    // Reset hero ring + percentage to 0 synchronously, then start the
+    // raf-driven count-up on the next frame so the user sees a clean
+    // 0 → final transition (not a flash of stale values).
+    ringEl.style.background = `conic-gradient(${rateColor(0)} 0deg, var(--surface-2) 0deg)`;
+    rateEl.textContent = '0%';
+    requestAnimationFrame(() => runAnalyticsAnimation(rate, finalRates));
+  } else {
+    if (_analyticsRaf) { cancelAnimationFrame(_analyticsRaf); _analyticsRaf = null; }
+    paintAnalyticsRing(rate, ringEl);
+    rateEl.textContent = rate + '%';
+  }
+
+  _lastShownAnalytics = { period: analyticsPeriod, rate, catRates: finalRates };
 }
 
 /* ============================================================
