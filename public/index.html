@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#0f1115" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -99,15 +99,12 @@
 
   .app {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    /* Height is driven from window.visualViewport.height (see syncAppHeight
-       below). On iOS, opening the keyboard shrinks the visual viewport;
-       binding to it keeps the entire app within the visible area instead
-       of letting iOS scroll the whole fixed element upward to reach the
-       focused input — which was hiding the chat header and conversation. */
-    height: var(--app-h, 100vh);
+    inset: 0;
+    /* The viewport meta has `interactive-widget=resizes-content`, so on
+       iOS 17+ / modern Chrome the layout viewport shrinks when the
+       keyboard opens. inset:0 + flex-column then reflows naturally —
+       header pinned at top, .main flexes in the middle, tabbar/dock
+       sit just above the keyboard. No JS sync needed. */
     display: flex;
     flex-direction: column;
     max-width: 480px;
@@ -5468,16 +5465,20 @@ const Coaching = (() => {
       if (!coachMessages[cid]) coachMessages[cid] = [];
       if (coachMessages[cid].some(m => m.id === message.id)) return;
       coachMessages[cid].push(message);
-      if (currentClientId === cid) {
+      const convoOpen = currentClientId === cid &&
+        !document.getElementById('coach-convo-overlay').hidden;
+      if (convoOpen) {
         renderCoachMessages(cid);
-        // The message is here, so the client is no longer typing.
         if (message.fromUserId === cid) hideTyping('coach');
       }
-      loadCoachThreads();
-      if (message.fromUserId !== me.id) {
-        const convoOpen = currentClientId === cid &&
-          !document.getElementById('coach-convo-overlay').hidden;
-        if (!convoOpen) setTabBadge('chat', true);
+      if (convoOpen && message.fromUserId !== me.id) {
+        // Convo is open and the coach is presumably reading — silently
+        // re-fetch so the server marks this message as read, then refresh
+        // the inbox so the chat-tab unread badge clears.
+        api('GET', `/api/messages/${cid}`).then(() => loadCoachThreads()).catch(() => {});
+      } else {
+        loadCoachThreads();
+        if (message.fromUserId !== me.id) setTabBadge('chat', true);
       }
     } else if (me.coachingClient) {
       if (clientMessages.some(m => m.id === message.id)) return;
@@ -5687,6 +5688,10 @@ const Coaching = (() => {
       }
       renderCoachMessages(clientId);
       if (data.tasks) renderClientSummary(data.tasks);
+      // The server just marked this client's incoming messages as read.
+      // Refresh the inbox so the unread badge on the chat tab clears
+      // instead of sticking around until the next thread-list reload.
+      loadCoachThreads();
     } catch (e) { console.warn('[coach convo]', e); }
     openOverlay('coach-convo-overlay');
   }
@@ -5975,22 +5980,6 @@ async function boot() {
 }
 
 boot();
-
-/* Keep .app sized to the visible viewport so opening the iOS keyboard
-   shrinks the app box (header, messages, input all stay in place above
-   the keyboard) instead of pushing the whole fixed-positioned app upward
-   off the screen. visualViewport reports the same dimensions on Android
-   Chrome, so this is harmless cross-platform. */
-(function syncAppHeight() {
-  const vv = window.visualViewport;
-  if (!vv) return;
-  function update() {
-    document.documentElement.style.setProperty('--app-h', vv.height + 'px');
-  }
-  vv.addEventListener('resize', update);
-  vv.addEventListener('scroll', update);
-  update();
-})();
 
 // Client-side keepalive: ping the server every 4 minutes while this tab is
 // open, preventing Railway from sleeping mid-session.
