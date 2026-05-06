@@ -99,7 +99,7 @@ router.get('/', wrap(async (req, res) => {
       ],
     },
     orderBy: { createdAt: 'asc' },
-    select: { id: true, fromUserId: true, toUserId: true, content: true, readAt: true, createdAt: true },
+    select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
   });
 
   // Mark unread messages from coach as read.
@@ -137,12 +137,12 @@ router.get('/:clientId', wrap(async (req, res) => {
       id: true, email: true, name: true, picture: true, coachingClient: true,
       timezone: true,
       tasks: {
-        // Pull every task — frontend filters for today's view. Filtering on
-        // scheduledDate here would drop every recurring task (those have
-        // scheduledDate: null by design) and the coach would see nothing.
+        // Pull every task — frontend filters for today's view AND uses the
+        // full set to compute at-a-glance analytics (week heatmap, exec
+        // rate, top streaks, etc) without an extra round-trip.
         orderBy: { createdAt: 'desc' },
-        take: 100,
-        select: { id: true, text: true, scheduledDate: true, done: true, completedDates: true, category: true, recurrence: true },
+        take: 200,
+        select: { id: true, text: true, scheduledDate: true, scheduledTime: true, done: true, completedDates: true, category: true, recurrence: true, createdAt: true, trackStreak: true },
       },
     },
   });
@@ -156,7 +156,7 @@ router.get('/:clientId', wrap(async (req, res) => {
       ],
     },
     orderBy: { createdAt: 'asc' },
-    select: { id: true, fromUserId: true, toUserId: true, content: true, readAt: true, createdAt: true },
+    select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
   });
 
   // Mark incoming messages from this client as read.
@@ -172,18 +172,34 @@ router.get('/:clientId', wrap(async (req, res) => {
 }));
 
 // POST /api/messages
-// Send a message. Body: { content, toUserId? }
+// Send a message. Body: { content, toUserId?, attachment? }
+// `attachment` is an optional base64 image data URL.
 // Clients always send to the coach (toUserId is ignored).
 // The coach must supply toUserId (the client's ID).
+const MAX_ATTACHMENT_LENGTH = 4 * 1024 * 1024; // 4MB of base64 (~3MB binary)
+const ATTACHMENT_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
 router.post('/', wrap(async (req, res) => {
   const me = req.user;
-  const { content, toUserId } = req.body || {};
+  const { content, toUserId, attachment } = req.body || {};
 
-  if (!content || typeof content !== 'string' || !content.trim()) {
+  // A message must have either text or an image (or both). Empty messages
+  // are rejected.
+  const trimmed = typeof content === 'string' ? content.trim() : '';
+  const hasAttachment = typeof attachment === 'string' && attachment.length > 0;
+  if (!trimmed && !hasAttachment) {
     return res.status(400).json({ error: 'content_required' });
   }
-  if (content.length > MAX_MESSAGE_LENGTH) {
+  if (trimmed.length > MAX_MESSAGE_LENGTH) {
     return res.status(400).json({ error: 'content_too_long' });
+  }
+  if (hasAttachment) {
+    if (attachment.length > MAX_ATTACHMENT_LENGTH) {
+      return res.status(413).json({ error: 'attachment_too_large' });
+    }
+    if (!ATTACHMENT_RE.test(attachment)) {
+      return res.status(400).json({ error: 'invalid_attachment' });
+    }
   }
 
   let recipientId;
@@ -203,8 +219,13 @@ router.post('/', wrap(async (req, res) => {
   }
 
   const message = await prisma.message.create({
-    data: { fromUserId: me.id, toUserId: recipientId, content: content.trim() },
-    select: { id: true, fromUserId: true, toUserId: true, content: true, readAt: true, createdAt: true },
+    data: {
+      fromUserId: me.id,
+      toUserId: recipientId,
+      content: trimmed,
+      attachment: hasAttachment ? attachment : null,
+    },
+    select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
   });
 
   // Real-time push via the WebSocket broadcast map (populated by server/index.js).

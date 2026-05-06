@@ -58,6 +58,10 @@ model Message {
   fromUser   User      @relation("SentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser     User      @relation("ReceivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
   content    String
+  // Optional inline image attachment. Stored as a base64 data URL
+  // ("data:image/jpeg;base64,..."). Client downscales to ~1280px / JPEG
+  // before posting, so each row stays under a few hundred KB.
+  attachment String?
   // Null = unread. Set to the time the recipient first opened the message.
   readAt     DateTime?
   createdAt  DateTime  @default(now())

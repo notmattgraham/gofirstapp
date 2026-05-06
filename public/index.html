@@ -2131,6 +2131,17 @@
     flex-direction: column;
     gap: 2px;
   }
+  /* When the conversation has actual bubbles, anchor them to the bottom
+     of the scroll container so a short conversation rests right above
+     the typing indicator/input instead of sitting at the top with empty
+     space below. The typing indicator (a sibling) naturally pushes the
+     messages area smaller when shown, sliding the bubbles up. Tall
+     conversations still scroll normally — `flex-grow:1` only consumes
+     leftover free space when there isn't already overflow. */
+  .chat-messages.has-messages::before {
+    content: '';
+    flex-grow: 1;
+  }
 
   .chat-empty {
     flex: 1;
@@ -2271,6 +2282,54 @@
     width: 18px; height: 18px;
     stroke: currentColor; fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* Paperclip / attach button — same size as the send button. */
+  .chat-attach {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-attach:active { background: var(--border); }
+  .chat-attach:disabled { opacity: 0.5; cursor: default; }
+  .chat-attach svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* Image attachments inside chat bubbles. */
+  .msg-image {
+    display: block;
+    max-width: 240px;
+    max-height: 280px;
+    width: 100%;
+    height: auto;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  /* Image-only bubbles drop the bubble background — the photo IS the bubble. */
+  .msg-bubble.image-only {
+    padding: 0;
+    background: transparent !important;
+    border: none !important;
+  }
+  .msg-bubble.image-only .msg-image {
+    border-radius: 18px;
+  }
+  .msg-group.mine .msg-bubble.image-only .msg-image  { border-bottom-right-radius: 4px; }
+  .msg-group.theirs .msg-bubble.image-only .msg-image { border-bottom-left-radius: 4px; }
+  /* Image + caption: small gap between photo and text. */
+  .msg-bubble:not(.image-only) .msg-image {
+    margin-bottom: 6px;
   }
 
   /* ── Back button (used in overlays) ─────────────────────────── */
@@ -2444,23 +2503,81 @@
   }
   details[open] > .client-summary-toggle::after { transform: rotate(-135deg); }
   .client-summary-body {
-    padding: 4px 16px 12px;
+    padding: 4px 14px 14px;
     font-size: 13px;
     color: var(--text-dim);
-    max-height: 35vh;
+    max-height: 50vh;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
-  .client-task-row {
+
+  /* Compact analytics block inside the convo overlay's "At a glance" panel. */
+  .client-glance-period select { height: 32px; font-size: 13px; padding: 0 30px 0 12px; font-weight: 600; }
+  .client-glance-hero {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 13px;
-    color: var(--text);
+    gap: 12px;
   }
-  .client-task-row:last-child { border-bottom: none; }
-  .client-task-done { text-decoration: line-through; color: var(--text-faint); }
+  .client-glance-ring {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    position: relative;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+  }
+  .client-glance-ring::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .client-glance-pct {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .client-glance-sub {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .client-glance-section {
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+  .client-glance-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  /* Tighter rank rows inside the convo panel. */
+  .client-summary-body .rank-row {
+    padding: 6px 0;
+  }
+  .client-summary-body .rank-row:last-child { border-bottom: none; }
+  .client-summary-body .rank-empty {
+    padding: 8px 0;
+    text-align: left;
+  }
+  .client-summary-body .week-bar {
+    padding: 0;
+  }
+  .client-summary-body .week-day-ring { width: 32px; height: 32px; }
+  .client-summary-body .week-day-letter { font-size: 11px; inset: 3px; }
 
   /* --- Animations --------------------------------------------- */
   .row, .streak-card {
@@ -2677,6 +2794,9 @@
             <span></span><span></span><span></span>
           </div>
           <div class="chat-input-wrap">
+            <button class="chat-attach" id="chat-attach" aria-label="Send a photo">
+              <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
             <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
             <button class="chat-send" id="chat-send" disabled aria-label="Send">
               <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
@@ -2978,14 +3098,45 @@
         </div>
       </div>
       <details class="client-summary-wrap" id="client-summary-wrap">
-        <summary class="client-summary-toggle">Today's tasks</summary>
-        <div class="client-summary-body" id="client-summary-body">Loading…</div>
+        <summary class="client-summary-toggle">At a glance</summary>
+        <div class="client-summary-body" id="client-summary-body">
+          <div class="client-glance-period">
+            <select id="client-glance-period-sel" class="field-input">
+              <option value="7days">Last 7 days</option>
+              <option value="14days">Last 14 days</option>
+              <option value="month">This month</option>
+              <option value="year">This year</option>
+            </select>
+          </div>
+          <div class="week-bar" id="client-glance-week"></div>
+          <div class="client-glance-hero">
+            <div class="client-glance-ring" id="client-glance-ring">
+              <div class="client-glance-pct" id="client-glance-pct">—</div>
+            </div>
+            <div class="client-glance-sub" id="client-glance-sub">Loading…</div>
+          </div>
+          <div class="client-glance-section">
+            <div class="client-glance-label">Best executed</div>
+            <ul class="rank-list" id="client-glance-best"></ul>
+          </div>
+          <div class="client-glance-section">
+            <div class="client-glance-label">Needs work</div>
+            <ul class="rank-list" id="client-glance-worst"></ul>
+          </div>
+          <div class="client-glance-section">
+            <div class="client-glance-label">Longest streaks</div>
+            <ul class="rank-list" id="client-glance-streaks"></ul>
+          </div>
+        </div>
       </details>
       <div class="chat-messages" id="coach-chat-messages"></div>
       <div class="typing-indicator" id="coach-typing" hidden aria-label="Client is typing">
         <span></span><span></span><span></span>
       </div>
       <div class="chat-input-wrap">
+        <button class="chat-attach" id="coach-chat-attach" aria-label="Send a photo">
+          <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
         <textarea class="chat-input" id="coach-chat-input" placeholder="Reply to client..." maxlength="4000" rows="1"></textarea>
         <button class="chat-send" id="coach-chat-send" disabled aria-label="Send">
           <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
@@ -4655,10 +4806,10 @@ function computeWeekDays(state) {
   });
 }
 
-/* Recurring tasks ranked by completion rate over the selected period.
+/* Recurring tasks ranked by completion rate over a given period.
    mode='best' descending, mode='worst' ascending. Top/bottom 5. */
-function computeTaskRanking(state, mode) {
-  const { start, end } = periodRange(analyticsPeriod);
+function computeTaskRanking(state, mode, period) {
+  const { start, end } = periodRange(period || analyticsPeriod);
   const rows = state.tasks
     .filter(t => t.recurrence)
     .map(t => {
@@ -5882,10 +6033,12 @@ const Coaching = (() => {
     const me = Auth.user;
     if (!clientMessages.length) {
       if (empty) empty.hidden = false;
+      container.classList.remove('has-messages');
       container.querySelectorAll('.msg-group').forEach(el => el.remove());
       return;
     }
     if (empty) empty.hidden = true;
+    container.classList.add('has-messages');
     const html = clientMessages.map(m => {
       const isNew = !_seenClientMsgIds.has(m.id);
       if (isNew) _seenClientMsgIds.add(m.id);
@@ -5993,7 +6146,10 @@ const Coaching = (() => {
         _hasLoadedCoachConvo.set(clientId, true);
       }
       renderCoachMessages(clientId);
-      if (data.tasks) renderClientSummary(data.tasks);
+      // Force a fresh animation when the coach opens this thread by
+      // wiping the snapshot key, so re-opening always plays the count-up.
+      _lastClientGlanceKey = null;
+      if (data.tasks) renderClientAnalytics(data.tasks);
       // The server just marked this client's incoming messages as read.
       // Refresh the inbox so the unread badge on the chat tab clears
       // instead of sticking around until the next thread-list reload.
@@ -6009,6 +6165,7 @@ const Coaching = (() => {
     const msgs = coachMessages[clientId] || [];
     let seen = _seenCoachMsgIds.get(clientId);
     if (!seen) { seen = new Set(); _seenCoachMsgIds.set(clientId, seen); }
+    container.classList.toggle('has-messages', msgs.length > 0);
     container.innerHTML = msgs.map(m => {
       const isNew = !seen.has(m.id);
       if (isNew) seen.add(m.id);
@@ -6017,26 +6174,159 @@ const Coaching = (() => {
     container.scrollTop = container.scrollHeight;
   }
 
-  function renderClientSummary(tasks) {
+  /* "At a glance" client analytics inside the coach's convo overlay.
+     Same look + count-up animation as the Analytics tab, but compact:
+     period dropdown, week heatmap, hero ring, top 3 best/worst/streaks.
+     The user picks the period independently — defaults to last 7 days. */
+  let _clientGlancePeriod = '7days';
+  let _clientGlanceTasks = [];
+  let _clientGlanceRaf = null;
+  let _lastClientGlanceKey = null;
+
+  function renderClientAnalytics(tasks) {
+    _clientGlanceTasks = tasks || [];
     const body = document.getElementById('client-summary-body');
     if (!body) return;
-    const today = todayISO();
-    const dow   = new Date().getDay();
-    const visible = tasks.filter(t =>
-      t.scheduledDate === today ||
-      (t.recurrence && (t.recurrence.daysOfWeek || []).includes(dow))
-    );
-    if (!visible.length) {
-      body.innerHTML = '<div style="padding:6px 0;color:var(--text-faint)">No tasks scheduled today.</div>';
-      return;
+    const fakeState = { tasks: _clientGlanceTasks };
+    const period = _clientGlancePeriod;
+    const periodSel = document.getElementById('client-glance-period-sel');
+    if (periodSel && periodSel.value !== period) periodSel.value = period;
+
+    const { completed, scheduled } = computePeriodRate(fakeState, period);
+    const { label } = periodRange(period);
+    const heroRate = scheduled === 0 ? null : Math.round((completed / scheduled) * 100);
+    const weekDays = computeWeekDays(fakeState);
+    const bestRows  = computeTaskRanking(fakeState, 'best',  period).slice(0, 3);
+    const worstRows = computeTaskRanking(fakeState, 'worst', period).slice(0, 3);
+    const streakRows = computeStreakRanking(fakeState).slice(0, 3);
+
+    const dataKey = JSON.stringify({
+      period,
+      hero: heroRate,
+      week: weekDays.map(d => d.rate),
+      best: bestRows.map(r => `${r.id}:${r.rate}`),
+      worst: worstRows.map(r => `${r.id}:${r.rate}`),
+      streak: streakRows.map(r => `${r.id}:${r.streak}`),
+    });
+    const dataChanged = dataKey !== _lastClientGlanceKey;
+    _lastClientGlanceKey = dataKey;
+
+    // Hero ring + percent
+    const ringEl = document.getElementById('client-glance-ring');
+    const pctEl  = document.getElementById('client-glance-pct');
+    const subEl  = document.getElementById('client-glance-sub');
+    if (heroRate == null) {
+      pctEl.textContent = '—';
+      pctEl.dataset.animateRate = '0';
+      subEl.textContent = `No tasks scheduled ${label} yet`;
+      ringEl.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
+    } else {
+      pctEl.dataset.animateRate = String(heroRate);
+      subEl.textContent = `${completed} of ${scheduled} completed ${label}`;
+      if (!dataChanged) {
+        ringEl.style.background = `conic-gradient(${rateColor(heroRate)} ${heroRate * 3.6}deg, var(--surface-2) 0deg)`;
+        pctEl.textContent = heroRate + '%';
+      } else {
+        ringEl.style.background = `conic-gradient(${rateColor(0)} 0deg, var(--surface-2) 0deg)`;
+        pctEl.textContent = '0%';
+      }
     }
-    body.innerHTML = visible.map(t => {
-      const done = t.done || (Array.isArray(t.completedDates) && t.completedDates.includes(today));
-      return `<div class="client-task-row">
-        <span class="check ${done ? 'done' : ''}"></span>
-        <span class="${done ? 'client-task-done' : ''}">${esc(t.text)}</span>
-      </div>`;
-    }).join('');
+
+    // Week bar (Sun-Sat)
+    const weekEl = document.getElementById('client-glance-week');
+    if (weekEl) {
+      weekEl.innerHTML = weekDays.map(d => {
+        const cls = `week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`;
+        const ringAttr = d.rate == null ? '' : String(d.rate);
+        return `
+          <div class="${cls}">
+            <div class="week-day-ring" data-animate-ring="${ringAttr}">
+              <div class="week-day-letter">${d.letter}</div>
+            </div>
+          </div>`;
+      }).join('');
+      const rings = weekEl.querySelectorAll('.week-day-ring');
+      if (!dataChanged) weekDays.forEach((d, i) => paintTinyRing(rings[i], d.rate));
+      else rings.forEach(r => paintTinyRing(r, null));
+    }
+
+    // Rank lists
+    function rankRowHtml(r) {
+      const shown = dataChanged ? '0%' : r.rate + '%';
+      return `
+        <li class="rank-row">
+          <span class="rank-row-name">${esc(r.text)}</span>
+          <span class="rank-row-meta">${r.completed}/${r.scheduled}</span>
+          <span class="rank-row-value" data-animate-rate="${r.rate}">${shown}</span>
+        </li>`;
+    }
+    const bestList = document.getElementById('client-glance-best');
+    bestList.innerHTML = bestRows.length
+      ? bestRows.map(rankRowHtml).join('')
+      : '<li class="rank-empty">Need a few recurring tasks to compare.</li>';
+    const worstList = document.getElementById('client-glance-worst');
+    worstList.innerHTML = worstRows.length
+      ? worstRows.map(rankRowHtml).join('')
+      : '<li class="rank-empty">Nothing chronic — keep it up.</li>';
+    const streakList = document.getElementById('client-glance-streaks');
+    streakList.innerHTML = streakRows.length
+      ? streakRows.map(r => {
+          const shown = dataChanged ? '0' : String(r.streak);
+          const unit = r.streak === 1 ? 'day' : 'days';
+          return `
+            <li class="rank-row">
+              <span class="rank-row-name">${esc(r.text)}</span>
+              <span class="rank-row-value">
+                <span data-animate-streak="${r.streak}">${shown}</span> ${unit}
+              </span>
+            </li>`;
+        }).join('')
+      : '<li class="rank-empty">No active streaks yet.</li>';
+
+    if (dataChanged) requestAnimationFrame(() => runClientGlanceAnimation());
+    else if (_clientGlanceRaf) { cancelAnimationFrame(_clientGlanceRaf); _clientGlanceRaf = null; }
+  }
+
+  /* Same shape as runAnalyticsAnimation but scoped to the convo overlay's
+     summary body so it doesn't fight the Analytics tab's animation. */
+  function runClientGlanceAnimation() {
+    if (_clientGlanceRaf) cancelAnimationFrame(_clientGlanceRaf);
+    const scope = document.getElementById('client-summary-body');
+    if (!scope) return;
+    const heroRing = scope.querySelector('#client-glance-ring');
+    const heroText = scope.querySelector('#client-glance-pct');
+    const heroFinal = Number((heroText && heroText.dataset.animateRate) || 0);
+    const rateEls   = [...scope.querySelectorAll('[data-animate-rate]')].filter(el => el !== heroText);
+    const streakEls = [...scope.querySelectorAll('[data-animate-streak]')];
+    const ringEls   = [...scope.querySelectorAll('[data-animate-ring]')];
+    const start = performance.now();
+    const dur = 700;
+    function step(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      if (heroRing) {
+        const r = heroFinal * eased;
+        heroRing.style.background = `conic-gradient(${rateColor(r)} ${r * 3.6}deg, var(--surface-2) 0deg)`;
+      }
+      if (heroText) heroText.textContent = Math.round(heroFinal * eased) + '%';
+      rateEls.forEach(el => {
+        const f = Number(el.dataset.animateRate) || 0;
+        el.textContent = Math.round(f * eased) + '%';
+      });
+      streakEls.forEach(el => {
+        const f = Number(el.dataset.animateStreak) || 0;
+        el.textContent = String(Math.round(f * eased));
+      });
+      ringEls.forEach(el => {
+        const raw = el.dataset.animateRing;
+        if (raw === '' || raw == null) { paintTinyRing(el, null); return; }
+        const f = Number(raw);
+        paintTinyRing(el, isFinite(f) ? f * eased : null);
+      });
+      if (t < 1) _clientGlanceRaf = requestAnimationFrame(step);
+      else _clientGlanceRaf = null;
+    }
+    _clientGlanceRaf = requestAnimationFrame(step);
   }
 
   async function sendCoachMessage() {
@@ -6080,10 +6370,64 @@ const Coaching = (() => {
     const mine = m.fromUserId === myId;
     const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const enterCls = isNew ? ' enter' : '';
+    const hasImg  = !!m.attachment;
+    const hasText = !!(m.content || '').trim();
+    const bubbleCls = (hasImg && !hasText) ? 'msg-bubble image-only' : 'msg-bubble';
+    const imgHtml = hasImg
+      ? `<img class="msg-image" src="${esc(m.attachment)}" alt="" loading="lazy" />`
+      : '';
+    const textHtml = hasText ? esc(m.content) : '';
     return `<div class="msg-group ${mine ? 'mine' : 'theirs'}${enterCls}">
-      <div class="msg-bubble">${esc(m.content)}</div>
+      <div class="${bubbleCls}">${imgHtml}${textHtml}</div>
       <div class="msg-time">${esc(time)}</div>
     </div>`;
+  }
+
+  /* Pick a photo from the device, downscale to a chat-friendly size, and
+     send it through the existing message POST. The endpoint accepts an
+     optional `attachment` data URL alongside (or in place of) text. */
+  function pickAndSendChatPhoto(send) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        banner('Sending photo…', false, 8000);
+        const dataUrl = await fileToScaledDataURL(file, 1280);
+        await send(dataUrl);
+        banner('Sent', false, 1500);
+      } catch (e) {
+        console.warn('[chat photo]', e);
+        banner('Photo upload failed', true);
+      }
+    });
+    input.click();
+  }
+
+  function fileToScaledDataURL(file, maxEdge) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('decode failed'));
+        img.onload = () => {
+          const longest = Math.max(img.width, img.height);
+          const scale = longest > maxEdge ? maxEdge / longest : 1;
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   function fmtAgo(iso) {
@@ -6175,6 +6519,18 @@ const Coaching = (() => {
     }
     if (chatSend) chatSend.addEventListener('click', sendClientMessage);
 
+    // Client-side: photo attach
+    const chatAttach = document.getElementById('chat-attach');
+    if (chatAttach) chatAttach.addEventListener('click', () => {
+      pickAndSendChatPhoto(async (dataUrl) => {
+        const { message } = await api('POST', '/api/messages', { content: '', attachment: dataUrl });
+        if (!clientMessages.some(m => m.id === message.id)) {
+          clientMessages.push(message);
+          renderClientMessages();
+        }
+      });
+    });
+
     // Coach chat send
     const coachSend  = document.getElementById('coach-chat-send');
     const coachInput = document.getElementById('coach-chat-input');
@@ -6190,6 +6546,28 @@ const Coaching = (() => {
       });
     }
     if (coachSend) coachSend.addEventListener('click', sendCoachMessage);
+
+    // Coach-side: photo attach (sends to whichever client thread is open)
+    const coachAttach = document.getElementById('coach-chat-attach');
+    if (coachAttach) coachAttach.addEventListener('click', () => {
+      if (!currentClientId) return;
+      pickAndSendChatPhoto(async (dataUrl) => {
+        const { message } = await api('POST', '/api/messages', { content: '', attachment: dataUrl, toUserId: currentClientId });
+        if (!coachMessages[currentClientId]) coachMessages[currentClientId] = [];
+        if (!coachMessages[currentClientId].some(m => m.id === message.id)) {
+          coachMessages[currentClientId].push(message);
+          renderCoachMessages(currentClientId);
+        }
+      });
+    });
+
+    // Client glance period dropdown — re-renders the at-a-glance panel
+    // for the same client tasks at the new period.
+    const glancePeriodSel = document.getElementById('client-glance-period-sel');
+    if (glancePeriodSel) glancePeriodSel.addEventListener('change', () => {
+      _clientGlancePeriod = glancePeriodSel.value;
+      renderClientAnalytics(_clientGlanceTasks);
+    });
 
     // Coach convo back (still slides over the chat tab when a thread is opened)
     const convoBack = document.getElementById('coach-convo-back');
