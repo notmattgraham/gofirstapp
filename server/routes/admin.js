@@ -9,6 +9,7 @@ const { requireAuth } = require('../middleware');
 const { dateInTz } = require('../time');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
+const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
 
 // Wrap async handlers so any thrown error reaches Express's error middleware
 // (returning a 500) instead of becoming an unhandledRejection that crashes
@@ -18,11 +19,15 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const router = express.Router();
 router.use(requireAuth);
 
-// Email gate. 404 (not 403) so the route is invisible to non-admins.
+// Access gate. 404 (not 403) so the route is invisible to outsiders.
+// Allowed: the explicit ADMIN_EMAIL, OR the coach (DB flag, or env-email
+// fallback). The coach IS the admin for this app — there's only one of them.
 router.use((req, res, next) => {
-  if (!req.user || (req.user.email || '').toLowerCase() !== ADMIN_EMAIL) {
-    return res.status(404).json({ error: 'not_found' });
-  }
+  if (!req.user) return res.status(404).json({ error: 'not_found' });
+  const email = (req.user.email || '').toLowerCase();
+  const isAdmin = email === ADMIN_EMAIL;
+  const isCoach = !!req.user.isCoach || email === COACH_EMAIL;
+  if (!isAdmin && !isCoach) return res.status(404).json({ error: 'not_found' });
   next();
 });
 
