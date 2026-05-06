@@ -210,6 +210,35 @@ router.patch('/users/:id/coaching', wrap(async (req, res) => {
   }
 }));
 
+// PATCH /api/admin/users/:id/overrides — adjust a user's monthly override
+// quota usage. Body: { overridesUsed: number } (clamped 0..3 — same cap
+// as the per-user runtime). Lets the admin reset (0), bump (++), or
+// claw back (--) overrides without the user having to wait out the
+// monthly window.
+router.patch('/users/:id/overrides', wrap(async (req, res) => {
+  const raw = req.body && req.body.overridesUsed;
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+    return res.status(400).json({ error: 'overridesUsed_required' });
+  }
+  const clamped = Math.max(0, Math.min(3, Math.floor(raw)));
+  try {
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data: {
+        overridesUsed: clamped,
+        // Reset the monthly window when admin sets to 0 so the next
+        // organic monthly rollover doesn't immediately reset again.
+        ...(clamped === 0 ? { overrideMonthStart: new Date() } : {}),
+      },
+      select: { id: true, email: true, name: true, overridesUsed: true, overrideMonthStart: true },
+    });
+    res.json({ user: updated });
+  } catch (e) {
+    if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
+    throw e;
+  }
+}));
+
 // PATCH /api/admin/users/:id/role — set a user's role.
 // Body: { role: 'user' | 'client' | 'coach' }
 //   user   → coachingClient=false, isCoach=false
