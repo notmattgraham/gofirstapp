@@ -4858,12 +4858,14 @@ const Coaching = (() => {
     const me = Auth.user;
     if (!me) return;
     if (me.coachingClient) {
+      if (clientMessages.some(m => m.id === message.id)) return;
       clientMessages.push(message);
       renderClientMessages();
       if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
     } else if (me.isCoach) {
       const cid = message.fromUserId === me.id ? message.toUserId : message.fromUserId;
       if (!coachMessages[cid]) coachMessages[cid] = [];
+      if (coachMessages[cid].some(m => m.id === message.id)) return;
       coachMessages[cid].push(message);
       if (currentClientId === cid) renderCoachMessages(cid);
       loadCoachThreads(); // refresh preview + unread count
