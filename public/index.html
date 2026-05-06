@@ -3644,7 +3644,8 @@ function setTab(name) {
 const _exitingTasks = new Set();
 
 function handleTaskToggle(id, rowEl) {
-  if (isTemp(id)) return;
+  // Temp ids (locally-queued tasks not yet confirmed) get gated inside
+  // Store.toggleTaskToday already; no need to duplicate that check here.
   const task = Store.get().tasks.find(t => t.id === id);
   if (!task) return;
   const wasDone = isTaskDoneOn(task, todayISO());
