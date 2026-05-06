@@ -445,7 +445,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    margin: 4px 0 4px;
+    margin: 4px 0 12px;
   }
   .stat-strip[hidden] { display: none; }
   .stat-ring {
@@ -592,6 +592,21 @@
   }
 
   /* Task list category section headers */
+  /* Each task group renders as its own card. The wrapper .task-group
+     sits inside #tasks-list and stacks vertically with even spacing. */
+  .task-group {
+    margin-bottom: 12px;
+  }
+  .task-group:last-child { margin-bottom: 0; }
+  .task-group-header {
+    padding: 10px 16px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
   .task-category-header {
     list-style: none;
     padding: 10px 16px 5px;
@@ -2434,12 +2449,13 @@
         </div>
 
         <div class="section-title" id="tasks-title">Tasks</div>
-        <div class="card">
-          <ul class="list" id="tasks-list"></ul>
-          <div class="empty" id="tasks-empty">
-            <div class="empty-title">Nothing on the list</div>
-            <div id="tasks-empty-sub">Add a task below to get moving.</div>
-          </div>
+        <!-- Container for one card per group (category / time-of-day / etc).
+             renderTasksView populates this with `<section class="card task-group">`
+             children — each its own visually-separated box. -->
+        <div id="tasks-list"></div>
+        <div class="card empty" id="tasks-empty">
+          <div class="empty-title">Nothing on the list</div>
+          <div id="tasks-empty-sub">Add a task below to get moving.</div>
         </div>
 
         <!-- Completed-tasks dropdown — populated by renderTasksView when any
@@ -4217,6 +4233,14 @@ function renderTasksView(state) {
     });
   }
 
+  // Wrap a list of row HTMLs into a card-styled task group. An optional
+  // label renders as a small uppercase header inside the card.
+  function groupCard(rowsHtml, label) {
+    if (!rowsHtml) return '';
+    const header = label ? `<div class="task-group-header">${esc(label)}</div>` : '';
+    return `<section class="card task-group">${header}<ul class="list">${rowsHtml}</ul></section>`;
+  }
+
   let html = '';
 
   if (taskViewMode === 'category') {
@@ -4227,16 +4251,20 @@ function renderTasksView(state) {
         (grouped[t.category] = grouped[t.category] || []).push(t);
       } else { uncategorized.push(t); }
     }
-    html = sortGroup(uncategorized, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+    if (uncategorized.length) {
+      const rows = sortGroup(uncategorized, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+      html += groupCard(rows);
+    }
     for (const cat of CATEGORY_ORDER) {
       const grp = grouped[cat];
       if (!grp || !grp.length) continue;
-      html += `<li class="task-category-header">${esc(cat)}</li>`;
-      html += sortGroup(grp, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+      const rows = sortGroup(grp, (a,b) => (a.createdAt||0)-(b.createdAt||0)).map(renderRow).join('');
+      html += groupCard(rows, cat);
     }
 
   } else if (taskViewMode === 'recent') {
-    html = sortGroup(activeTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
+    const rows = sortGroup(activeTasks, (a,b) => (b.createdAt||0)-(a.createdAt||0)).map(renderRow).join('');
+    html = groupCard(rows);
 
   } else if (taskViewMode === 'chronological') {
     const morning = [], afternoon = [], evening = [], anyTime = [];
@@ -4256,8 +4284,8 @@ function renderTasksView(state) {
     ];
     for (const { label, tasks } of groups) {
       if (!tasks.length) continue;
-      html += `<li class="task-time-header">${label}</li>`;
-      html += sortGroup(tasks, timeSort).map(renderRow).join('');
+      const rows = sortGroup(tasks, timeSort).map(renderRow).join('');
+      html += groupCard(rows, label);
     }
 
   } else if (taskViewMode === 'custom') {
@@ -4270,7 +4298,8 @@ function renderTasksView(state) {
       if (bi === -1) return -1;
       return ai - bi;
     });
-    html = sorted.map(renderRow).join('');
+    const rows = sorted.map(renderRow).join('');
+    html = groupCard(rows);
   }
 
   els.tasksList.innerHTML = html;
