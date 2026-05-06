@@ -757,33 +757,30 @@
   /* icon-btn active state for analytics button */
   .icon-btn.active { color: var(--text); background: var(--surface-2); }
 
-  /* View-mode selector bar */
+  /* View-mode selector — left-aligned label + compact dropdown. */
   .view-mode-bar {
     display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    align-items: center;
+    gap: 10px;
     padding-bottom: 10px;
     margin-bottom: 2px;
   }
-  .view-mode-bar::-webkit-scrollbar { display: none; }
-  .view-mode-chip {
-    flex-shrink: 0;
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
+  .view-mode-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
     color: var(--text-dim);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
   }
-  .view-mode-chip.selected {
-    background: var(--accent);
-    color: var(--accent-fg);
-    border-color: var(--accent);
+  .view-mode-select-wrap {
+    flex: 0 0 auto;
+    width: auto;
+  }
+  .view-mode-select-wrap select {
+    height: 32px;
+    padding: 0 30px 0 12px;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   /* Time-of-day group headers (Chronological mode, same look as category headers) */
@@ -2425,7 +2422,17 @@
           </div>
         </div>
 
-        <div id="view-mode-bar" class="view-mode-bar"></div>
+        <div id="view-mode-bar" class="view-mode-bar">
+          <span class="view-mode-label">View by</span>
+          <div class="select-wrap view-mode-select-wrap">
+            <select id="view-mode-select" class="field-input">
+              <option value="chronological">Chronological</option>
+              <option value="category">By category</option>
+              <option value="recent">Recent</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </div>
         <div class="lock-banner" id="lock-banner" hidden></div>
 
         <div class="stat-strip" id="stat-strip" hidden>
@@ -3966,8 +3973,10 @@ function renderLockBanner(state) {
 }
 
 // ---- View mode state ('category' | 'recent' | 'chronological' | 'custom') ----
+// Default is Chronological; whatever the user picks is persisted in
+// localStorage and restored on every load.
 let taskViewMode = (() => {
-  try { return localStorage.getItem('gofirst:view-mode') || 'category'; } catch { return 'category'; }
+  try { return localStorage.getItem('gofirst:view-mode') || 'chronological'; } catch { return 'chronological'; }
 })();
 function setViewMode(mode) {
   taskViewMode = mode;
@@ -4132,15 +4141,11 @@ function renderAnalyticsPanel(task, today) {
 }
 
 function renderViewModeBar() {
-  const MODES = [
-    { id: 'category',      label: 'By Category' },
-    { id: 'recent',        label: 'Recent' },
-    { id: 'chronological', label: 'Chronological' },
-    { id: 'custom',        label: 'Custom' },
-  ];
-  els.viewModeBar.innerHTML = MODES.map(m =>
-    `<button class="view-mode-chip${taskViewMode === m.id ? ' selected' : ''}" data-view-mode="${m.id}">${m.label}</button>`
-  ).join('');
+  // The dropdown markup is static in the HTML; here we just sync the
+  // selected value so external state changes (e.g. setViewMode called
+  // programmatically) reflect in the UI.
+  const sel = document.getElementById('view-mode-select');
+  if (sel && sel.value !== taskViewMode) sel.value = taskViewMode;
 }
 
 function renderTasksView(state) {
@@ -4865,10 +4870,13 @@ els.editCancel.addEventListener('click', () => {
 });
 
 // --- View mode selector ---
-els.viewModeBar.addEventListener('click', (e) => {
-  const chip = e.target.closest('[data-view-mode]');
-  if (chip) setViewMode(chip.dataset.viewMode);
-});
+(() => {
+  const sel = document.getElementById('view-mode-select');
+  if (!sel) return;
+  // Reflect the persisted choice on first paint.
+  sel.value = taskViewMode;
+  sel.addEventListener('change', () => setViewMode(sel.value));
+})();
 
 // --- Drag-to-reorder (Custom mode) ---
 let _drag = null;
