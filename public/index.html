@@ -202,6 +202,9 @@
     -webkit-overflow-scrolling: touch;
     padding: 12px 14px calc(var(--nav-h) + var(--safe-bottom) + 96px);
   }
+  /* [hidden] must beat per-id `display:flex` rules (e.g. #view-chat) so
+     hidden views collapse out of the flex slider and tab indices line up. */
+  .view[hidden] { display: none !important; }
   /* Every view starts with the same top padding so switching tabs
      never shifts the first content line up or down. */
   .view > :first-child { margin-top: 4px !important; }
@@ -2110,8 +2113,8 @@
         </div>
       </section>
 
-      <!-- Streaks view -->
-      <section id="view-streaks" class="view">
+      <!-- Streaks view (retired — habits/streaks now live on the Tasks view) -->
+      <section id="view-streaks" class="view" hidden>
         <form class="panel" id="streak-form" hidden autocomplete="off">
           <div class="field">
             <label class="field-label" for="s-name">What are you tracking?</label>
@@ -2416,8 +2419,8 @@
         </svg>
         Tasks
       </button>
-      <!-- Hidden for coaching clients; visible for everyone else -->
-      <button class="tab" data-tab="streaks" id="tab-streaks">
+      <!-- Streaks tab retired — habits/streaks now live inline on the Tasks view. -->
+      <button class="tab" data-tab="streaks" id="tab-streaks" hidden>
         <svg viewBox="0 0 24 24">
           <path d="M12 3c.5 2 2 3 2 5a2 2 0 1 1-4 0c0-.7.3-1.3.8-2"/>
           <path d="M12 22a7 7 0 0 0 7-7c0-3.3-2-5-3-7.5 0 2.5-1.2 3.7-3 4.5-1.8-.8-3-2-3-4.5-1 2.5-3 4.2-3 7.5a7 7 0 0 0 5 7z"/>
@@ -3279,10 +3282,7 @@ const StreakForm = {
 /* ---- Top-action label ---- */
 let currentTab = 'todo';
 function setTopAction() {
-  if (currentTab === 'streaks') {
-    els.topAction.hidden = false;
-    els.topAction.textContent = els.streakForm.hidden ? '+ New streak' : 'Close';
-  } else if (currentTab === 'todo') {
+  if (currentTab === 'todo') {
     els.topAction.hidden = false;
     els.topAction.textContent = els.dockWrap.classList.contains('closed') ? '+ New task' : 'Close';
   } else {
@@ -3302,8 +3302,8 @@ function isDockClosed() {
 }
 
 // Dynamic tab order depends on user type (set by applyUserTabs after auth).
-// Default is the standard non-coaching layout.
-let _tabOrder = ['todo', 'streaks', 'analytics', 'profile'];
+// Streaks tab is retired — habits/streaks render inline on the Tasks view.
+let _tabOrder = ['todo', 'analytics', 'profile'];
 function getActiveTabOrder() { return _tabOrder; }
 
 function setTab(name) {
@@ -4172,11 +4172,6 @@ els.categoryToggle.addEventListener('click', (e) => {
 
 // --- Top action (context-sensitive per tab) ---
 els.topAction.addEventListener('click', () => {
-  if (currentTab === 'streaks') {
-    if (els.streakForm.hidden) StreakForm.open();
-    else StreakForm.close();
-    return;
-  }
   if (currentTab === 'todo') {
     if (isDockClosed()) {
       TaskForm.reset();
@@ -4809,24 +4804,24 @@ const Coaching = (() => {
     const isClient = !!(user && user.coachingClient);
     const isCoach  = !!(user && user.isCoach);
 
-    // Swap streaks ↔ chat tab visibility
-    const tabStreaks = document.getElementById('tab-streaks');
-    const tabChat    = document.getElementById('tab-chat');
-    if (tabStreaks) tabStreaks.hidden = isClient;
-    if (tabChat)    tabChat.hidden   = !isClient;
-
-    // Swap the corresponding slider views so the flex-row slot order is correct
+    // Streaks tab is permanently retired — keep it hidden regardless of role.
+    const tabStreaks  = document.getElementById('tab-streaks');
     const viewStreaks = document.getElementById('view-streaks');
-    const viewChat   = document.getElementById('view-chat');
-    if (viewStreaks) viewStreaks.hidden = isClient;
-    if (viewChat)   viewChat.hidden   = !isClient;
+    if (tabStreaks)  tabStreaks.hidden  = true;
+    if (viewStreaks) viewStreaks.hidden = true;
 
-    // Update the global tab order used by setTab + swipe
+    // Chat tab is visible only for coaching clients (the coach uses Profile → Messages).
+    const tabChat  = document.getElementById('tab-chat');
+    const viewChat = document.getElementById('view-chat');
+    if (tabChat)  tabChat.hidden  = !isClient;
+    if (viewChat) viewChat.hidden = !isClient;
+
+    // Update the global tab order used by setTab + swipe.
     _tabOrder = isClient
       ? ['todo', 'analytics', 'chat', 'profile']
-      : ['todo', 'streaks', 'analytics', 'profile'];
+      : ['todo', 'analytics', 'profile'];
 
-    // Show coaching profile sections
+    // Show coaching profile sections.
     const coachingSection = document.getElementById('coaching-profile-section');
     const coachSection    = document.getElementById('coach-profile-section');
     if (coachingSection) coachingSection.hidden = !isClient;
