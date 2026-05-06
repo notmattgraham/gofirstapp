@@ -492,6 +492,23 @@
     return me;
   }
 
+  // Fetch with a hard timeout so a slow/hung server endpoint never leaves a
+  // section stuck in "Loading…". Surfaces an error message in that section
+  // instead, and logs the underlying cause to the console for triage.
+  async function fetchJson(url, { timeoutMs = 25000 } = {}) {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), timeoutMs);
+    try {
+      const r = await fetch(url, { credentials: 'same-origin', signal: ac.signal });
+      const text = await r.text();
+      if (!r.ok) throw new Error(`${url} → ${r.status} ${text.slice(0, 200)}`);
+      try { return JSON.parse(text); }
+      catch { throw new Error(`${url} → non-JSON response: ${text.slice(0, 200)}`); }
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   async function loadAll() {
     const me = await gate();
     if (!me) return;
@@ -499,29 +516,36 @@
     $('loading').hidden = true;
     $('app').hidden = false;
 
-    // Load stats, users, and coaching clients in parallel.
-    const [stats, users, clients] = await Promise.all([
-      fetch('/api/admin/stats', { credentials: 'same-origin' }).then(r => r.json()).catch(() => null),
-      fetch('/api/admin/users', { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ users: [] })),
-      fetch('/api/admin/coaching-clients', { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ clients: [] })),
-    ]);
+    // Each section loads independently — one slow endpoint must not block
+    // the others. Sections with a failed fetch render an inline error.
+    fetchJson('/api/admin/stats')
+      .then(renderStats)
+      .catch((err) => { console.error('[admin] stats failed', err); renderStatsError(err); });
+    fetchJson('/api/admin/users')
+      .then((d) => renderUsers(d.users || []))
+      .catch((err) => { console.error('[admin] users failed', err); renderUsersError(err); });
+    fetchJson('/api/admin/coaching-clients')
+      .then((d) => renderClients(d.clients || []))
+      .catch((err) => { console.error('[admin] coaching-clients failed', err); });
+  }
 
-    if (stats) renderStats(stats);
-    renderUsers(users.users || []);
-    renderClients(clients.clients || []);
+  function renderStatsError(err) {
+    const el = $('stats');
+    el.innerHTML = `<div class="stat" style="grid-column:1/-1"><div class="label">Stats failed to load</div><div class="num" style="font-size:14px;color:var(--danger)">${escapeHtml(String(err.message || err))}</div></div>`;
+  }
+  function renderUsersError(err) {
+    $('users-body').innerHTML = `<tr><td colspan="8" class="center" style="color:var(--danger)">Could not load users: ${escapeHtml(String(err.message || err))}</td></tr>`;
   }
 
   function renderStats(s) {
     const el = $('stats');
     if (s.serverDate) $('server-date').textContent = 'Server date: ' + s.serverDate;
+    const total = s.users && s.users.total;
     const cards = [
-      { label: 'Total users', num: fmt.int(s.users.total), delta: `+${fmt.int(s.users.newLast7Days)} last 7d / +${fmt.int(s.users.newLast30Days)} last 30d` },
-      { label: 'Active (7d)', num: fmt.int(s.users.activeLast7Days), delta: `out of ${fmt.int(s.users.total)} total` },
-      { label: 'Total tasks', num: fmt.int(s.tasks.total), delta: '' },
-      { label: 'One-shot completions', num: fmt.int(s.tasks.oneShotCompletions), delta: '' },
-      { label: 'Recurring completions', num: fmt.int(s.tasks.recurringCompletions), delta: '' },
-      { label: 'Streaks tracked', num: fmt.int(s.streaks.total), delta: '' },
-      { label: 'Overrides used', num: fmt.int(s.overrides.totalUsed), delta: 'across all users' },
+      { label: 'Total users', num: fmt.int(total), delta: '' },
+      { label: 'Active users', num: fmt.int(s.users && s.users.active30d), delta: 'created a task in last 30d' },
+      { label: 'Paid users', num: fmt.int(s.users && s.users.paid), delta: 'on coaching subscription' },
+      { label: 'App-wide execution', num: fmt.pct(s.appExecutionRate), delta: 'avg of per-user rates' },
     ];
     el.innerHTML = cards.map(c => `
       <div class="stat">
