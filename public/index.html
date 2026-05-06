@@ -2372,7 +2372,7 @@
             <div class="chat-paywall-title">Unlock 1-on-1 coaching</div>
             <div class="chat-paywall-sub">Get a coach who reviews your tasks, helps you stay accountable, and messages with you anytime — right inside the app.</div>
             <button class="chat-paywall-cta" id="chat-paywall-cta">Upgrade</button>
-            <div class="chat-paywall-foot">Coming soon — tap Upgrade to join the waitlist.</div>
+            <div class="chat-paywall-foot">Secure checkout via Stripe. Cancel anytime.</div>
           </div>
         </div>
 
@@ -5406,10 +5406,10 @@ const Coaching = (() => {
       });
     }
 
-    // Paywall CTA — placeholder until upgrade flow exists.
+    // Paywall CTA → Stripe checkout for the coaching subscription.
     const paywallCta = document.getElementById('chat-paywall-cta');
     if (paywallCta) paywallCta.addEventListener('click', () => {
-      banner('Coaching is invite-only right now. Email mattgraham15@gmail.com to join.', false, 4000);
+      window.location.href = 'https://buy.stripe.com/5kQ4gzcyJfAu55R79477O04';
     });
 
     // Clear chat badge when switching to chat tab.
