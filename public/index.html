@@ -988,7 +988,7 @@
   .check.checking::before {
     content: "";
     position: absolute;
-    inset: -2px;
+    inset: -3px;
     border-radius: 50%;
     border: 2px solid var(--success);
     animation: checkRipple 0.55s ease-out;
@@ -996,20 +996,23 @@
   }
   @keyframes checkPop {
     0%   { transform: scale(1); }
-    45%  { transform: scale(1.35); }
+    35%  { transform: scale(1.45); }
+    65%  { transform: scale(0.92); }
     100% { transform: scale(1); }
   }
   @keyframes checkRipple {
-    from { transform: scale(1); opacity: 0.7; }
-    to   { transform: scale(2.6); opacity: 0; }
+    from { transform: scale(1); opacity: 0.85; }
+    to   { transform: scale(2.8); opacity: 0; }
   }
+  /* No CSS delay here — handleTaskToggle adds the class manually after
+     the pop crests, so the slide-out should start immediately. */
   .row.checking-out {
-    animation: rowOut 0.42s 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+    animation: rowOut 0.42s cubic-bezier(0.4, 0, 0.6, 1) forwards;
     pointer-events: none;
   }
   @keyframes rowOut {
     to {
-      transform: translateX(28px);
+      transform: translateX(60px);
       opacity: 0;
       max-height: 0;
       padding-top: 0;
@@ -3644,40 +3647,43 @@ function setTab(name) {
 const _exitingTasks = new Set();
 
 function handleTaskToggle(id, rowEl) {
-  // Temp ids (locally-queued tasks not yet confirmed) get gated inside
-  // Store.toggleTaskToday already; no need to duplicate that check here.
   const task = Store.get().tasks.find(t => t.id === id);
   if (!task) return;
   const wasDone = isTaskDoneOn(task, todayISO());
 
   if (wasDone) {
-    // Going done → undone (from the Completed dropdown). No animation,
-    // just toggle and let the row reappear at the top of the active list.
+    // Going done → undone (from the Completed dropdown). No animation —
+    // toggle immediately and let the row reappear in the active list.
     Store.toggleTaskToday(id);
     return;
   }
 
-  // Going undone → done. Optimistically apply the .checking class to the
-  // check button so the pop + ripple play immediately, mark the task as
-  // exiting so it stays in the active list during the animation, then
-  // let Store.toggleTaskToday update state. The next render will keep
-  // the row in place (with .checking-out from the renderer) until the
-  // timer expires and we drop the id from _exitingTasks.
-  if (rowEl) {
-    const btn = rowEl.querySelector('.check');
-    if (btn) {
-      btn.classList.add('checking', 'done');
-      // Strip the checking class after the bounce so re-renders don't
-      // restart it (rendered HTML doesn't include it anyway).
-      setTimeout(() => btn.classList.remove('checking'), 400);
-    }
+  // Going undone → done. Animate the EXISTING DOM in place: pop the check
+  // button, then slide the row out, and only commit state at the very end.
+  // If we updated state up front, Store.toggleTaskToday's synchronous emit
+  // would re-render the list and destroy the button mid-pop — which is
+  // why the previous version showed a "wiggle then disappear" instead of
+  // a satisfying pop.
+  if (!rowEl) {
+    Store.toggleTaskToday(id);
+    return;
   }
+
+  // Mark as exiting so any unrelated re-render that lands during the
+  // animation window keeps this row in the active list with .checking-out.
   _exitingTasks.add(id);
-  Store.toggleTaskToday(id);
+
+  const btn = rowEl.querySelector('.check');
+  if (btn) btn.classList.add('checking', 'done');
+  // Slide-out kicks in after the pop has had room to crest.
+  setTimeout(() => rowEl.classList.add('checking-out'), 220);
+
+  // After both animations finish, commit state. The next render moves the
+  // task into the Completed dropdown via the normal pending/done split.
   setTimeout(() => {
     _exitingTasks.delete(id);
-    render(Store.get());
-  }, 600);
+    Store.toggleTaskToday(id);
+  }, 720);
 }
 
 /* ---- Stat ring animation ----
