@@ -7195,7 +7195,7 @@ const Coaching = (() => {
   }
 
   function threadRowHtml(opts) {
-    // opts: { user, latest, unread, pinned }
+    // opts: { user, latest, unread, pinned, friendshipId }
     const u = opts.user;
     const name = u.name || 'Friend';
     const preview = fmtPreviewMsg(opts.latest);
@@ -7204,7 +7204,11 @@ const Coaching = (() => {
       ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
     const pinIcon = opts.pinned
       ? '<span class="coach-thread-time" title="Pinned">★</span>' : '';
-    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${opts.pinned ? 'coach' : 'friend'}">
+    // Friendship id + name carried on the row so swipe-to-remove can
+    // confirm + DELETE without an extra lookup.
+    const fidAttr = opts.friendshipId ? ` data-friendship-id="${esc(opts.friendshipId)}"` : '';
+    const nameAttr = ` data-peer-name="${esc(name)}"`;
+    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${opts.pinned ? 'coach' : 'friend'}"${fidAttr}${nameAttr}>
       <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
       <div class="coach-thread-body">
         <div class="coach-thread-name">${esc(name)}${opts.pinned ? ' · Coach' : ''}</div>
@@ -7235,7 +7239,7 @@ const Coaching = (() => {
     }
     // Friends below, newest-first (server already sorted).
     for (const t of friendThreads) {
-      html += threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false });
+      html += threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false, friendshipId: t.friendshipId });
     }
     list.innerHTML = html;
     const hasContent = !!html;
@@ -7253,7 +7257,7 @@ const Coaching = (() => {
     }
     if (empty) empty.hidden = true;
     list.innerHTML = friendThreads.map(t =>
-      threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false })
+      threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false, friendshipId: t.friendshipId })
     ).join('');
   }
 
@@ -7286,6 +7290,75 @@ const Coaching = (() => {
       coachList.innerHTML = html;
       if (coachSec) coachSec.hidden = pendingIncoming.length === 0;
     }
+  }
+
+  /* ── Swipe-left a friend row in the inbox to remove them ─────
+     iOS gesture: drag left far enough on a friend row → confirm
+     dialog. The pinned coach entry is excluded (paid relationship,
+     not a friendship). The swipe never fires the row's tap-to-open
+     handler because iOS suppresses click after a >10px drag. */
+  let _removeSwipe = null;
+  function attachRemoveSwipe(listEl) {
+    if (!listEl || listEl.dataset.removeSwipeWired) return;
+    listEl.dataset.removeSwipeWired = '1';
+    listEl.addEventListener('touchstart', (e) => {
+      const row = e.target.closest('[data-thread][data-peer-kind="friend"][data-friendship-id]');
+      if (!row) return;
+      const t = e.touches[0];
+      _removeSwipe = { x: t.clientX, y: t.clientY, row, fired: false };
+    }, { passive: true });
+    listEl.addEventListener('touchmove', (e) => {
+      if (!_removeSwipe || _removeSwipe.fired) return;
+      const t = e.touches[0];
+      const dx = t.clientX - _removeSwipe.x;
+      const dy = t.clientY - _removeSwipe.y;
+      if (dx < -80 && Math.abs(dy) < 30) {
+        _removeSwipe.fired = true;
+        const row = _removeSwipe.row;
+        confirmRemoveFriend(row.dataset.peerName || 'this friend', row.dataset.friendshipId);
+      }
+    }, { passive: true });
+    listEl.addEventListener('touchend',  () => { _removeSwipe = null; });
+    listEl.addEventListener('touchcancel', () => { _removeSwipe = null; });
+  }
+
+  function confirmRemoveFriend(name, friendshipId) {
+    const el = document.createElement('div');
+    el.className = 'confirm-overlay';
+    el.innerHTML = `
+      <div class="confirm-sheet">
+        <div class="confirm-title">Remove friend</div>
+        <div class="confirm-msg">Do you want to remove ${esc(name)} as a friend?</div>
+        <div class="confirm-actions">
+          <button class="confirm-btn danger" data-choice="remove">Remove</button>
+          <button class="confirm-btn muted"  data-choice="cancel">Cancel</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-choice]');
+      const choice = btn ? btn.dataset.choice : (e.target === el ? 'cancel' : null);
+      if (choice === null) return;
+      document.body.removeChild(el);
+      if (choice === 'remove') removeFriend(friendshipId);
+    });
+  }
+
+  async function removeFriend(friendshipId) {
+    try {
+      await api('DELETE', `/api/friends/${friendshipId}`);
+      // If the DM with this friend is open, close it — they're gone.
+      if (dmPeerId && document.getElementById('dm-overlay') &&
+          !document.getElementById('dm-overlay').hidden) {
+        // We don't know the peer id from the friendshipId without the cached
+        // friendThreads list — look it up before refresh.
+        const wasOpenWith = friendThreads.find(t => t.friendshipId === friendshipId);
+        if (wasOpenWith && wasOpenWith.user.id === dmPeerId) closeDm();
+      }
+      banner('Friend removed');
+      await loadFriends();
+      await loadInboxThreads();
+    } catch { banner('Could not remove friend', true); }
   }
 
   async function acceptFriend(friendshipId) {
@@ -7930,6 +8003,7 @@ const Coaching = (() => {
           openDm(peerId, t ? t.user : { id: peerId });
         }
       });
+      attachRemoveSwipe(inboxList);
     }
     // Coach's friends pane uses the same row format.
     const coachFriendsList = document.getElementById('coach-friends-list');
@@ -7940,6 +8014,7 @@ const Coaching = (() => {
         const t = friendThreads.find(x => x.user.id === row.dataset.peerId);
         openDm(row.dataset.peerId, t ? t.user : { id: row.dataset.peerId });
       });
+      attachRemoveSwipe(coachFriendsList);
     }
 
     // Pending request actions (Accept / Decline).
