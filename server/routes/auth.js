@@ -9,7 +9,7 @@ const router = express.Router();
 const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
 // The one app-wide admin. Same env-fallback pattern as COACH_EMAIL so the
 // dashboard works on a fresh database before any user has been flagged.
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 
 // Kick off Google OAuth.
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

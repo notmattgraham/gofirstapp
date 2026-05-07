@@ -8,7 +8,7 @@ const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { dateInTz } = require('../time');
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
 
 // Wrap async handlers so any thrown error reaches Express's error middleware
