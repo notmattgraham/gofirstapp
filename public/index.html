@@ -487,6 +487,24 @@
     margin-top: 2px;
   }
 
+  /* Analytics — Execution Streak card. Big number, "days at 100%" label. */
+  .analytics-streak-card {
+    padding: 22px 20px;
+    text-align: center;
+  }
+  .analytics-streak-num {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .analytics-streak-label {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
   /* Analytics tab — "This week" mini-rings */
   .week-bar-card {
     padding: 12px 8px;
@@ -2915,6 +2933,39 @@
     padding-bottom: calc(var(--safe-bottom) + 12px);
   }
 
+  /* Friend-row meta: small ring with today's exec rate + streak text. */
+  .thread-day-ring {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+  }
+  .thread-day-ring::before {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .thread-day-ring span {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .coach-thread-streak {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
   /* ── Coach thread list ───────────────────────────────────────── */
   .coach-thread-list { padding: 0; }
   .coach-thread {
@@ -3331,6 +3382,12 @@
             <div class="analytics-big" id="analytics-rate">—</div>
           </div>
           <div class="analytics-sub" id="analytics-sub">No data yet</div>
+        </div>
+
+        <div class="section-title">Execution streak</div>
+        <div class="card analytics-streak-card">
+          <div class="analytics-streak-num" id="analytics-streak-num" data-animate-streak="0">0</div>
+          <div class="analytics-streak-label" id="analytics-streak-label">days at 100%</div>
         </div>
 
         <div class="section-title">By category</div>
@@ -5517,6 +5574,28 @@ function computeTaskRanking(state, mode, period) {
   return rows.slice(0, 5);
 }
 
+/* Consecutive days at 100% execution, walking backwards from today.
+   Mid-day grace: today only counts when its rate is already 100% (so
+   the streak doesn't drop just because the user hasn't finished yet).
+   Days with no scheduled tasks are skipped without breaking. Capped
+   at 365 to stop a malformed dataset from spinning the loop. Mirrors
+   the server-side executionStreakFromTasks helper. */
+function executionStreak(state) {
+  const today = todayISO();
+  const todayRate = dayExecutionRate(state, today);
+  let streak = 0;
+  let cursor;
+  if (todayRate === 100) { streak = 1; cursor = addDaysISO(today, -1); }
+  else                   { cursor = addDaysISO(today, -1); }
+  for (let i = 0; i < 365; i++) {
+    const r = dayExecutionRate(state, cursor);
+    if (r === null) { cursor = addDaysISO(cursor, -1); continue; }
+    if (r === 100)  { streak++; cursor = addDaysISO(cursor, -1); }
+    else            { break; }
+  }
+  return streak;
+}
+
 /* Top 5 recurring tasks by current consecutive-day streak (skip:* dates
    excluded so an "I'm sick today, skip it" doesn't extend a streak). */
 function computeStreakRanking(state) {
@@ -5665,6 +5744,7 @@ function renderAnalyticsView(state) {
   const bestRows  = computeTaskRanking(state, 'best');
   const worstRows = computeTaskRanking(state, 'worst');
   const streakRows = computeStreakRanking(state);
+  const execStreak = executionStreak(state);
 
   // Snapshot key — animation replays whenever any displayed number differs.
   const dataKey = JSON.stringify({
@@ -5675,6 +5755,7 @@ function renderAnalyticsView(state) {
     best: bestRows.map(r => `${r.id}:${r.rate}`),
     worst: worstRows.map(r => `${r.id}:${r.rate}`),
     streak: streakRows.map(r => `${r.id}:${r.streak}`),
+    execStreak,
   });
   const dataChanged = dataKey !== _lastShownAnalytics;
   _lastShownAnalytics = dataKey;
@@ -5774,6 +5855,19 @@ function renderAnalyticsView(state) {
           </li>`;
       }).join('')
     : '<li class="rank-empty">Check off a recurring task today to start a streak.</li>';
+
+  // === Execution streak card ===
+  const execStreakEl = document.getElementById('analytics-streak-num');
+  const execStreakLabel = document.getElementById('analytics-streak-label');
+  if (execStreakEl) {
+    execStreakEl.dataset.animateStreak = String(execStreak);
+    execStreakEl.textContent = dataChanged ? '0' : String(execStreak);
+  }
+  if (execStreakLabel) {
+    execStreakLabel.textContent = execStreak === 1
+      ? 'day at 100%'
+      : 'days at 100%';
+  }
 
   // === Animate or finalize ===
   if (dataChanged) {
@@ -7292,31 +7386,65 @@ const Coaching = (() => {
   }
 
   function threadRowHtml(opts) {
-    // opts: { user, latest, unread, pinned, friendshipId }
+    // opts: { user, latest, unread, pinned, friendshipId, todayRate, executionStreak }
     const u = opts.user;
     const name = u.name || 'Friend';
-    const preview = fmtPreviewMsg(opts.latest);
-    const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
-    const badge = opts.unread > 0
-      ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
-    const pinIcon = opts.pinned
-      ? '<span class="coach-thread-time" title="Pinned">★</span>' : '';
     // Friendship id + name carried on the row so swipe-to-remove can
     // confirm + DELETE without an extra lookup.
     const fidAttr = opts.friendshipId ? ` data-friendship-id="${esc(opts.friendshipId)}"` : '';
     const nameAttr = ` data-peer-name="${esc(name)}"`;
-    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${opts.pinned ? 'coach' : 'friend'}"${fidAttr}${nameAttr}>
+    const kind = opts.pinned ? 'coach' : 'friend';
+
+    if (opts.pinned) {
+      // Pinned coach entry keeps the message-preview / unread layout —
+      // exec data isn't a thing for a coach in this context.
+      const preview = fmtPreviewMsg(opts.latest);
+      const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
+      const badge = opts.unread > 0
+        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
+      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="coach"${nameAttr}>
+        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)} · Coach</div>
+          <div class="coach-thread-preview">${esc(preview)}</div>
+        </div>
+        <div class="coach-thread-meta">
+          <span class="coach-thread-time">${esc(time)}</span>
+          <span class="coach-thread-time" title="Pinned">★</span>
+          ${badge}
+        </div>
+      </div>`;
+    }
+
+    // Friend row: name + "X day streak" + today's exec ring.
+    const streak = opts.executionStreak || 0;
+    const streakLabel = `${streak} day streak`;
+    const todayRate = opts.todayRate;
+    const ringText = todayRate == null ? '—' : (todayRate + '%');
+    const badge = opts.unread > 0
+      ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
+    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${kind}"${fidAttr}${nameAttr}>
       <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
       <div class="coach-thread-body">
-        <div class="coach-thread-name">${esc(name)}${opts.pinned ? ' · Coach' : ''}</div>
-        <div class="coach-thread-preview">${esc(preview)}</div>
+        <div class="coach-thread-name">${esc(name)}</div>
+        <div class="coach-thread-streak">${esc(streakLabel)}</div>
       </div>
       <div class="coach-thread-meta">
-        <span class="coach-thread-time">${esc(time)}</span>
-        ${pinIcon}
         ${badge}
+        <div class="thread-day-ring" data-today-rate="${todayRate == null ? '' : todayRate}">
+          <span>${esc(ringText)}</span>
+        </div>
       </div>
     </div>`;
+  }
+
+  // After every inbox/coach-friends render, paint the small per-row rings.
+  function paintThreadRowRings(scope) {
+    (scope || document).querySelectorAll('.thread-day-ring').forEach(el => {
+      const raw = el.dataset.todayRate;
+      if (raw === '' || raw == null) { paintTinyRing(el, null); return; }
+      paintTinyRing(el, Number(raw));
+    });
   }
 
   function renderInbox() {
@@ -7336,9 +7464,14 @@ const Coaching = (() => {
     }
     // Friends below, newest-first (server already sorted).
     for (const t of friendThreads) {
-      html += threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false, friendshipId: t.friendshipId });
+      html += threadRowHtml({
+        user: t.user, latest: t.latest, unread: t.unread, pinned: false,
+        friendshipId: t.friendshipId,
+        todayRate: t.todayRate, executionStreak: t.executionStreak,
+      });
     }
     list.innerHTML = html;
+    paintThreadRowRings(list);
     const hasContent = !!html;
     if (empty) empty.hidden = hasContent;
   }
@@ -7354,8 +7487,13 @@ const Coaching = (() => {
     }
     if (empty) empty.hidden = true;
     list.innerHTML = friendThreads.map(t =>
-      threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false, friendshipId: t.friendshipId })
+      threadRowHtml({
+        user: t.user, latest: t.latest, unread: t.unread, pinned: false,
+        friendshipId: t.friendshipId,
+        todayRate: t.todayRate, executionStreak: t.executionStreak,
+      })
     ).join('');
+    paintThreadRowRings(list);
   }
 
   /* Incoming pending-friend-requests row with Accept / Decline buttons. */

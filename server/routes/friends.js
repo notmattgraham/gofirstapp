@@ -28,6 +28,68 @@ function otherSide(meId, row) {
   return row.fromUserId === meId ? row.toUser : row.fromUser;
 }
 
+// ─── Date + task aggregation helpers ─────────────────────────
+// All math uses UTC dates. Cross-TZ skew is at most a few hours per
+// day boundary, which is acceptable for "today's exec rate" / streak
+// at-a-glance. Per-user TZ math can come later if needed.
+function pad2(n) { return String(n).padStart(2, '0'); }
+function utcISO(d) { return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`; }
+function addDaysISO(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return utcISO(dt);
+}
+
+// Mirror of the frontend's countTaskInRange but for a single (task, day).
+function countTaskOnDay(t, dayISO, todayISO) {
+  if (dayISO > todayISO) return { scheduled: 0, completed: 0 };
+  const createdISO = utcISO(new Date(t.createdAt));
+  if (!t.recurrence) {
+    if (createdISO === dayISO) return { scheduled: 1, completed: t.done ? 1 : 0 };
+    return { scheduled: 0, completed: 0 };
+  }
+  if (createdISO > dayISO) return { scheduled: 0, completed: 0 };
+  if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return { scheduled: 0, completed: 0 };
+  const days = t.recurrence.daysOfWeek || [];
+  if (!days.length) return { scheduled: 0, completed: 0 };
+  const [y, m, d] = dayISO.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  if (!days.includes(dow)) return { scheduled: 0, completed: 0 };
+  const cd = t.completedDates || [];
+  if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
+  return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
+}
+
+function dayRateFromTasks(tasks, dayISO, todayISO) {
+  let s = 0, c = 0;
+  for (const t of tasks) {
+    const r = countTaskOnDay(t, dayISO, todayISO);
+    s += r.scheduled; c += r.completed;
+  }
+  return s === 0 ? null : Math.round((c / s) * 100);
+}
+
+/* Consecutive days at 100% execution, walking backwards from today.
+   Mid-day grace: if today is in progress (rate < 100), the streak
+   walks back from yesterday so the user isn't penalized before
+   midnight. Days with no scheduled tasks are skipped without
+   breaking the streak. Capped at 365 to stop a malformed dataset
+   from spinning the loop. */
+function executionStreakFromTasks(tasks, todayISO) {
+  let cursor = todayISO;
+  const todayRate = dayRateFromTasks(tasks, todayISO, todayISO);
+  let streak = 0;
+  if (todayRate === 100) { streak = 1; cursor = addDaysISO(cursor, -1); }
+  else                   { cursor = addDaysISO(cursor, -1); }
+  for (let i = 0; i < 365; i++) {
+    const r = dayRateFromTasks(tasks, cursor, todayISO);
+    if (r === null) { cursor = addDaysISO(cursor, -1); continue; }
+    if (r === 100)  { streak++; cursor = addDaysISO(cursor, -1); }
+    else            { break; }
+  }
+  return streak;
+}
+
 // True iff the two users are accepted friends in either direction.
 async function areFriendsServer(a, b) {
   if (a === b) return false;
@@ -196,9 +258,30 @@ router.get('/threads', wrap(async (req, res) => {
   });
   if (friendRows.length === 0) return res.json({ threads: [] });
 
+  // Bulk-load tasks for every friend in one query, then bucket per-user
+  // so we can compute today's exec rate + execution streak without an
+  // N-times round-trip to the DB.
+  const friendIds = friendRows.map(r => otherSide(me.id, r).id);
+  const allTasks = await prisma.task.findMany({
+    where: { userId: { in: friendIds } },
+    select: {
+      userId: true, scheduledDate: true, done: true,
+      completedDates: true, recurrence: true, createdAt: true,
+    },
+  });
+  const tasksByUser = {};
+  for (const t of allTasks) {
+    if (!tasksByUser[t.userId]) tasksByUser[t.userId] = [];
+    tasksByUser[t.userId].push(t);
+  }
+  const todayISO = utcISO(new Date());
+
   // For each friend, latest message in either direction + my unread count.
   const threads = await Promise.all(friendRows.map(async (row) => {
     const friend = otherSide(me.id, row);
+    const friendTasks = tasksByUser[friend.id] || [];
+    const todayRate = dayRateFromTasks(friendTasks, todayISO, todayISO);
+    const executionStreak = executionStreakFromTasks(friendTasks, todayISO);
     const [latestFrom, latestTo, unread] = await Promise.all([
       prisma.message.findFirst({
         where: { fromUserId: friend.id, toUserId: me.id },
@@ -221,7 +304,7 @@ router.get('/threads', wrap(async (req, res) => {
         : { ...latestTo, fromMe: true };
     } else if (latestFrom) latest = { ...latestFrom, fromMe: false };
     else if (latestTo)     latest = { ...latestTo, fromMe: true };
-    return { user: shapeUser(friend), friendshipId: row.id, latest, unread };
+    return { user: shapeUser(friend), friendshipId: row.id, latest, unread, todayRate, executionStreak };
   }));
 
   threads.sort((a, b) => {
@@ -253,41 +336,8 @@ router.get('/:userId/glance', wrap(async (req, res) => {
     },
   });
 
-  // ---- Date helpers (UTC, matching the rest of the server) ----
-  function pad(n) { return String(n).padStart(2, '0'); }
-  function toISO(d) { return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`; }
-  function addDaysISO(iso, n) {
-    const [y, m, d] = iso.split('-').map(Number);
-    const dt = new Date(Date.UTC(y, m - 1, d + n));
-    return toISO(dt);
-  }
   const today = new Date();
-  const todayISO = toISO(today);
-
-  // Mirrors the frontend's countTaskInRange for a single day.
-  function countOnDay(t, dayISO) {
-    if (dayISO > todayISO) return { scheduled: 0, completed: 0 };
-    const createdISO = toISO(new Date(t.createdAt));
-    if (!t.recurrence) {
-      if (createdISO === dayISO) return { scheduled: 1, completed: t.done ? 1 : 0 };
-      return { scheduled: 0, completed: 0 };
-    }
-    if (createdISO > dayISO) return { scheduled: 0, completed: 0 };
-    if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return { scheduled: 0, completed: 0 };
-    const days = t.recurrence.daysOfWeek || [];
-    if (!days.length) return { scheduled: 0, completed: 0 };
-    const [y, m, d] = dayISO.split('-').map(Number);
-    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-    if (!days.includes(dow)) return { scheduled: 0, completed: 0 };
-    const cd = t.completedDates || [];
-    if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
-    return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
-  }
-  function dayRate(dayISO) {
-    let s = 0, c = 0;
-    for (const t of tasks) { const r = countOnDay(t, dayISO); s += r.scheduled; c += r.completed; }
-    return s === 0 ? null : Math.round((c / s) * 100);
-  }
+  const todayISO = utcISO(today);
 
   // Week (Sunday → Saturday) containing today.
   const dow = today.getUTCDay();
@@ -300,11 +350,16 @@ router.get('/:userId/glance', wrap(async (req, res) => {
       letter: letters[i],
       isToday: iso === todayISO,
       isFuture: iso > todayISO,
-      rate: dayRate(iso),
+      rate: dayRateFromTasks(tasks, iso, todayISO),
     };
   });
 
-  res.json({ todayISO, todayRate: dayRate(todayISO), weekDays });
+  res.json({
+    todayISO,
+    todayRate: dayRateFromTasks(tasks, todayISO, todayISO),
+    executionStreak: executionStreakFromTasks(tasks, todayISO),
+    weekDays,
+  });
 }));
 
 module.exports = router;
