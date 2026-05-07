@@ -3844,6 +3844,12 @@
           <span class="presence-dot" id="dm-presence-dot"></span>
           <span class="presence-text" id="dm-presence-text"></span>
         </div>
+        <!-- Admin-only: delete this conversation. Hidden by default;
+             updateDmHeader reveals it when the admin is viewing an
+             admin-kind thread (broadcast reply or follow-up). -->
+        <button class="back-btn" id="dm-delete-convo" hidden aria-label="Delete conversation" title="Delete conversation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+        </button>
       </div>
       <details class="client-summary-wrap" id="dm-glance-wrap" hidden>
         <summary class="client-summary-toggle"><span id="dm-glance-title">Friend's data</span></summary>
@@ -7134,7 +7140,11 @@ const Coaching = (() => {
   const _seenDmMsgIds = new Map(); // peerId → Set
   const _hasLoadedDm = new Map();  // peerId → boolean
   let coachPeerInfo = null;     // cached coach record (for the pinned coach entry)
+  let adminPeerInfo = null;     // cached admin record (for the pinned admin entry — non-admin users only)
+  let adminInboxMsgPreview = null; // most recent message between me and admin
+  let adminInboxUnread = 0;        // unread incoming from admin
   let friendThreads = [];       // friend inbox rows
+  let adminThreads = [];        // admin inbox rows (only populated when Auth.user.isAdmin)
   let pendingIncoming = [];     // friendship rows awaiting my accept
   let pendingOutgoing = [];     // friendship rows awaiting their accept
   let coachInboxMsgPreview = null; // most recent message between me and coach (for inbox preview)
@@ -7214,6 +7224,7 @@ const Coaching = (() => {
     const dot = document.getElementById('dm-presence-dot');
     const txt = document.getElementById('dm-presence-text');
     const input = document.getElementById('dm-input');
+    const del = document.getElementById('dm-delete-convo');
     if (av) av.innerHTML = avatarHtml(info, info.name || 'Friend');
     if (nameEl) nameEl.textContent = info.name || 'Friend';
     if (statusEl) statusEl.textContent = info.subline || '';
@@ -7223,6 +7234,13 @@ const Coaching = (() => {
     if (input) {
       const fname = (info.name || '').trim().split(/\s+/)[0] || 'them';
       input.placeholder = `Message ${fname}...`;
+    }
+    // Delete-conversation control: only the admin sees it, and only on
+    // admin-kind threads (replies to broadcasts / follow-ups). Avoids
+    // accidentally deleting a friend thread that happens to share a peer.
+    if (del) {
+      const me = Auth.user;
+      del.hidden = !(me && me.isAdmin && info && info.kind === 'admin');
     }
   }
 
@@ -7481,7 +7499,36 @@ const Coaching = (() => {
         } catch {}
       }
 
-      const totalUnread = friendThreads.reduce((s, t) => s + (t.unread || 0), 0) + coachInboxUnread;
+      // Admin's broadcast-reply threads. Only surfaces threads where a
+      // recipient has actually replied — broadcasts on their own stay
+      // hidden from the admin inbox per the server's hiddenFromAdminAt rule.
+      adminThreads = [];
+      if (me.isAdmin) {
+        try {
+          const data = await api('GET', '/api/messages/admin-threads');
+          adminThreads = data.threads || [];
+        } catch (e) { console.warn('[admin-threads]', e); }
+      }
+
+      // Pinned-admin entry for non-admin users who have any message history
+      // with the admin (i.e. received a broadcast or follow-up). Mirrors
+      // the pinned-coach pattern.
+      adminPeerInfo = null;
+      adminInboxMsgPreview = null;
+      adminInboxUnread = 0;
+      if (!me.isAdmin) {
+        try {
+          const data = await api('GET', '/api/messages/admin-pin');
+          if (data && data.admin) {
+            adminPeerInfo = { ...data.admin, subline: 'GoFirst' };
+            adminInboxMsgPreview = data.latest || null;
+            adminInboxUnread = data.unread || 0;
+          }
+        } catch (e) { console.warn('[admin-pin]', e); }
+      }
+
+      const adminUnread = adminThreads.reduce((s, t) => s + (t.unread || 0), 0);
+      const totalUnread = friendThreads.reduce((s, t) => s + (t.unread || 0), 0) + coachInboxUnread + adminUnread + adminInboxUnread;
       setTabBadge('chat', totalUnread > 0);
 
       if (me.isCoach) renderCoachFriendsPane();
@@ -7490,14 +7537,58 @@ const Coaching = (() => {
   }
 
   function threadRowHtml(opts) {
-    // opts: { user, latest, unread, pinned, friendshipId, todayRate, executionStreak }
+    // opts: { user, latest, unread, pinned, friendshipId, todayRate, executionStreak, admin, adminPin }
     const u = opts.user;
     const name = u.name || 'Friend';
     // Friendship id + name carried on the row so swipe-to-remove can
     // confirm + DELETE without an extra lookup.
     const fidAttr = opts.friendshipId ? ` data-friendship-id="${esc(opts.friendshipId)}"` : '';
     const nameAttr = ` data-peer-name="${esc(name)}"`;
-    const kind = opts.pinned ? 'coach' : 'friend';
+    const kind = opts.admin ? 'admin'
+      : opts.adminPin ? 'admin-pin'
+        : opts.pinned ? 'coach'
+          : 'friend';
+
+    // Admin reply rows: same compact layout as the pinned coach entry but
+    // visible only to the admin themselves. No streak ring.
+    if (opts.admin) {
+      const preview = fmtPreviewMsg(opts.latest);
+      const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
+      const badge = opts.unread > 0
+        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
+      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="admin"${nameAttr}>
+        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)}</div>
+          <div class="coach-thread-preview">${esc(preview)}</div>
+        </div>
+        <div class="coach-thread-meta">
+          <span class="coach-thread-time">${esc(time)}</span>
+          ${badge}
+        </div>
+      </div>`;
+    }
+
+    // Pinned-admin row (user's view of the admin). Same shape as pinned
+    // coach but with a "GoFirst" subline. Routes to admin DM on tap.
+    if (opts.adminPin) {
+      const preview = fmtPreviewMsg(opts.latest);
+      const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
+      const badge = opts.unread > 0
+        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
+      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="admin-pin"${nameAttr}>
+        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)} · GoFirst</div>
+          <div class="coach-thread-preview">${esc(preview)}</div>
+        </div>
+        <div class="coach-thread-meta">
+          <span class="coach-thread-time">${esc(time)}</span>
+          <span class="coach-thread-time" title="Pinned">★</span>
+          ${badge}
+        </div>
+      </div>`;
+    }
 
     if (opts.pinned) {
       // Pinned coach entry keeps the message-preview / unread layout —
@@ -7564,6 +7655,27 @@ const Coaching = (() => {
         latest: coachInboxMsgPreview,
         unread: coachInboxUnread,
         pinned: true,
+      });
+    }
+    // Pinned-admin entry for any user who has message history with admin
+    // (server only returns it when there's at least one). The admin
+    // doesn't get themselves pinned.
+    if (me && !me.isAdmin && adminPeerInfo) {
+      html += threadRowHtml({
+        user: adminPeerInfo,
+        latest: adminInboxMsgPreview,
+        unread: adminInboxUnread,
+        adminPin: true,
+      });
+    }
+    // Admin's broadcast-reply threads next (only present when me.isAdmin).
+    // Filter out anyone who's also a friend — that thread already shows up
+    // below with the friend chrome, no need to render it twice.
+    const friendIds = new Set(friendThreads.map(t => t.user.id));
+    for (const t of adminThreads) {
+      if (friendIds.has(t.user.id)) continue;
+      html += threadRowHtml({
+        user: t.user, latest: t.latest, unread: t.unread, admin: true,
       });
     }
     // Friends below, newest-first (server already sorted).
@@ -8332,6 +8444,31 @@ const Coaching = (() => {
     });
     if (dmBack) dmBack.addEventListener('click', closeDm);
 
+    // Admin: delete conversation. Hides every existing message in the pair
+    // from the admin's inbox via DELETE /api/messages/dm/:userId. The peer
+    // keeps their copy; the thread re-surfaces if the peer sends a new
+    // message later.
+    const dmDelete = document.getElementById('dm-delete-convo');
+    if (dmDelete) dmDelete.addEventListener('click', async () => {
+      if (!dmPeerId) return;
+      const name = (dmPeerInfo && dmPeerInfo.name) || 'this user';
+      if (!confirm(`Delete this conversation with ${name}?\n\nIt will disappear from your inbox. ${name} keeps their copy. If they message you again, the thread comes back.`)) return;
+      dmDelete.disabled = true;
+      try {
+        const r = await fetch(`/api/messages/dm/${encodeURIComponent(dmPeerId)}`, {
+          method: 'DELETE',
+          credentials: 'same-origin',
+        });
+        if (!r.ok) throw new Error('status ' + r.status);
+        closeDm();
+        loadInboxThreads();
+      } catch (err) {
+        alert('Could not delete conversation. ' + (err.message || err));
+      } finally {
+        dmDelete.disabled = false;
+      }
+    });
+
     // Coach chat send
     const coachSend  = document.getElementById('coach-chat-send');
     const coachInput = document.getElementById('coach-chat-input');
@@ -8383,16 +8520,26 @@ const Coaching = (() => {
       });
     }
 
-    // Inbox (everyone-not-coach): pinned coach OR friend rows open the
-    // generic DM overlay with the right peer.
+    // Inbox (everyone-not-coach): pinned coach, pinned admin, admin reply,
+    // or friend rows all open the generic DM overlay with the right peer.
     const inboxList = document.getElementById('inbox-thread-list');
     if (inboxList) {
       inboxList.addEventListener('click', (e) => {
         const row = e.target.closest('[data-thread]');
         if (!row) return;
         const peerId = row.dataset.peerId;
-        if (row.dataset.peerKind === 'coach') {
+        const kind = row.dataset.peerKind;
+        if (kind === 'coach') {
           openDm(peerId, coachPeerInfo);
+        } else if (kind === 'admin-pin') {
+          // Non-admin user opening the pinned admin thread.
+          openDm(peerId, adminPeerInfo || { id: peerId });
+        } else if (kind === 'admin') {
+          // Admin opening one of their reply threads.
+          const t = adminThreads.find(x => x.user.id === peerId);
+          // `kind: 'admin'` carried into peerInfo so the DM header shows
+          // the delete-conversation control for admin-only threads.
+          openDm(peerId, t ? { ...t.user, kind: 'admin' } : { id: peerId, kind: 'admin' });
         } else {
           const t = friendThreads.find(x => x.user.id === peerId);
           openDm(peerId, t ? t.user : { id: peerId });

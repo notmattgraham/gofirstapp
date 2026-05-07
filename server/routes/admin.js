@@ -20,24 +20,35 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Access gate. 404 (not 403) so the route is invisible to outsiders.
-// Allowed: the explicit ADMIN_EMAIL, OR the coach (DB flag, or env-email
-// fallback). The coach IS the admin for this app — there's only one of them.
+// Allowed: the admin (DB flag or env-email fallback) OR the coach (DB flag
+// or env-email fallback). Admin and coach are distinct roles now; both can
+// hit the dashboard.
 router.use((req, res, next) => {
   if (!req.user) return res.status(404).json({ error: 'not_found' });
   const email = (req.user.email || '').toLowerCase();
-  const isAdmin = email === ADMIN_EMAIL;
+  const isAdmin = !!req.user.isAdmin || email === ADMIN_EMAIL;
   const isCoach = !!req.user.isCoach || email === COACH_EMAIL;
   if (!isAdmin && !isCoach) return res.status(404).json({ error: 'not_found' });
   next();
 });
 
+// Helper: is the given user the app-wide admin? DB flag wins, env email
+// is the bootstrap fallback (mirrors how isCoach works).
+function isAdmin(user) {
+  if (!user) return false;
+  return !!user.isAdmin || (user.email || '').toLowerCase() === ADMIN_EMAIL;
+}
+
 // "Am I admin?" — used by the dashboard UI to show/hide itself before
-// kicking off the heavier data calls.
+// kicking off the heavier data calls. Reports the caller's specific role
+// so the dashboard can hide admin-only sections (Broadcast, Delete) from
+// the coach.
 router.get('/me', (req, res) => {
   res.json({
     admin: true,
     email: req.user.email,
     name: req.user.name,
+    isAdmin: isAdmin(req.user),
   });
 });
 
@@ -179,6 +190,7 @@ router.get('/users', wrap(async (_req, res) => {
       overridesUsed: u.overridesUsed,
       coachingClient: u.coachingClient,
       isCoach: u.isCoach,
+      isAdmin: u.isAdmin,
       taskCount: summary.totalTasks,
       streakCount: u.quitStreaks.length,
       executionRate: summary.executionRate,
@@ -240,14 +252,20 @@ router.patch('/users/:id/overrides', wrap(async (req, res) => {
 }));
 
 // PATCH /api/admin/users/:id/role — set a user's role.
-// Body: { role: 'user' | 'client' | 'coach' }
-//   user   → coachingClient=false, isCoach=false
-//   client → coachingClient=true,  isCoach=false
-//   coach  → coachingClient=false, isCoach=true   (and demote any other coach)
+// Body: { role: 'user' | 'client' | 'coach' | 'admin' }
+//   user   → coachingClient=false, isCoach=false, isAdmin=false
+//   client → coachingClient=true,  isCoach=false, isAdmin=false
+//   coach  → coachingClient=false, isCoach=true,  isAdmin=false  (demote any other coach)
+//   admin  → coachingClient=false, isCoach=false, isAdmin=true   (demote any other admin)
+// Only the admin can promote anyone TO admin (the coach has dashboard
+// access but can't grant the admin role).
 router.patch('/users/:id/role', wrap(async (req, res) => {
   const role = (req.body && req.body.role) || '';
-  if (!['user', 'client', 'coach'].includes(role)) {
+  if (!['user', 'client', 'coach', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'invalid_role' });
+  }
+  if (role === 'admin' && !isAdmin(req.user)) {
+    return res.status(403).json({ error: 'admin_only' });
   }
   try {
     if (role === 'coach') {
@@ -257,21 +275,112 @@ router.patch('/users/:id/role', wrap(async (req, res) => {
         data: { isCoach: false },
       });
     }
-    const data = role === 'coach'
-      ? { coachingClient: false, isCoach: true }
-      : role === 'client'
-        ? { coachingClient: true, isCoach: false }
-        : { coachingClient: false, isCoach: false };
+    if (role === 'admin') {
+      // Only one admin at a time — demote anyone else flagged.
+      await prisma.user.updateMany({
+        where: { isAdmin: true, NOT: { id: req.params.id } },
+        data: { isAdmin: false },
+      });
+    }
+    const data = role === 'admin'
+      ? { coachingClient: false, isCoach: false, isAdmin: true }
+      : role === 'coach'
+        ? { coachingClient: false, isCoach: true, isAdmin: false }
+        : role === 'client'
+          ? { coachingClient: true, isCoach: false, isAdmin: false }
+          : { coachingClient: false, isCoach: false, isAdmin: false };
     const updated = await prisma.user.update({
       where: { id: req.params.id },
       data,
-      select: { id: true, email: true, name: true, coachingClient: true, isCoach: true },
+      select: { id: true, email: true, name: true, coachingClient: true, isCoach: true, isAdmin: true },
     });
     res.json({ user: updated });
   } catch (e) {
     if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
     throw e;
   }
+}));
+
+// DELETE /api/admin/users/:id — hard delete. Cascades through tasks,
+// streaks, messages, and friendships per the schema's onDelete: Cascade.
+// Admin-only; refuses to delete the calling admin.
+router.delete('/users/:id', wrap(async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
+  if (req.params.id === req.user.id) return res.status(400).json({ error: 'cannot_delete_self' });
+  try {
+    await prisma.user.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
+    throw e;
+  }
+}));
+
+// POST /api/admin/broadcast — admin-only mass DM. Body: { content, attachment? }.
+// Creates one Message per non-admin user with hiddenFromAdminAt stamped at
+// creation time so the admin's inbox does not get flooded with N empty
+// threads. A thread surfaces in the admin inbox only when the recipient
+// replies (creating a row with hiddenFromAdminAt = null).
+const MAX_BROADCAST_RECIPIENTS = 5000;
+const BROADCAST_MAX_LENGTH = 4000;
+const BROADCAST_MAX_ATTACHMENT = 4 * 1024 * 1024; // 4MB base64
+const BROADCAST_ATTACHMENT_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+
+router.post('/broadcast', wrap(async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
+  const { content, attachment } = req.body || {};
+  const trimmed = typeof content === 'string' ? content.trim() : '';
+  const hasAttachment = typeof attachment === 'string' && attachment.length > 0;
+  if (!trimmed && !hasAttachment) return res.status(400).json({ error: 'content_required' });
+  if (trimmed.length > BROADCAST_MAX_LENGTH) return res.status(400).json({ error: 'content_too_long' });
+  if (hasAttachment) {
+    if (attachment.length > BROADCAST_MAX_ATTACHMENT) return res.status(413).json({ error: 'attachment_too_large' });
+    if (!BROADCAST_ATTACHMENT_RE.test(attachment)) return res.status(400).json({ error: 'invalid_attachment' });
+  }
+
+  const recipients = await prisma.user.findMany({
+    where: { id: { not: req.user.id } },
+    select: { id: true },
+  });
+  if (recipients.length > MAX_BROADCAST_RECIPIENTS) {
+    return res.status(413).json({ error: 'too_many_recipients', count: recipients.length });
+  }
+  if (recipients.length === 0) return res.json({ sent: 0 });
+
+  const now = new Date();
+  // createMany doesn't return ids, but we don't need them — websocket pushes
+  // use a prebuilt payload below. Hidden-from-admin so threads only surface
+  // when recipients reply.
+  await prisma.message.createMany({
+    data: recipients.map((r) => ({
+      fromUserId: req.user.id,
+      toUserId: r.id,
+      content: trimmed,
+      attachment: hasAttachment ? attachment : null,
+      hiddenFromAdminAt: now,
+      createdAt: now,
+    })),
+  });
+
+  // Real-time push to whoever's online. Best-effort; offline recipients pick
+  // it up the next time they hit GET /api/messages/dm/<admin-id>.
+  if (typeof global.wsBroadcast === 'function') {
+    for (const r of recipients) {
+      global.wsBroadcast(r.id, {
+        type: 'message',
+        message: {
+          fromUserId: req.user.id,
+          toUserId: r.id,
+          content: trimmed,
+          attachment: hasAttachment ? attachment : null,
+          readAt: null,
+          createdAt: now.toISOString(),
+        },
+      });
+    }
+  }
+
+  res.json({ sent: recipients.length });
 }));
 
 // GET /api/admin/coaching-clients — every flagged client with full drill-down.

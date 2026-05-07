@@ -7,6 +7,9 @@ const router = express.Router();
 // The one coach account. Hardcoded as an env-var default so the whole
 // coaching feature can be ripped out by deleting COACH_EMAIL.
 const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
+// The one app-wide admin. Same env-fallback pattern as COACH_EMAIL so the
+// dashboard works on a fresh database before any user has been flagged.
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
 
 // Kick off Google OAuth.
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
@@ -31,6 +34,7 @@ function shape(u) {
     // DB flag wins; the env-email fallback bootstraps the very first coach
     // before anyone has been flagged via /dev.
     isCoach: !!u.isCoach || (u.email || '').toLowerCase() === COACH_EMAIL,
+    isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
   };
 }
 

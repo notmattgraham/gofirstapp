@@ -7,6 +7,7 @@ const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 
 const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
 const MAX_MESSAGE_LENGTH = 4000;
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -20,6 +21,13 @@ function isCoach(user) {
   return !!user.isCoach || (user.email || '').toLowerCase() === COACH_EMAIL;
 }
 
+// Helper: is the given user the app-wide admin? Same env-fallback pattern
+// as isCoach. Admin can DM any user without a friend relationship — used
+// both for outgoing 1:1 follow-ups and for receiving replies to broadcasts.
+function isAdmin(user) {
+  return !!user.isAdmin || (user.email || '').toLowerCase() === ADMIN_EMAIL;
+}
+
 // Helper: fetch the coach user record. Prefer a user explicitly flagged in
 // the DB; fall back to the env-configured email.
 async function fetchCoach() {
@@ -27,6 +35,149 @@ async function fetchCoach() {
   if (flagged) return flagged;
   return prisma.user.findFirst({ where: { email: { equals: COACH_EMAIL, mode: 'insensitive' } } });
 }
+
+// GET /api/messages/admin-threads — admin-only inbox listing.
+// One row per peer who has at least one message between us with
+// hiddenFromAdminAt = null. That's exactly the set of users who have
+// either replied to a broadcast or sent the admin a fresh message after
+// the admin last "deleted" the conversation.
+router.get('/admin-threads', wrap(async (req, res) => {
+  const me = req.user;
+  if (!isAdmin(me)) return res.status(403).json({ error: 'admin_only' });
+
+  // Pull every visible (non-hidden) message touching the admin, in a single
+  // query, then bucket in JS. Cap at a reasonable number — even the most
+  // chatty admin won't have more than a few thousand active threads.
+  const visible = await prisma.message.findMany({
+    where: {
+      hiddenFromAdminAt: null,
+      OR: [
+        { fromUserId: me.id },
+        { toUserId: me.id },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5000,
+    select: {
+      id: true, fromUserId: true, toUserId: true,
+      content: true, attachment: true, readAt: true, createdAt: true,
+    },
+  });
+
+  // Bucket into peer → latest message + unread count.
+  const byPeer = new Map();
+  for (const m of visible) {
+    const peerId = m.fromUserId === me.id ? m.toUserId : m.fromUserId;
+    let bucket = byPeer.get(peerId);
+    if (!bucket) {
+      bucket = { latest: null, unread: 0 };
+      byPeer.set(peerId, bucket);
+    }
+    if (!bucket.latest || new Date(m.createdAt) > new Date(bucket.latest.createdAt)) {
+      bucket.latest = m;
+    }
+    if (m.fromUserId === peerId && !m.readAt) bucket.unread += 1;
+  }
+
+  if (byPeer.size === 0) return res.json({ threads: [] });
+
+  // Hydrate peer profile fields in one query.
+  const peers = await prisma.user.findMany({
+    where: { id: { in: Array.from(byPeer.keys()) } },
+    select: { id: true, name: true, picture: true, lastSeenAt: true },
+  });
+
+  const threads = peers.map((p) => {
+    const b = byPeer.get(p.id);
+    const fromMe = b.latest.fromUserId === me.id;
+    return {
+      // Same shape as /api/friends/threads so the SPA inbox can merge both
+      // lists into a single `inbox-thread-list`. `kind` distinguishes admin
+      // threads from friend threads at render time (no glance row, shows a
+      // delete-conversation control, etc).
+      user: { id: p.id, name: p.name, picture: p.picture, lastSeenAt: p.lastSeenAt },
+      kind: 'admin',
+      latest: {
+        id: b.latest.id,
+        content: b.latest.content,
+        createdAt: b.latest.createdAt,
+        readAt: b.latest.readAt,
+        fromMe,
+      },
+      unread: b.unread,
+    };
+  });
+
+  threads.sort((a, b) => new Date(b.latest.createdAt) - new Date(a.latest.createdAt));
+  res.json({ threads });
+}));
+
+// GET /api/messages/admin-pin — for non-admin users.
+// Returns the admin user record + latest message preview + unread count
+// IF this user has at least one message with the admin (in either
+// direction). Mirrors the "pinned coach" entry that coaching clients see.
+// When the caller IS the admin, or has no messages with the admin, returns
+// { admin: null } so the SPA can skip rendering the pinned row.
+router.get('/admin-pin', wrap(async (req, res) => {
+  const me = req.user;
+  if (isAdmin(me)) return res.json({ admin: null });
+
+  const admin = await prisma.user.findFirst({ where: { isAdmin: true } })
+    || await prisma.user.findFirst({ where: { email: { equals: ADMIN_EMAIL, mode: 'insensitive' } } });
+  if (!admin) return res.json({ admin: null });
+
+  const [latest, unread] = await Promise.all([
+    prisma.message.findFirst({
+      where: {
+        OR: [
+          { fromUserId: me.id, toUserId: admin.id },
+          { fromUserId: admin.id, toUserId: me.id },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, fromUserId: true, content: true, attachment: true, createdAt: true, readAt: true },
+    }),
+    prisma.message.count({
+      where: { fromUserId: admin.id, toUserId: me.id, readAt: null },
+    }),
+  ]);
+  if (!latest) return res.json({ admin: null });
+
+  res.json({
+    admin: { id: admin.id, name: admin.name, picture: admin.picture, lastSeenAt: admin.lastSeenAt },
+    latest: {
+      id: latest.id,
+      content: latest.content,
+      attachment: latest.attachment,
+      createdAt: latest.createdAt,
+      fromMe: latest.fromUserId === me.id,
+    },
+    unread,
+  });
+}));
+
+// DELETE /api/messages/dm/:userId — admin-only "delete conversation".
+// Stamps hiddenFromAdminAt on every message in the pair so the thread
+// vanishes from the admin's inbox listing. Recipient still keeps full
+// history. If the user later sends a new message, that new row has
+// hiddenFromAdminAt = null and the thread re-surfaces.
+router.delete('/dm/:userId', wrap(async (req, res) => {
+  const me = req.user;
+  if (!isAdmin(me)) return res.status(403).json({ error: 'admin_only' });
+  const otherId = req.params.userId;
+  if (otherId === me.id) return res.status(400).json({ error: 'cannot_dm_self' });
+  const result = await prisma.message.updateMany({
+    where: {
+      hiddenFromAdminAt: null,
+      OR: [
+        { fromUserId: me.id, toUserId: otherId },
+        { fromUserId: otherId, toUserId: me.id },
+      ],
+    },
+    data: { hiddenFromAdminAt: new Date() },
+  });
+  res.json({ ok: true, hidden: result.count });
+}));
 
 // GET /api/messages
 // For a coaching client: returns the full conversation with the coach.
@@ -124,24 +275,39 @@ router.get('/', wrap(async (req, res) => {
   });
 }));
 
-// GET /api/messages/dm/:userId  (friends only)
+// GET /api/messages/dm/:userId  (friends, OR admin↔anyone)
 // Conversation between me and an accepted friend. Marks incoming as read.
+// Admin↔anyone is allowed without a friendship (in either direction) — the
+// admin can read replies to broadcasts, and any user can read what the
+// admin sent them.
 router.get('/dm/:userId', wrap(async (req, res) => {
   const me = req.user;
   const otherId = req.params.userId;
   if (otherId === me.id) return res.status(400).json({ error: 'cannot_dm_self' });
 
-  const f = await prisma.friendship.findFirst({
-    where: {
-      status: 'accepted',
-      OR: [
-        { fromUserId: me.id, toUserId: otherId },
-        { fromUserId: otherId, toUserId: me.id },
-      ],
-    },
-    select: { id: true },
-  });
-  if (!f) return res.status(403).json({ error: 'not_friends' });
+  let allowed = isAdmin(me);
+  if (!allowed) {
+    // Other party might be the admin — non-admin user opening the
+    // pinned-admin thread to read a broadcast.
+    const other = await prisma.user.findUnique({
+      where: { id: otherId },
+      select: { isAdmin: true, email: true },
+    });
+    if (other && isAdmin(other)) allowed = true;
+  }
+  if (!allowed) {
+    const f = await prisma.friendship.findFirst({
+      where: {
+        status: 'accepted',
+        OR: [
+          { fromUserId: me.id, toUserId: otherId },
+          { fromUserId: otherId, toUserId: me.id },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!f) return res.status(403).json({ error: 'not_friends' });
+  }
 
   const friend = await prisma.user.findUnique({
     where: { id: otherId },
@@ -260,13 +426,16 @@ router.post('/', wrap(async (req, res) => {
     if (toUserId === me.id) return res.status(400).json({ error: 'cannot_dm_self' });
     const recipient = await prisma.user.findUnique({
       where: { id: toUserId },
-      select: { id: true, coachingClient: true, isCoach: true, email: true },
+      select: { id: true, coachingClient: true, isCoach: true, isAdmin: true, email: true },
     });
     if (!recipient) return res.status(404).json({ error: 'recipient_not_found' });
 
     const isCoachToClient = isCoach(me) && recipient.coachingClient;
     const isClientToCoach = me.coachingClient && (recipient.isCoach || (recipient.email || '').toLowerCase() === COACH_EMAIL);
-    let allowed = isCoachToClient || isClientToCoach;
+    // Admin can DM anyone (outgoing 1:1 follow-ups), and anyone can DM the
+    // admin (replying to a broadcast). No friend relationship required.
+    const isAdminPair = isAdmin(me) || isAdmin(recipient);
+    let allowed = isCoachToClient || isClientToCoach || isAdminPair;
     if (!allowed) {
       // Friend DM path — both sides must be accepted friends.
       const f = await prisma.friendship.findFirst({

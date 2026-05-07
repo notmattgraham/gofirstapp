@@ -206,8 +206,9 @@
   }
   .badge.role-coach { background: var(--warn); color: #1a1d25; border-color: transparent; }
   .badge.role-client { background: var(--accent-dim); color: var(--text); border-color: transparent; }
+  .badge.role-admin { background: var(--danger); color: #fff; border-color: transparent; }
 
-  /* Role picker — three-segment toggle (User / Client / Coach) */
+  /* Role picker — four-segment toggle (User / Client / Coach / Admin) */
   .role-picker {
     display: inline-flex;
     border: 1px solid var(--border);
@@ -292,6 +293,53 @@
     border-color: rgba(239,68,68,0.3);
   }
   .btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* Plain "X" delete button at the end of each user row. Subtle until hover. */
+  .row-delete {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 16px;
+    line-height: 1;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .row-delete:hover { color: var(--danger); background: var(--accent-dim); }
+  .row-delete:disabled { opacity: 0.4; cursor: default; }
+
+  /* --- Broadcast composer ----------------------------------- */
+  .broadcast {
+    display: grid;
+    gap: 10px;
+  }
+  .broadcast textarea {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--text);
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1.45;
+  }
+  .broadcast textarea:focus { outline: none; border-color: var(--accent); }
+  .broadcast .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .broadcast .meta { color: var(--text-dim); font-size: 12px; }
+  .broadcast .meta.ok { color: var(--success); }
+  .broadcast .meta.err { color: var(--danger); }
 
   .filter-row {
     display: flex;
@@ -439,6 +487,15 @@
     </div>
     <div id="clients"></div>
 
+    <div class="section-title" id="broadcast-title" hidden>Broadcast to all users</div>
+    <div class="card broadcast" id="broadcast-card" hidden>
+      <textarea id="broadcast-content" placeholder="Write a message to send to every user…" maxlength="4000"></textarea>
+      <div class="row">
+        <div class="meta" id="broadcast-meta">Delivered as a DM from your account. Replies show up in your inbox.</div>
+        <button class="btn primary" id="broadcast-send">Send to all</button>
+      </div>
+    </div>
+
     <div class="section-title">All users</div>
     <div class="filter-row">
       <input id="user-filter" type="search" placeholder="Search by name or email…" autocomplete="off" />
@@ -456,10 +513,11 @@
             <th class="num">Exec %</th>
             <th class="num hide-sm">Overrides</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="8" class="center">Loading users…</td></tr>
+          <tr><td colspan="9" class="center">Loading users…</td></tr>
         </tbody>
       </table>
     </div>
@@ -510,6 +568,9 @@
     : `<span class="avatar">${escapeHtml(initials(u.name, u.email))}</span>`;
 
   // Auth gate: hit /api/admin/me. 404 (or anything else) => 404 page.
+  // Also captures whether the caller is the app-wide admin (vs the coach
+  // who has dashboard access but not admin-only powers like Delete/Broadcast).
+  let amAdmin = false;
   async function gate() {
     let me;
     try {
@@ -521,6 +582,7 @@
       $('not-found').hidden = false;
       return null;
     }
+    amAdmin = !!me.isAdmin;
     return me;
   }
 
@@ -548,6 +610,13 @@
     $('loading').hidden = true;
     $('app').hidden = false;
 
+    // Broadcast composer is admin-only — coach view doesn't show it.
+    if (amAdmin) {
+      $('broadcast-title').hidden = false;
+      $('broadcast-card').hidden = false;
+      wireBroadcast();
+    }
+
     // Each section loads independently — one slow endpoint must not block
     // the others. Sections with a failed fetch render an inline error.
     fetchJson('/api/admin/stats')
@@ -566,7 +635,7 @@
     el.innerHTML = `<div class="stat" style="grid-column:1/-1"><div class="label">Stats failed to load</div><div class="num" style="font-size:14px;color:var(--danger)">${escapeHtml(String(err.message || err))}</div></div>`;
   }
   function renderUsersError(err) {
-    $('users-body').innerHTML = `<tr><td colspan="8" class="center" style="color:var(--danger)">Could not load users: ${escapeHtml(String(err.message || err))}</td></tr>`;
+    $('users-body').innerHTML = `<tr><td colspan="9" class="center" style="color:var(--danger)">Could not load users: ${escapeHtml(String(err.message || err))}</td></tr>`;
   }
 
   function renderStats(s) {
@@ -607,16 +676,25 @@
 
     const body = $('users-body');
     if (!rows.length) {
-      body.innerHTML = `<tr><td colspan="8" class="center">No users match.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="9" class="center">No users match.</td></tr>`;
       return;
     }
     body.innerHTML = rows.map(u => {
-      const role = u.isCoach ? 'coach' : (u.coachingClient ? 'client' : 'user');
-      const roleBadge = role === 'coach'
-        ? '<span class="badge role-coach">Coach</span>'
-        : role === 'client'
-          ? '<span class="badge role-client">Client</span>'
-          : '';
+      const role = u.isAdmin ? 'admin' : (u.isCoach ? 'coach' : (u.coachingClient ? 'client' : 'user'));
+      const roleBadge = role === 'admin'
+        ? '<span class="badge role-admin">Admin</span>'
+        : role === 'coach'
+          ? '<span class="badge role-coach">Coach</span>'
+          : role === 'client'
+            ? '<span class="badge role-client">Client</span>'
+            : '';
+      // Only the actual admin can promote/demote the admin role; coach
+      // viewers see the segment but it's disabled. The X delete button is
+      // also admin-only (coach can't remove users).
+      const adminBtnAttrs = amAdmin ? '' : 'disabled title="Only the admin can grant the admin role"';
+      const deleteCell = amAdmin
+        ? `<td><button class="row-delete" data-delete data-id="${escapeHtml(u.id)}" data-email="${escapeHtml(u.email || '')}" title="Delete user" aria-label="Delete user">×</button></td>`
+        : `<td></td>`;
       return `
       <tr data-id="${escapeHtml(u.id)}">
         <td>
@@ -646,8 +724,10 @@
             <button data-role="user"   class="${role === 'user'   ? 'active' : ''}">User</button>
             <button data-role="client" class="${role === 'client' ? 'active' : ''}">Client</button>
             <button data-role="coach"  class="${role === 'coach'  ? 'active' : ''}">Coach</button>
+            <button data-role="admin"  class="${role === 'admin'  ? 'active' : ''}" ${adminBtnAttrs}>Admin</button>
           </div>
         </td>
+        ${deleteCell}
       </tr>`;
     }).join('');
   }
@@ -662,8 +742,9 @@
     if (!btn) return;
     const picker = btn.closest('[data-role-picker]');
     const id = picker.dataset.id;
-    const role = btn.dataset.role; // 'user' | 'client' | 'coach'
+    const role = btn.dataset.role; // 'user' | 'client' | 'coach' | 'admin'
     if (btn.classList.contains('active')) return; // no-op
+    if (btn.disabled) return; // admin segment is disabled for non-admin viewers
     [...picker.querySelectorAll('button')].forEach(b => b.disabled = true);
     try {
       const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/role`, {
@@ -673,15 +754,19 @@
         body: JSON.stringify({ role }),
       });
       if (!r.ok) throw new Error('bad status ' + r.status);
-      // Update in-memory state.
+      // Update in-memory state — roles are mutually exclusive.
       const u = allUsers.find(x => x.id === id);
       if (u) {
         u.coachingClient = role === 'client';
         u.isCoach = role === 'coach';
+        u.isAdmin = role === 'admin';
       }
-      // If we just promoted someone to coach, demote any other in-memory coach.
+      // Single-coach / single-admin invariants — demote any other in-memory holder.
       if (role === 'coach') {
         for (const x of allUsers) if (x.id !== id) x.isCoach = false;
+      }
+      if (role === 'admin') {
+        for (const x of allUsers) if (x.id !== id) x.isAdmin = false;
       }
       applyUserFilter();
       reloadClients();
@@ -690,6 +775,86 @@
       alert('Could not update role. ' + err.message);
     }
   });
+
+  // Hard-delete a user. Cascades through their tasks, streaks, messages,
+  // friendships per the schema. Confirm via a typed-email dialog so the
+  // wrong row can't be wiped with a stray click.
+  $('users-body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-delete]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const email = btn.dataset.email || '(no email)';
+    const typed = prompt(
+      `Permanently delete this user?\n\n${email}\n\n` +
+      `This cannot be undone. All of their tasks, streaks, messages, and ` +
+      `friend connections will be removed.\n\n` +
+      `Type the email to confirm:`
+    );
+    if (typed == null) return;
+    if (typed.trim().toLowerCase() !== email.trim().toLowerCase()) {
+      alert('Email did not match. User was not deleted.');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        throw new Error(`status ${r.status} ${body.slice(0, 200)}`);
+      }
+      allUsers = allUsers.filter(x => x.id !== id);
+      applyUserFilter();
+      reloadClients();
+    } catch (err) {
+      btn.disabled = false;
+      alert('Could not delete user. ' + err.message);
+    }
+  });
+
+  // --- Broadcast ----------------------------------------------------
+  function wireBroadcast() {
+    const send = $('broadcast-send');
+    const ta = $('broadcast-content');
+    const meta = $('broadcast-meta');
+    send.addEventListener('click', async () => {
+      const content = (ta.value || '').trim();
+      if (!content) { ta.focus(); return; }
+      const recipientCount = allUsers.length; // approx — server is source of truth
+      const ok = confirm(
+        `Send this message to every user${recipientCount ? ` (~${recipientCount})` : ''}?\n\n` +
+        `Replies will appear in your inbox. The broadcast itself stays hidden ` +
+        `from your inbox until someone responds.\n\n${content.slice(0, 280)}` +
+        (content.length > 280 ? '…' : '')
+      );
+      if (!ok) return;
+      send.disabled = true;
+      ta.disabled = true;
+      meta.className = 'meta';
+      meta.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/admin/broadcast', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || `status ${r.status}`);
+        meta.className = 'meta ok';
+        meta.textContent = `Sent to ${data.sent} user${data.sent === 1 ? '' : 's'}.`;
+        ta.value = '';
+      } catch (err) {
+        meta.className = 'meta err';
+        meta.textContent = 'Failed: ' + (err.message || err);
+      } finally {
+        send.disabled = false;
+        ta.disabled = false;
+      }
+    });
+  }
 
   // Click handler for the override editor. step="-1"/"1"/"0":
   //   -1 → give the user one back   (overridesUsed - 1)
