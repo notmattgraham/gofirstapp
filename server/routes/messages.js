@@ -39,7 +39,7 @@ router.get('/', wrap(async (req, res) => {
     const clients = await prisma.user.findMany({
       where: { coachingClient: true },
       select: {
-        id: true, email: true, name: true, picture: true,
+        id: true, name: true, picture: true,
         sentMessages: {
           where: { toUserId: me.id },
           orderBy: { createdAt: 'desc' },
@@ -72,7 +72,8 @@ router.get('/', wrap(async (req, res) => {
       } else if (fromCoach) {
         latest = { ...fromCoach, fromMe: true };
       }
-      return { client: { id: client.id, email: client.email, name: client.name, picture: client.picture }, latest, unread };
+      // Email omitted — privacy. Coach identifies clients by display name.
+      return { client: { id: client.id, name: client.name, picture: client.picture }, latest, unread };
     }));
 
     // Sort by latest message timestamp descending (threads with no messages go last).
@@ -144,7 +145,8 @@ router.get('/dm/:userId', wrap(async (req, res) => {
 
   const friend = await prisma.user.findUnique({
     where: { id: otherId },
-    select: { id: true, name: true, email: true, picture: true, lastSeenAt: true },
+    // Email intentionally omitted — friends shouldn't see each other's email.
+    select: { id: true, name: true, picture: true, lastSeenAt: true },
   });
   if (!friend) return res.status(404).json({ error: 'user_not_found' });
 
@@ -182,7 +184,7 @@ router.get('/:clientId', wrap(async (req, res) => {
   const client = await prisma.user.findUnique({
     where: { id: clientId },
     select: {
-      id: true, email: true, name: true, picture: true, coachingClient: true,
+      id: true, name: true, picture: true, coachingClient: true,
       timezone: true,
       tasks: {
         // Pull every task — frontend filters for today's view AND uses the
@@ -216,7 +218,7 @@ router.get('/:clientId', wrap(async (req, res) => {
     });
   }
 
-  res.json({ messages, client: { id: client.id, email: client.email, name: client.name, picture: client.picture, timezone: client.timezone }, tasks: client.tasks });
+  res.json({ messages, client: { id: client.id, name: client.name, picture: client.picture, timezone: client.timezone }, tasks: client.tasks });
 }));
 
 // POST /api/messages
