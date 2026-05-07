@@ -40,6 +40,13 @@ model User {
   // the original coach account works before anyone is flagged in the DB.
   isCoach             Boolean  @default(false)
 
+  // Marks a user as the app-wide admin. Admin can broadcast a DM to every
+  // user, manage roles, and delete users from /dev. Only one admin exists at
+  // a time (the role PATCH demotes any other admin when promoting). Falls
+  // back to env ADMIN_EMAIL match in code so the original admin account
+  // works before anyone is flagged in the DB.
+  isAdmin             Boolean  @default(false)
+
   // Updated by the trackLastSeen middleware on authenticated requests
   // (throttled to 1 write/min/user). Drives the "Active now / 5m ago"
   // presence display in the chat header.
@@ -84,6 +91,16 @@ model Message {
   attachment String?
   // Null = unread. Set to the time the recipient first opened the message.
   readAt     DateTime?
+  // Hides this row from the admin's inbox listing only. Set when:
+  //   (a) the message was sent as part of an admin broadcast — so a thread
+  //       only surfaces in the admin inbox once a reply (which has this
+  //       field null) is created, and
+  //   (b) the admin "deletes" a conversation — every row in the pair gets
+  //       this stamped, and the thread vanishes from the admin's list until
+  //       a new reply lands.
+  // Does not affect the recipient's view, and does not hide messages once
+  // the admin actually opens the thread.
+  hiddenFromAdminAt DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([fromUserId])
