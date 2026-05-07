@@ -2260,6 +2260,11 @@
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    /* Zero the browser's default <ul> padding/margin so rows align flush
+       with the surrounding container instead of getting indented ~40px. */
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
   /* Section label inside the inbox (e.g. "Friend requests"). */
   .inbox-section-label {
