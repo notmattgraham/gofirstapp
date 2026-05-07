@@ -70,6 +70,7 @@ app.use('/api/streaks', require('./routes/streaks'));
 app.use('/api/overrides', require('./routes/overrides'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/friends', require('./routes/friends'));
 
 // Static assets — the SPA lives in /public.
 const publicDir = path.join(__dirname, '..', 'public');
@@ -208,14 +209,13 @@ server.on('upgrade', async (request, socket, head) => {
     const userId = sess?.passport?.user;
     if (!userId) { socket.destroy(); return; }
 
-    // Only coaching clients and the coach get a WS connection — everyone else
-    // can't use the chat feature, so there's no point keeping a socket open.
+    // Any authenticated user gets a WS connection — friends DMs need it
+    // too. Role still gets cached on the socket so per-message handlers
+    // can authorize without a DB hit per keystroke.
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, coachingClient: true, isCoach: true } });
+    if (!user) { socket.destroy(); return; }
     const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
-    const isCoach = !!user?.isCoach || (user?.email || '').toLowerCase() === COACH_EMAIL;
-    if (!user || (!user.coachingClient && !isCoach)) {
-      socket.destroy(); return;
-    }
+    const isCoach = !!user.isCoach || (user.email || '').toLowerCase() === COACH_EMAIL;
 
     // Resolve the coach id once at upgrade time so client-side typing events
     // can be forwarded without an extra DB hit per keystroke.

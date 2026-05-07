@@ -123,6 +123,54 @@ router.get('/', wrap(async (req, res) => {
   });
 }));
 
+// GET /api/messages/dm/:userId  (friends only)
+// Conversation between me and an accepted friend. Marks incoming as read.
+router.get('/dm/:userId', wrap(async (req, res) => {
+  const me = req.user;
+  const otherId = req.params.userId;
+  if (otherId === me.id) return res.status(400).json({ error: 'cannot_dm_self' });
+
+  const f = await prisma.friendship.findFirst({
+    where: {
+      status: 'accepted',
+      OR: [
+        { fromUserId: me.id, toUserId: otherId },
+        { fromUserId: otherId, toUserId: me.id },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!f) return res.status(403).json({ error: 'not_friends' });
+
+  const friend = await prisma.user.findUnique({
+    where: { id: otherId },
+    select: { id: true, name: true, email: true, picture: true, lastSeenAt: true },
+  });
+  if (!friend) return res.status(404).json({ error: 'user_not_found' });
+
+  const messages = await prisma.message.findMany({
+    where: {
+      OR: [
+        { fromUserId: me.id, toUserId: otherId },
+        { fromUserId: otherId, toUserId: me.id },
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
+  });
+
+  // Mark unread incoming as read.
+  const unreadIds = messages.filter(m => m.fromUserId === otherId && !m.readAt).map(m => m.id);
+  if (unreadIds.length > 0) {
+    await prisma.message.updateMany({
+      where: { id: { in: unreadIds } },
+      data: { readAt: new Date() },
+    });
+  }
+
+  res.json({ messages, friend });
+}));
+
 // GET /api/messages/:clientId  (coach only)
 // Full conversation between coach and a specific client. Also marks coach's
 // incoming messages from that client as read.
@@ -204,14 +252,37 @@ router.post('/', wrap(async (req, res) => {
 
   let recipientId;
 
-  if (isCoach(me)) {
-    // Coach is sending to a client.
-    if (!toUserId) return res.status(400).json({ error: 'toUserId_required' });
-    const recipient = await prisma.user.findUnique({ where: { id: toUserId }, select: { id: true, coachingClient: true } });
-    if (!recipient || !recipient.coachingClient) return res.status(404).json({ error: 'client_not_found' });
+  if (toUserId) {
+    // Explicit recipient — the coach replying to a client, OR any user
+    // DMing a friend. Allowed pairs: coach↔client OR accepted friends.
+    if (toUserId === me.id) return res.status(400).json({ error: 'cannot_dm_self' });
+    const recipient = await prisma.user.findUnique({
+      where: { id: toUserId },
+      select: { id: true, coachingClient: true, isCoach: true, email: true },
+    });
+    if (!recipient) return res.status(404).json({ error: 'recipient_not_found' });
+
+    const isCoachToClient = isCoach(me) && recipient.coachingClient;
+    const isClientToCoach = me.coachingClient && (recipient.isCoach || (recipient.email || '').toLowerCase() === COACH_EMAIL);
+    let allowed = isCoachToClient || isClientToCoach;
+    if (!allowed) {
+      // Friend DM path — both sides must be accepted friends.
+      const f = await prisma.friendship.findFirst({
+        where: {
+          status: 'accepted',
+          OR: [
+            { fromUserId: me.id, toUserId },
+            { fromUserId: toUserId, toUserId: me.id },
+          ],
+        },
+        select: { id: true },
+      });
+      allowed = !!f;
+    }
+    if (!allowed) return res.status(403).json({ error: 'not_authorized' });
     recipientId = toUserId;
   } else {
-    // Client is sending to the coach.
+    // Legacy path with no toUserId: a coaching client DMing the coach.
     if (!me.coachingClient) return res.status(403).json({ error: 'not_a_coaching_client' });
     const coach = await fetchCoach();
     if (!coach) return res.status(503).json({ error: 'coach_not_found' });

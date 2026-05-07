@@ -1,0 +1,235 @@
+// Social graph: friend search, friend requests, friends list, friends inbox.
+// All endpoints require auth. Real names only — no @handles. Direction
+// matters at request time (fromUser asked toUser) but stops mattering once
+// the row flips to 'accepted'; either side can DM the other or unfriend.
+
+const express = require('express');
+const prisma = require('../db');
+const { requireAuth } = require('../middleware');
+
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const router = express.Router();
+router.use(requireAuth);
+
+// Public-shape user record returned by every friends endpoint.
+function shapeUser(u) {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    picture: u.picture,
+    lastSeenAt: u.lastSeenAt,
+  };
+}
+
+// Helper: find the "other" user in a Friendship row (the one that isn't `meId`).
+function otherSide(meId, row) {
+  return row.fromUserId === meId ? row.toUser : row.fromUser;
+}
+
+// True iff the two users are accepted friends in either direction.
+async function areFriendsServer(a, b) {
+  if (a === b) return false;
+  const f = await prisma.friendship.findFirst({
+    where: {
+      status: 'accepted',
+      OR: [
+        { fromUserId: a, toUserId: b },
+        { fromUserId: b, toUserId: a },
+      ],
+    },
+    select: { id: true },
+  });
+  return !!f;
+}
+
+// GET /api/friends — { friends, incoming, outgoing }.
+//   friends  — accepted on either side (the other party in each row)
+//   incoming — pending where I'm the toUser (someone asked me)
+//   outgoing — pending where I'm the fromUser (I asked someone)
+router.get('/', wrap(async (req, res) => {
+  const me = req.user;
+  const rows = await prisma.friendship.findMany({
+    where: {
+      OR: [
+        { fromUserId: me.id },
+        { toUserId: me.id },
+      ],
+    },
+    include: {
+      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  const friends  = [];
+  const incoming = [];
+  const outgoing = [];
+  for (const r of rows) {
+    const other = otherSide(me.id, r);
+    if (r.status === 'accepted') {
+      friends.push({ friendshipId: r.id, since: r.acceptedAt, user: shapeUser(other) });
+    } else if (r.status === 'pending') {
+      if (r.toUserId === me.id) incoming.push({ friendshipId: r.id, requestedAt: r.createdAt, user: shapeUser(other) });
+      else                       outgoing.push({ friendshipId: r.id, requestedAt: r.createdAt, user: shapeUser(other) });
+    }
+  }
+  res.json({ friends, incoming, outgoing });
+}));
+
+// GET /api/friends/search?q= — find people by display name (case-insensitive).
+// Excludes the current user, anyone who already has a friendship row with
+// the user (any status), and the coach (coaching is a paid relationship,
+// not a friend one).
+router.get('/search', wrap(async (req, res) => {
+  const q = String((req.query && req.query.q) || '').trim();
+  if (q.length < 2) return res.json({ users: [] });
+  const me = req.user;
+
+  // Existing friendships in either direction — exclude all of them.
+  const existing = await prisma.friendship.findMany({
+    where: { OR: [{ fromUserId: me.id }, { toUserId: me.id }] },
+    select: { fromUserId: true, toUserId: true },
+  });
+  const excludeIds = new Set([me.id]);
+  existing.forEach(f => { excludeIds.add(f.fromUserId); excludeIds.add(f.toUserId); });
+
+  const users = await prisma.user.findMany({
+    where: {
+      id: { notIn: [...excludeIds] },
+      OR: [
+        { name:  { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ],
+      // Skip placeholder accounts that never set a name.
+      name: { not: null },
+    },
+    select: { id: true, name: true, email: true, picture: true, lastSeenAt: true },
+    take: 12,
+    orderBy: { name: 'asc' },
+  });
+  res.json({ users: users.map(shapeUser) });
+}));
+
+// POST /api/friends/request — body: { toUserId }
+// Creates a pending row from me → target. Idempotent if a pending request
+// already exists in that direction; if a pending row exists the OTHER way
+// (the target asked me first), this auto-accepts instead.
+router.post('/request', wrap(async (req, res) => {
+  const me = req.user;
+  const { toUserId } = req.body || {};
+  if (!toUserId || typeof toUserId !== 'string') return res.status(400).json({ error: 'toUserId_required' });
+  if (toUserId === me.id) return res.status(400).json({ error: 'cannot_friend_self' });
+
+  const target = await prisma.user.findUnique({ where: { id: toUserId }, select: { id: true } });
+  if (!target) return res.status(404).json({ error: 'user_not_found' });
+
+  // Look up any existing relationship in either direction.
+  const existing = await prisma.friendship.findFirst({
+    where: {
+      OR: [
+        { fromUserId: me.id, toUserId },
+        { fromUserId: toUserId, toUserId: me.id },
+      ],
+    },
+  });
+
+  if (existing) {
+    if (existing.status === 'accepted') {
+      return res.status(409).json({ error: 'already_friends', friendshipId: existing.id });
+    }
+    if (existing.fromUserId === me.id) {
+      return res.status(409).json({ error: 'already_requested', friendshipId: existing.id });
+    }
+    // The target already asked me — auto-accept.
+    const accepted = await prisma.friendship.update({
+      where: { id: existing.id },
+      data: { status: 'accepted', acceptedAt: new Date() },
+    });
+    return res.status(200).json({ friendshipId: accepted.id, status: 'accepted', autoAccepted: true });
+  }
+
+  const created = await prisma.friendship.create({
+    data: { fromUserId: me.id, toUserId, status: 'pending' },
+  });
+  res.status(201).json({ friendshipId: created.id, status: 'pending' });
+}));
+
+// POST /api/friends/accept/:id — accept a pending request where I'm the toUser.
+router.post('/accept/:id', wrap(async (req, res) => {
+  const me = req.user;
+  const row = await prisma.friendship.findUnique({ where: { id: req.params.id } });
+  if (!row || row.toUserId !== me.id) return res.status(404).json({ error: 'not_found' });
+  if (row.status !== 'pending') return res.status(409).json({ error: 'not_pending' });
+  const updated = await prisma.friendship.update({
+    where: { id: row.id },
+    data: { status: 'accepted', acceptedAt: new Date() },
+  });
+  res.json({ friendshipId: updated.id, status: 'accepted' });
+}));
+
+// DELETE /api/friends/:id — works for: declining an incoming request,
+// cancelling an outgoing request, or unfriending. Either side may delete.
+router.delete('/:id', wrap(async (req, res) => {
+  const me = req.user;
+  const row = await prisma.friendship.findUnique({ where: { id: req.params.id } });
+  if (!row) return res.status(404).json({ error: 'not_found' });
+  if (row.fromUserId !== me.id && row.toUserId !== me.id) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  await prisma.friendship.delete({ where: { id: row.id } });
+  res.json({ ok: true });
+}));
+
+// GET /api/friends/threads — list of accepted friends with last message
+// preview + unread count, sorted newest-first. Drives the friends inbox
+// in the chat tab (mirrors the coach inbox shape).
+router.get('/threads', wrap(async (req, res) => {
+  const me = req.user;
+  const friendRows = await prisma.friendship.findMany({
+    where: { status: 'accepted', OR: [{ fromUserId: me.id }, { toUserId: me.id }] },
+    include: {
+      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+    },
+  });
+  const friends = friendRows.map(r => otherSide(me.id, r));
+  if (friends.length === 0) return res.json({ threads: [] });
+
+  // For each friend, latest message in either direction + my unread count.
+  const threads = await Promise.all(friends.map(async (friend) => {
+    const [latestFrom, latestTo, unread] = await Promise.all([
+      prisma.message.findFirst({
+        where: { fromUserId: friend.id, toUserId: me.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, content: true, attachment: true, createdAt: true, readAt: true },
+      }),
+      prisma.message.findFirst({
+        where: { fromUserId: me.id, toUserId: friend.id },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, content: true, attachment: true, createdAt: true },
+      }),
+      prisma.message.count({
+        where: { fromUserId: friend.id, toUserId: me.id, readAt: null },
+      }),
+    ]);
+    let latest = null;
+    if (latestFrom && latestTo) {
+      latest = latestFrom.createdAt > latestTo.createdAt
+        ? { ...latestFrom, fromMe: false }
+        : { ...latestTo, fromMe: true };
+    } else if (latestFrom) latest = { ...latestFrom, fromMe: false };
+    else if (latestTo)     latest = { ...latestTo, fromMe: true };
+    return { user: shapeUser(friend), latest, unread };
+  }));
+
+  threads.sort((a, b) => {
+    const ta = a.latest ? new Date(a.latest.createdAt).getTime() : 0;
+    const tb = b.latest ? new Date(b.latest.createdAt).getTime() : 0;
+    return tb - ta;
+  });
+  res.json({ threads });
+}));
+
+module.exports = router;
+module.exports.areFriendsServer = areFriendsServer;

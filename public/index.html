@@ -2175,24 +2175,231 @@
   }
   .chat-mode[hidden] { display: none !important; }
 
-  /* Coach inbox header — flat iMessage-style title bar */
+  /* Coach inbox header — flat iMessage-style title bar with optional
+     right-aligned action button (add friend) and toggle (clients/friends). */
   .chat-inbox-header {
     flex-shrink: 0;
     padding: 14px 18px 12px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
   .chat-inbox-title {
+    flex: 1;
     font-size: 22px;
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.01em;
   }
+  .chat-icon-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .chat-icon-btn:active { background: var(--border); }
+  .chat-icon-btn svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .chat-icon-btn .pending-dot {
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--danger);
+    border: 2px solid var(--bg);
+  }
+  .chat-icon-btn .pending-dot[hidden] { display: none; }
+  /* Clients / Friends segmented toggle inside the coach header. */
+  .chat-toggle {
+    flex: 1;
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px;
+    overflow: hidden;
+  }
+  .chat-toggle button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px 14px;
+    cursor: pointer;
+    flex: 1;
+    border-radius: 999px;
+  }
+  .chat-toggle button.active {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .chat-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .chat-pane[hidden] { display: none !important; }
   .chat-inbox-list {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+  /* Section label inside the inbox (e.g. "Friend requests"). */
+  .inbox-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 12px 18px 4px;
+  }
+  .inbox-empty {
+    padding: 36px 24px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .inbox-empty .empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  /* Bottom-pinned promo card for non-coaching users. Compact, no
+     longer takes over the whole chat tab like the old paywall. */
+  .chat-promo-card {
+    flex-shrink: 0;
+    margin: 12px 14px calc(12px + var(--safe-bottom));
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .chat-promo-card[hidden] { display: none; }
+  .chat-promo-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .chat-promo-icon svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .chat-promo-text { flex: 1; min-width: 0; }
+  .chat-promo-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .chat-promo-sub   { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+  .chat-promo-cta {
+    flex-shrink: 0;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .chat-promo-cta:active { background: var(--accent-hover); }
+
+  /* Friend-search overlay body — input + scrolling result list. */
+  .friend-search-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .friend-search-input {
+    flex-shrink: 0;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+  }
+  .friend-search-input:focus { border-color: var(--accent); }
+  .friend-search-hint {
+    font-size: 13px;
+    color: var(--text-faint);
+    text-align: center;
+    padding: 24px 16px;
+  }
+  /* Pending-request rows — Accept / Decline buttons inline. */
+  .pending-row-actions {
+    display: inline-flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .pending-row-btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .pending-row-btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+  }
+  .pending-row-btn:active { opacity: 0.85; }
+  /* Search result rows reuse coach-thread layout with a tail action. */
+  .search-row-action {
+    flex-shrink: 0;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .search-row-action.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+  }
+  .search-row-action:disabled { opacity: 0.55; cursor: default; }
 
   /* Paywall mode — non-coaching clients see this when they tap Chat. */
   .chat-paywall {
@@ -3025,70 +3232,69 @@
         </div>
       </section>
 
-      <!-- Chat view — visible to everyone, content varies by role:
-           coach → iMessage-style inbox; coaching client → conversation
-           with the coach; non-client → upgrade paywall. -->
+      <!-- Chat view — friends inbox for everyone. Coach gets a clients/friends
+           toggle. Coaching clients see a pinned Coach entry above their friends.
+           Non-clients see a small "Get a coach" promo at the bottom. -->
       <section id="view-chat" class="view">
 
-        <!-- Mode: coaching client — direct conversation with their coach -->
-        <div class="chat-mode" data-mode="client" hidden>
-          <div class="chat-header">
-            <div class="chat-header-avatar" id="chat-coach-avatar">?</div>
-            <div class="chat-header-info">
-              <div class="chat-header-name" id="chat-coach-name">Coach</div>
-              <div class="chat-header-status" id="chat-status">Loading…</div>
-            </div>
-            <div class="chat-header-presence">
-              <span class="presence-dot" id="chat-presence-dot"></span>
-              <span class="presence-text" id="chat-presence-text"></span>
-            </div>
-          </div>
-          <div class="chat-messages" id="chat-messages">
-            <div class="chat-empty" id="chat-empty">
-              <div class="chat-empty-title">Start the conversation</div>
-              <div class="chat-empty-sub">Your coach will see your tasks and analytics to give you the best guidance.</div>
-            </div>
-          </div>
-          <div class="typing-indicator" id="chat-typing" hidden aria-label="Coach is typing">
-            <span></span><span></span><span></span>
-          </div>
-          <div class="chat-input-wrap">
-            <button class="chat-attach" id="chat-attach" aria-label="Send a photo">
-              <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-            </button>
-            <textarea class="chat-input" id="chat-input" placeholder="Message your coach..." maxlength="4000" rows="1"></textarea>
-            <button class="chat-send" id="chat-send" disabled aria-label="Send">
-              <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Mode: coach — iMessage-style inbox of every coaching client -->
-        <div class="chat-mode" data-mode="coach" hidden>
+        <!-- Mode: inbox — everyone except the coach. -->
+        <div class="chat-mode" data-mode="inbox" hidden>
           <div class="chat-inbox-header">
             <div class="chat-inbox-title">Messages</div>
+            <button class="chat-icon-btn" id="inbox-add-friend" aria-label="Add friend">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
           </div>
-          <div id="chat-coach-thread-list" class="chat-inbox-list coach-thread-list">
-            <div class="empty" id="chat-coach-inbox-empty">
-              <div class="empty-title">No messages yet</div>
-              <div>Coaching clients will appear here once you activate them.</div>
+          <div id="inbox-pending-section" hidden>
+            <div class="inbox-section-label">Friend requests</div>
+            <ul class="chat-inbox-list" id="inbox-pending-list"></ul>
+          </div>
+          <ul class="chat-inbox-list coach-thread-list" id="inbox-thread-list"></ul>
+          <div class="inbox-empty" id="inbox-empty" hidden>
+            <div class="empty-title">No messages yet</div>
+            <div>Tap + to find a friend.</div>
+          </div>
+          <div class="chat-promo-card" id="chat-promo-card" hidden>
+            <div class="chat-promo-icon">
+              <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
             </div>
+            <div class="chat-promo-text">
+              <div class="chat-promo-title">Get a 1:1 coach</div>
+              <div class="chat-promo-sub">Personal accountability, right in the app.</div>
+            </div>
+            <button class="chat-promo-cta" id="chat-promo-cta">Upgrade</button>
           </div>
         </div>
 
-        <!-- Mode: non-client — locked, upgrade paywall -->
-        <div class="chat-mode" data-mode="paywall" hidden>
-          <div class="chat-paywall">
-            <div class="chat-paywall-icon">
-              <svg viewBox="0 0 24 24">
-                <rect x="4" y="11" width="16" height="10" rx="2"/>
-                <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
-              </svg>
+        <!-- Mode: coach — Clients / Friends toggle, plus add-friend button. -->
+        <div class="chat-mode" data-mode="coach" hidden>
+          <div class="chat-inbox-header">
+            <div class="chat-toggle" id="coach-toggle">
+              <button data-coach-tab="clients" class="active">Clients</button>
+              <button data-coach-tab="friends">Friends</button>
             </div>
-            <div class="chat-paywall-title">Unlock 1-on-1 coaching</div>
-            <div class="chat-paywall-sub">Get a coach who reviews your tasks, helps you stay accountable, and messages with you anytime — right inside the app.</div>
-            <button class="chat-paywall-cta" id="chat-paywall-cta">Upgrade</button>
-            <div class="chat-paywall-foot">Secure checkout via Stripe. Cancel anytime.</div>
+            <button class="chat-icon-btn" id="coach-add-friend" aria-label="Add friend">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <div class="chat-pane" data-coach-pane="clients">
+            <ul class="chat-inbox-list coach-thread-list" id="chat-coach-thread-list">
+              <div class="empty" id="chat-coach-inbox-empty">
+                <div class="empty-title">No messages yet</div>
+                <div>Coaching clients will appear here once you activate them.</div>
+              </div>
+            </ul>
+          </div>
+          <div class="chat-pane" data-coach-pane="friends" hidden>
+            <div id="coach-pending-section" hidden>
+              <div class="inbox-section-label">Friend requests</div>
+              <ul class="chat-inbox-list" id="coach-pending-list"></ul>
+            </div>
+            <ul class="chat-inbox-list coach-thread-list" id="coach-friends-list"></ul>
+            <div class="inbox-empty" id="coach-friends-empty" hidden>
+              <div class="empty-title">No friends yet</div>
+              <div>Tap + to find a friend.</div>
+            </div>
           </div>
         </div>
 
@@ -3395,6 +3601,64 @@
         <button class="chat-send" id="coach-chat-send" disabled aria-label="Send">
           <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
         </button>
+      </div>
+    </div>
+
+    <!-- Generic DM overlay — used for any peer-to-peer DM (friend
+         DMs in either direction, plus a coaching client DMing their
+         coach). Same shape as the coach convo overlay, minus the
+         analytics dropdown (that's coach→client only). -->
+    <div id="dm-overlay" class="coach-overlay" hidden>
+      <div class="coach-convo-header">
+        <button class="back-btn" id="dm-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="chat-header-avatar" id="dm-peer-avatar">?</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name" id="dm-peer-name">—</div>
+          <div class="chat-header-status" id="dm-peer-status"></div>
+        </div>
+        <div class="chat-header-presence">
+          <span class="presence-dot" id="dm-presence-dot"></span>
+          <span class="presence-text" id="dm-presence-text"></span>
+        </div>
+      </div>
+      <div class="chat-messages" id="dm-messages"></div>
+      <div class="typing-indicator" id="dm-typing" hidden>
+        <span></span><span></span><span></span>
+      </div>
+      <div class="chat-input-wrap">
+        <button class="chat-attach" id="dm-attach" aria-label="Send a photo">
+          <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <textarea class="chat-input" id="dm-input" placeholder="Message..." maxlength="4000" rows="1"></textarea>
+        <button class="chat-send" id="dm-send" disabled aria-label="Send">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Friend search overlay (search by name → tap to send request). -->
+    <div id="friend-search-overlay" class="coach-overlay" hidden>
+      <div class="coach-overlay-header">
+        <button class="back-btn" id="friend-search-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <span class="coach-overlay-title">Add friend</span>
+      </div>
+      <div class="friend-search-body">
+        <input
+          id="friend-search-input"
+          class="friend-search-input"
+          type="text"
+          placeholder="Search by name or email"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="words"
+          spellcheck="false"
+        />
+        <ul class="chat-inbox-list" id="friend-search-results"></ul>
+        <div class="friend-search-hint" id="friend-search-hint">Type at least 2 characters.</div>
       </div>
     </div>
   </div>
@@ -6408,15 +6672,10 @@ const Coaching = (() => {
   let ws = null;
   let reconnectTimer = null;
   let currentClientId = null;
-  let clientMessages = [];  // client's chat history
   let coachMessages = {};   // coach's view: clientId → messages[]
   let coachThreads = [];    // coach's thread list
 
-  // Track which message ids have been rendered already so initial history
-  // doesn't replay the bubbleEnter animation. Only NEW ids (arriving via
-  // WebSocket or a fresh send) animate in.
-  let _seenClientMsgIds = new Set();
-  let _hasLoadedClientChat = false;
+  // Coach's per-client seen sets (drive the iMessage-style enter animation).
   const _seenCoachMsgIds = new Map();      // clientId → Set<msgId>
   const _hasLoadedCoachConvo = new Map();  // clientId → boolean
 
@@ -6433,19 +6692,23 @@ const Coaching = (() => {
     if (tabStreaks)  tabStreaks.hidden  = true;
     if (viewStreaks) viewStreaks.hidden = true;
 
-    // Chat tab is now visible for every signed-in user. Content varies:
-    //   coach   → iMessage-style inbox of every coaching client
-    //   client  → direct conversation with their coach
-    //   neither → upgrade paywall
+    // Chat tab is visible for every signed-in user. Content varies:
+    //   coach → Clients/Friends toggle (clients tab is the existing inbox)
+    //   else  → friends inbox, with a pinned coach for active clients and
+    //           a small "Get a coach" promo for non-clients
     const tabChat  = document.getElementById('tab-chat');
     const viewChat = document.getElementById('view-chat');
     if (tabChat)  tabChat.hidden  = false;
     if (viewChat) viewChat.hidden = false;
 
-    const activeMode = isCoach ? 'coach' : (isClient ? 'client' : 'paywall');
+    const activeMode = isCoach ? 'coach' : 'inbox';
     document.querySelectorAll('#view-chat .chat-mode').forEach(el => {
       el.hidden = el.dataset.mode !== activeMode;
     });
+
+    // Promo card only shows for non-coach, non-client users.
+    const promo = document.getElementById('chat-promo-card');
+    if (promo) promo.hidden = isCoach || isClient;
 
     // Tab order is the same for everyone now — chat is always present.
     _tabOrder = ['todo', 'analytics', 'chat', 'profile'];
@@ -6457,7 +6720,7 @@ const Coaching = (() => {
 
   /* ── WebSocket ───────────────────────────────────────────── */
   function connect(user) {
-    if (!(user && (user.coachingClient || user.isCoach))) return;
+    if (!user) return;
     if (ws && ws.readyState <= 1) return;
     clearTimeout(reconnectTimer);
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -6501,20 +6764,12 @@ const Coaching = (() => {
         loadCoachThreads();
         if (message.fromUserId !== me.id) setTabBadge('chat', true);
       }
-    } else if (me.coachingClient) {
-      if (clientMessages.some(m => m.id === message.id)) return;
-      clientMessages.push(message);
-      // Only re-render when the chat tab is actually visible. Off-tab,
-      // we keep the message in the array but skip rendering — that way
-      // the bubbleEnter animation still plays on the user's first paint
-      // when they switch to the chat tab (the seen set is untouched).
-      if (currentTab === 'chat') renderClientMessages();
-      if (message.fromUserId !== me.id) {
-        hideTyping('client');
-        // The coach just sent a message — they're active right now.
-        if (coachInfo) { coachInfo.lastSeenAt = message.createdAt; updateCoachHeader(); }
-      }
-      if (currentTab !== 'chat' && message.fromUserId !== me.id) setTabBadge('chat', true);
+    } else {
+      // Non-coach: route through the generic DM state. If the dm-overlay
+      // is open with the matching peer, update the visible thread; either
+      // way refresh the inbox so previews and unread counts stay in sync.
+      const peerId = message.fromUserId === me.id ? message.toUserId : message.fromUserId;
+      handleDmIncoming(message, peerId);
     }
   }
 
@@ -6524,50 +6779,23 @@ const Coaching = (() => {
     if (el) el.hidden = !show;
   }
 
-  /* ── Client chat ─────────────────────────────────────────── */
-  let coachInfo = null; // { id, name, picture, lastSeenAt }
-
-  async function loadClientChat() {
-    try {
-      const data = await api('GET', '/api/messages');
-      clientMessages = data.messages || [];
-      if (data.coach) {
-        coachInfo = data.coach;
-        updateCoachHeader();
-      }
-      // First load of the session: seed the seen set with the entire
-      // history so we don't animate every bubble at once. Subsequent
-      // loads (e.g., re-entering the chat tab) leave the seen set alone
-      // so messages that arrived while off-tab still animate in.
-      if (!_hasLoadedClientChat) {
-        _seenClientMsgIds = new Set(clientMessages.map(m => m.id));
-        _hasLoadedClientChat = true;
-      }
-      renderClientMessages();
-    } catch (e) { console.warn('[chat]', e); }
-  }
-
-  function updateCoachHeader() {
-    if (!coachInfo) return;
-    const av     = document.getElementById('chat-coach-avatar');
-    const nameEl = document.getElementById('chat-coach-name');
-    const dot    = document.getElementById('chat-presence-dot');
-    const txt    = document.getElementById('chat-presence-text');
-    const status = document.getElementById('chat-status');
-    const name = coachInfo.name || 'Coach';
-    if (av) {
-      av.innerHTML = coachInfo.picture
-        ? `<img src="${esc(coachInfo.picture)}" alt="" referrerpolicy="no-referrer" />`
-        : esc(name.trim().charAt(0).toUpperCase());
-    }
-    if (nameEl) nameEl.textContent = name;
-    // Status line below the name stays as a tagline.
-    if (status) status.textContent = 'GoFirst coach';
-    // Right-side presence: dot turns green if active in last 90s.
-    const ms = coachInfo.lastSeenAt ? Date.now() - new Date(coachInfo.lastSeenAt).getTime() : Infinity;
-    if (dot) dot.classList.toggle('active', ms < 90_000);
-    if (txt) txt.textContent = presenceText(coachInfo.lastSeenAt);
-  }
+  /* ── Generic DM (used by everyone-except-coach for talking to the
+     coach AND any friend; also used by the coach for friend DMs).
+     The coach→client path still uses coach-convo-overlay for the
+     analytics dropdown. ───────────────────────────────────────── */
+  // Per-peer caches so the open DM always knows whose history it's
+  // showing and which message ids have already been rendered.
+  let dmPeerId = null;          // user id of the peer the dm-overlay is showing
+  let dmPeerInfo = null;        // { id, name, picture, lastSeenAt }
+  const dmMessages = new Map(); // peerId → array of messages
+  const _seenDmMsgIds = new Map(); // peerId → Set
+  const _hasLoadedDm = new Map();  // peerId → boolean
+  let coachPeerInfo = null;     // cached coach record (for the pinned coach entry)
+  let friendThreads = [];       // friend inbox rows
+  let pendingIncoming = [];     // friendship rows awaiting my accept
+  let pendingOutgoing = [];     // friendship rows awaiting their accept
+  let coachInboxMsgPreview = null; // most recent message between me and coach (for inbox preview)
+  let coachInboxUnread = 0;        // unread incoming from the coach
 
   function presenceText(iso) {
     if (!iso) return 'Last seen —';
@@ -6583,56 +6811,437 @@ const Coaching = (() => {
     return `Last seen ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
   }
 
-  // Refresh the presence text every 30s so "5m ago" rolls forward without
-  // a server hit. The actual lastSeenAt is refreshed when loadClientChat
-  // re-fires, when a new message arrives, or on a typing event.
+  function avatarHtml(u, fallback) {
+    const name = (u && u.name) || (u && u.email) || fallback || '?';
+    const initial = name.trim().charAt(0).toUpperCase() || '?';
+    return u && u.picture
+      ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer" />`
+      : esc(initial);
+  }
+
+  function fmtPreviewMsg(latest) {
+    if (!latest) return 'No messages yet';
+    if (latest.attachment && !(latest.content || '').trim()) return (latest.fromMe ? 'You: ' : '') + 'Photo';
+    return (latest.fromMe ? 'You: ' : '') + (latest.content || '');
+  }
+
+  /* ── DM overlay (peer = coach for clients, or any friend for anyone) ── */
+  async function openDm(peerId, peerInfo) {
+    dmPeerId = peerId;
+    dmPeerInfo = peerInfo || dmPeerInfo;
+    hideTyping('dm');
+    updateDmHeader();
+    // Render any cached messages immediately, then fetch fresh.
+    renderDmMessages();
+    openOverlay('dm-overlay');
+    await loadDmMessages(peerId);
+  }
+  function closeDm() {
+    closeOverlay('dm-overlay');
+    setTimeout(() => { dmPeerId = null; }, 300);
+  }
+
+  function updateDmHeader() {
+    const info = dmPeerInfo;
+    if (!info) return;
+    const av = document.getElementById('dm-peer-avatar');
+    const nameEl = document.getElementById('dm-peer-name');
+    const statusEl = document.getElementById('dm-peer-status');
+    const dot = document.getElementById('dm-presence-dot');
+    const txt = document.getElementById('dm-presence-text');
+    const input = document.getElementById('dm-input');
+    if (av) av.innerHTML = avatarHtml(info, info.name || 'Friend');
+    if (nameEl) nameEl.textContent = info.name || info.email || 'Friend';
+    if (statusEl) statusEl.textContent = info.subline || '';
+    const ms = info.lastSeenAt ? Date.now() - new Date(info.lastSeenAt).getTime() : Infinity;
+    if (dot) dot.classList.toggle('active', ms < 90_000);
+    if (txt) txt.textContent = presenceText(info.lastSeenAt);
+    if (input) {
+      const fname = (info.name || '').trim().split(/\s+/)[0]
+        || (info.email || '').split('@')[0] || 'them';
+      input.placeholder = `Message ${fname}...`;
+    }
+  }
+
+  // Periodic relative-time refresh so "5m ago" rolls forward without a hit.
   setInterval(() => {
-    if (Auth.user && Auth.user.coachingClient && coachInfo) updateCoachHeader();
+    if (dmPeerId && !document.getElementById('dm-overlay').hidden) updateDmHeader();
   }, 30_000);
 
-  function renderClientMessages() {
-    const container = document.getElementById('chat-messages');
-    const empty     = document.getElementById('chat-empty');
-    if (!container) return;
+  async function loadDmMessages(peerId) {
     const me = Auth.user;
-    if (!clientMessages.length) {
-      if (empty) empty.hidden = false;
-      container.classList.remove('has-messages');
-      container.querySelectorAll('.msg-group').forEach(el => el.remove());
-      return;
-    }
-    if (empty) empty.hidden = true;
-    container.classList.add('has-messages');
-    const html = clientMessages.map(m => {
-      const isNew = !_seenClientMsgIds.has(m.id);
-      if (isNew) _seenClientMsgIds.add(m.id);
+    if (!me) return;
+    const isCoachPeer = peerId === (coachPeerInfo && coachPeerInfo.id);
+    try {
+      let data;
+      if (me.coachingClient && isCoachPeer) {
+        // Client → coach: the existing /api/messages endpoint returns the
+        // conversation as `messages` and includes coach metadata.
+        data = await api('GET', '/api/messages');
+        if (data.coach) {
+          coachPeerInfo = { ...data.coach, subline: 'GoFirst coach' };
+          if (peerId === coachPeerInfo.id) dmPeerInfo = coachPeerInfo;
+          updateDmHeader();
+        }
+      } else {
+        // Friend DM.
+        data = await api('GET', `/api/messages/dm/${peerId}`);
+        if (data.friend) {
+          dmPeerInfo = { ...data.friend, subline: '' };
+          updateDmHeader();
+        }
+      }
+      const msgs = data.messages || [];
+      dmMessages.set(peerId, msgs);
+      if (!_hasLoadedDm.get(peerId)) {
+        _seenDmMsgIds.set(peerId, new Set(msgs.map(m => m.id)));
+        _hasLoadedDm.set(peerId, true);
+      }
+      renderDmMessages();
+    } catch (e) { console.warn('[dm load]', e); }
+  }
+
+  function renderDmMessages() {
+    const container = document.getElementById('dm-messages');
+    if (!container || !dmPeerId) return;
+    const msgs = dmMessages.get(dmPeerId) || [];
+    let seen = _seenDmMsgIds.get(dmPeerId);
+    if (!seen) { seen = new Set(); _seenDmMsgIds.set(dmPeerId, seen); }
+    container.classList.toggle('has-messages', msgs.length > 0);
+    const me = Auth.user;
+    container.innerHTML = msgs.map(m => {
+      const isNew = !seen.has(m.id);
+      if (isNew) seen.add(m.id);
       return buildBubble(m, me.id, isNew);
     }).join('');
-    container.innerHTML = (empty ? empty.outerHTML : '') + html;
-    if (empty) {
-      const newEmpty = container.querySelector('.chat-empty');
-      if (newEmpty) newEmpty.hidden = true;
-    }
     container.scrollTop = container.scrollHeight;
   }
 
-  async function sendClientMessage() {
-    const input = document.getElementById('chat-input');
+  async function sendDmMessage() {
+    if (!dmPeerId) return;
+    const me = Auth.user;
+    const input = document.getElementById('dm-input');
     const content = (input && input.value.trim()) || '';
     if (!content) return;
     input.value = '';
     autoResizeTextarea(input);
-    document.getElementById('chat-send').disabled = true;
+    document.getElementById('dm-send').disabled = true;
     try {
-      const { message } = await api('POST', '/api/messages', { content });
-      // The server also echoes this message back over the WebSocket. If the
-      // WS event raced ahead and onIncoming already pushed it, skip the
-      // optimistic push here so we don't render two bubbles.
-      if (!clientMessages.some(m => m.id === message.id)) {
-        clientMessages.push(message);
-        renderClientMessages();
+      // Clients DMing the coach use the legacy no-toUserId path; everyone
+      // else passes the explicit peer id.
+      const isCoachPeer = me.coachingClient && coachPeerInfo && dmPeerId === coachPeerInfo.id;
+      const body = isCoachPeer ? { content } : { content, toUserId: dmPeerId };
+      const { message } = await api('POST', '/api/messages', body);
+      const arr = dmMessages.get(dmPeerId) || [];
+      if (!arr.some(m => m.id === message.id)) {
+        arr.push(message);
+        dmMessages.set(dmPeerId, arr);
+        renderDmMessages();
       }
+      // Refresh inbox preview/unread.
+      if (!Auth.user.isCoach) loadInboxThreads();
     } catch { banner('Could not send message', true); }
+  }
+
+  async function sendDmPhoto(dataUrl) {
+    if (!dmPeerId) return;
+    const me = Auth.user;
+    const isCoachPeer = me.coachingClient && coachPeerInfo && dmPeerId === coachPeerInfo.id;
+    const body = isCoachPeer ? { content: '', attachment: dataUrl } : { content: '', attachment: dataUrl, toUserId: dmPeerId };
+    const { message } = await api('POST', '/api/messages', body);
+    const arr = dmMessages.get(dmPeerId) || [];
+    if (!arr.some(m => m.id === message.id)) {
+      arr.push(message);
+      dmMessages.set(dmPeerId, arr);
+      renderDmMessages();
+    }
+    if (!Auth.user.isCoach) loadInboxThreads();
+  }
+
+  /* Routes a freshly-arrived (or freshly-sent-with-WS-echo) DM message
+     into the right local cache, updating the open thread if applicable
+     and the inbox preview either way. */
+  function handleDmIncoming(message, peerId) {
+    const me = Auth.user;
+    if (!me) return;
+    const arr = dmMessages.get(peerId) || [];
+    if (arr.some(m => m.id === message.id)) return;
+    arr.push(message);
+    dmMessages.set(peerId, arr);
+    const overlayOpen = dmPeerId === peerId &&
+      !document.getElementById('dm-overlay').hidden;
+    if (overlayOpen) {
+      renderDmMessages();
+      if (message.fromUserId === peerId) {
+        hideTyping('dm');
+        // They just sent something — bump presence to "Active now".
+        if (dmPeerInfo) { dmPeerInfo.lastSeenAt = message.createdAt; updateDmHeader(); }
+        // Silent re-fetch so the server marks it read; refresh inbox.
+        const url = (me.coachingClient && coachPeerInfo && peerId === coachPeerInfo.id)
+          ? '/api/messages'
+          : `/api/messages/dm/${peerId}`;
+        api('GET', url).then(() => loadInboxThreads()).catch(() => {});
+      }
+    } else {
+      loadInboxThreads();
+      if (message.fromUserId !== me.id) setTabBadge('chat', true);
+    }
+  }
+
+  /* ── Friends graph + inbox ────────────────────────────────
+     loadFriends    — pulls accepted friends + pending requests in/out
+     loadInboxThreads — combines pinned coach (clients only) + friends
+                        with last-message previews
+     renderInbox    — paints the chat-mode='inbox' view
+     renderCoachFriendsPane — same data, painted in the coach's
+                        Friends pane                                */
+  async function loadFriends() {
+    try {
+      const data = await api('GET', '/api/friends');
+      pendingIncoming = data.incoming || [];
+      pendingOutgoing = data.outgoing || [];
+      renderPendingRequests();
+      // Add-friend button gets a red dot when there are incoming requests.
+      const dot1 = document.querySelector('#inbox-add-friend .pending-dot');
+      const dot2 = document.querySelector('#coach-add-friend .pending-dot');
+      [dot1, dot2].forEach(d => { if (d) d.hidden = pendingIncoming.length === 0; });
+    } catch (e) { console.warn('[friends]', e); }
+  }
+
+  async function loadInboxThreads() {
+    const me = Auth.user;
+    if (!me) return;
+    try {
+      // Friends inbox (everyone — coach has friends too, in their pane).
+      const friendsData = await api('GET', '/api/friends/threads');
+      friendThreads = friendsData.threads || [];
+
+      // For coaching clients we also need a "coach" pinned entry — use
+      // the legacy /api/messages call which returns the conversation +
+      // coach metadata. Compute the latest preview + unread count locally.
+      coachInboxMsgPreview = null;
+      coachInboxUnread = 0;
+      if (me.coachingClient && !me.isCoach) {
+        try {
+          const data = await api('GET', '/api/messages');
+          if (data.coach) coachPeerInfo = { ...data.coach, subline: 'GoFirst coach' };
+          const msgs = data.messages || [];
+          if (msgs.length) {
+            const last = msgs[msgs.length - 1];
+            coachInboxMsgPreview = {
+              content: last.content,
+              attachment: last.attachment,
+              createdAt: last.createdAt,
+              fromMe: last.fromUserId === me.id,
+            };
+          }
+          coachInboxUnread = msgs.filter(m => m.fromUserId !== me.id && !m.readAt).length;
+        } catch {}
+      }
+
+      const totalUnread = friendThreads.reduce((s, t) => s + (t.unread || 0), 0) + coachInboxUnread;
+      setTabBadge('chat', totalUnread > 0);
+
+      if (me.isCoach) renderCoachFriendsPane();
+      else            renderInbox();
+    } catch (e) { console.warn('[inbox]', e); }
+  }
+
+  function threadRowHtml(opts) {
+    // opts: { user, latest, unread, pinned }
+    const u = opts.user;
+    const name = u.name || u.email || 'Friend';
+    const preview = fmtPreviewMsg(opts.latest);
+    const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
+    const badge = opts.unread > 0
+      ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
+    const pinIcon = opts.pinned
+      ? '<span class="coach-thread-time" title="Pinned">★</span>' : '';
+    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${opts.pinned ? 'coach' : 'friend'}">
+      <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+      <div class="coach-thread-body">
+        <div class="coach-thread-name">${esc(name)}${opts.pinned ? ' · Coach' : ''}</div>
+        <div class="coach-thread-preview">${esc(preview)}</div>
+      </div>
+      <div class="coach-thread-meta">
+        <span class="coach-thread-time">${esc(time)}</span>
+        ${pinIcon}
+        ${badge}
+      </div>
+    </div>`;
+  }
+
+  function renderInbox() {
+    const list = document.getElementById('inbox-thread-list');
+    const empty = document.getElementById('inbox-empty');
+    if (!list) return;
+    const me = Auth.user;
+    let html = '';
+    // Pinned coach entry first for active coaching clients.
+    if (me && me.coachingClient && coachPeerInfo) {
+      html += threadRowHtml({
+        user: coachPeerInfo,
+        latest: coachInboxMsgPreview,
+        unread: coachInboxUnread,
+        pinned: true,
+      });
+    }
+    // Friends below, newest-first (server already sorted).
+    for (const t of friendThreads) {
+      html += threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false });
+    }
+    list.innerHTML = html;
+    const hasContent = !!html;
+    if (empty) empty.hidden = hasContent;
+  }
+
+  function renderCoachFriendsPane() {
+    const list = document.getElementById('coach-friends-list');
+    const empty = document.getElementById('coach-friends-empty');
+    if (!list) return;
+    if (!friendThreads.length) {
+      list.innerHTML = '';
+      if (empty) empty.hidden = false;
+      return;
+    }
+    if (empty) empty.hidden = true;
+    list.innerHTML = friendThreads.map(t =>
+      threadRowHtml({ user: t.user, latest: t.latest, unread: t.unread, pinned: false })
+    ).join('');
+  }
+
+  /* Incoming pending-friend-requests row with Accept / Decline buttons. */
+  function renderPendingRequests() {
+    const inboxSec = document.getElementById('inbox-pending-section');
+    const inboxList = document.getElementById('inbox-pending-list');
+    const coachSec = document.getElementById('coach-pending-section');
+    const coachList = document.getElementById('coach-pending-list');
+    const html = pendingIncoming.map(p => {
+      const u = p.user;
+      const name = u.name || u.email || 'Someone';
+      return `<div class="coach-thread" data-pending-id="${esc(p.friendshipId)}">
+        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)}</div>
+          <div class="coach-thread-preview">wants to be friends</div>
+        </div>
+        <div class="pending-row-actions">
+          <button class="pending-row-btn primary" data-pending-action="accept">Accept</button>
+          <button class="pending-row-btn"         data-pending-action="decline">Decline</button>
+        </div>
+      </div>`;
+    }).join('');
+    if (inboxList) {
+      inboxList.innerHTML = html;
+      if (inboxSec) inboxSec.hidden = pendingIncoming.length === 0;
+    }
+    if (coachList) {
+      coachList.innerHTML = html;
+      if (coachSec) coachSec.hidden = pendingIncoming.length === 0;
+    }
+  }
+
+  async function acceptFriend(friendshipId) {
+    try {
+      await api('POST', `/api/friends/accept/${friendshipId}`, {});
+      await loadFriends();
+      await loadInboxThreads();
+    } catch (e) { banner('Could not accept request', true); }
+  }
+  async function declineFriend(friendshipId) {
+    try {
+      await api('DELETE', `/api/friends/${friendshipId}`);
+      await loadFriends();
+    } catch (e) { banner('Could not update request', true); }
+  }
+
+  /* ── Friend search overlay ─────────────────────────────── */
+  let _friendSearchTimer = null;
+  function openFriendSearch() {
+    openOverlay('friend-search-overlay');
+    const input = document.getElementById('friend-search-input');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 280);
+    }
+    document.getElementById('friend-search-results').innerHTML = '';
+    document.getElementById('friend-search-hint').hidden = false;
+    document.getElementById('friend-search-hint').textContent = 'Type at least 2 characters.';
+  }
+  function closeFriendSearch() { closeOverlay('friend-search-overlay'); }
+
+  function runFriendSearch(q) {
+    const list = document.getElementById('friend-search-results');
+    const hint = document.getElementById('friend-search-hint');
+    if (!list || !hint) return;
+    const trimmed = (q || '').trim();
+    if (trimmed.length < 2) {
+      list.innerHTML = '';
+      hint.hidden = false;
+      hint.textContent = 'Type at least 2 characters.';
+      return;
+    }
+    clearTimeout(_friendSearchTimer);
+    _friendSearchTimer = setTimeout(async () => {
+      try {
+        hint.hidden = false;
+        hint.textContent = 'Searching…';
+        const data = await api('GET', `/api/friends/search?q=${encodeURIComponent(trimmed)}`);
+        const users = data.users || [];
+        if (!users.length) {
+          list.innerHTML = '';
+          hint.textContent = 'No matches.';
+          return;
+        }
+        const sentSet = new Set(pendingOutgoing.map(p => p.user.id));
+        list.innerHTML = users.map(u => {
+          const sent = sentSet.has(u.id);
+          return `<div class="coach-thread">
+            <div class="coach-thread-avatar">${avatarHtml(u, u.name || 'User')}</div>
+            <div class="coach-thread-body">
+              <div class="coach-thread-name">${esc(u.name || u.email || 'User')}</div>
+              <div class="coach-thread-preview">${esc(u.email || '')}</div>
+            </div>
+            <button class="search-row-action ${sent ? '' : 'primary'}" data-search-add data-user-id="${esc(u.id)}" ${sent ? 'disabled' : ''}>
+              ${sent ? 'Requested' : 'Add'}
+            </button>
+          </div>`;
+        }).join('');
+        hint.hidden = true;
+      } catch (e) {
+        list.innerHTML = '';
+        hint.hidden = false;
+        hint.textContent = 'Search failed.';
+      }
+    }, 180);
+  }
+
+  async function sendFriendRequest(userId, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Requesting…'; }
+    try {
+      const r = await api('POST', '/api/friends/request', { toUserId: userId });
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.remove('primary');
+        btn.textContent = r.status === 'accepted' ? 'Friends' : 'Requested';
+      }
+      await loadFriends();
+      if (r.status === 'accepted') await loadInboxThreads();
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+      banner('Could not send request', true);
+    }
+  }
+
+  /* ── Coach Clients/Friends toggle ────────────────────────── */
+  function setCoachPane(name) {
+    document.querySelectorAll('#coach-toggle button').forEach(b => {
+      b.classList.toggle('active', b.dataset.coachTab === name);
+    });
+    document.querySelectorAll('#view-chat .chat-pane').forEach(p => {
+      p.hidden = p.dataset.coachPane !== name;
+    });
+    if (name === 'friends') loadInboxThreads();
   }
 
   /* ── Coach inbox ─────────────────────────────────────────── */
@@ -7036,74 +7645,78 @@ const Coaching = (() => {
     try { ws.send(JSON.stringify(payload)); } catch {}
   }
 
-  let _clientTypingHide = null;
-  let _coachTypingHide  = null;
+  let _dmTypingHide    = null;
+  let _coachTypingHide = null;
   function handleTyping(fromId) {
     const me = Auth.user;
     if (!me) return;
-    if (me.isCoach) {
-      // Only show in the convo overlay if it's the open thread.
-      if (fromId !== currentClientId) return;
+    // Coach: route to coach-typing only if their convo with this client is open.
+    if (me.isCoach && fromId === currentClientId &&
+        !document.getElementById('coach-convo-overlay').hidden) {
       const el = document.getElementById('coach-typing');
-      if (!el) return;
-      el.hidden = false;
-      const c = document.getElementById('coach-chat-messages');
-      if (c) c.scrollTop = c.scrollHeight;
-      clearTimeout(_coachTypingHide);
-      _coachTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
-    } else if (me.coachingClient) {
-      const el = document.getElementById('chat-typing');
-      if (!el) return;
-      el.hidden = false;
-      const c = document.getElementById('chat-messages');
-      if (c) c.scrollTop = c.scrollHeight;
-      clearTimeout(_clientTypingHide);
-      _clientTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
-      // The coach is typing right now — bump presence to "Active now".
-      if (coachInfo) { coachInfo.lastSeenAt = new Date().toISOString(); updateCoachHeader(); }
+      const c  = document.getElementById('coach-chat-messages');
+      if (el) {
+        el.hidden = false;
+        if (c) c.scrollTop = c.scrollHeight;
+        clearTimeout(_coachTypingHide);
+        _coachTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
+      }
+      return;
+    }
+    // Generic DM overlay (clients DMing the coach OR friends DMing each other).
+    if (fromId === dmPeerId && !document.getElementById('dm-overlay').hidden) {
+      const el = document.getElementById('dm-typing');
+      const c  = document.getElementById('dm-messages');
+      if (el) {
+        el.hidden = false;
+        if (c) c.scrollTop = c.scrollHeight;
+        clearTimeout(_dmTypingHide);
+        _dmTypingHide = setTimeout(() => { el.hidden = true; }, 3500);
+      }
+      // The peer just typed — bump presence to "Active now".
+      if (dmPeerInfo) { dmPeerInfo.lastSeenAt = new Date().toISOString(); updateDmHeader(); }
     }
   }
-  function hideTyping(forSide /* 'client' | 'coach' */) {
-    if (forSide === 'client') {
-      const el = document.getElementById('chat-typing');
-      if (el) el.hidden = true;
-      clearTimeout(_clientTypingHide);
-    } else if (forSide === 'coach') {
+  function hideTyping(forSide /* 'dm' | 'coach' | 'client' (legacy alias) */) {
+    if (forSide === 'coach') {
       const el = document.getElementById('coach-typing');
       if (el) el.hidden = true;
       clearTimeout(_coachTypingHide);
+    } else {
+      const el = document.getElementById('dm-typing');
+      if (el) el.hidden = true;
+      clearTimeout(_dmTypingHide);
     }
   }
 
   /* ── Public event wiring (called once from boot) ─────────── */
   function wireEvents() {
-    // Client chat send
-    const chatSend  = document.getElementById('chat-send');
-    const chatInput = document.getElementById('chat-input');
-    if (chatInput) {
-      chatInput.addEventListener('input', () => {
-        autoResizeTextarea(chatInput);
-        if (chatSend) chatSend.disabled = !chatInput.value.trim();
-        // Notify the coach the client is typing (server resolves the recipient).
-        if (chatInput.value.trim()) emitTyping();
-      });
-      chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendClientMessage(); }
-      });
-    }
-    if (chatSend) chatSend.addEventListener('click', sendClientMessage);
-
-    // Client-side: photo attach
-    const chatAttach = document.getElementById('chat-attach');
-    if (chatAttach) chatAttach.addEventListener('click', () => {
-      pickAndSendChatPhoto(async (dataUrl) => {
-        const { message } = await api('POST', '/api/messages', { content: '', attachment: dataUrl });
-        if (!clientMessages.some(m => m.id === message.id)) {
-          clientMessages.push(message);
-          renderClientMessages();
+    // Generic DM overlay — input, send, attach, typing, back.
+    const dmInput  = document.getElementById('dm-input');
+    const dmSend   = document.getElementById('dm-send');
+    const dmAttach = document.getElementById('dm-attach');
+    const dmBack   = document.getElementById('dm-back');
+    if (dmInput) {
+      dmInput.addEventListener('input', () => {
+        autoResizeTextarea(dmInput);
+        if (dmSend) dmSend.disabled = !dmInput.value.trim();
+        if (dmInput.value.trim() && dmPeerId) {
+          // Clients DMing the coach use the legacy "no toUserId" typing
+          // path; everyone else explicitly addresses the peer.
+          const me = Auth.user;
+          const isCoachPeer = me && me.coachingClient && coachPeerInfo && dmPeerId === coachPeerInfo.id;
+          emitTyping(isCoachPeer ? null : dmPeerId);
         }
       });
+      dmInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDmMessage(); }
+      });
+    }
+    if (dmSend) dmSend.addEventListener('click', sendDmMessage);
+    if (dmAttach) dmAttach.addEventListener('click', () => {
+      pickAndSendChatPhoto(async (dataUrl) => sendDmPhoto(dataUrl));
     });
+    if (dmBack) dmBack.addEventListener('click', closeDm);
 
     // Coach chat send
     const coachSend  = document.getElementById('coach-chat-send');
@@ -7147,31 +7760,106 @@ const Coaching = (() => {
     const convoBack = document.getElementById('coach-convo-back');
     if (convoBack) convoBack.addEventListener('click', closeConvo);
 
-    // Thread list tap (event delegation, lives inside #view-chat now)
-    const threadList = document.getElementById('chat-coach-thread-list');
-    if (threadList) {
-      threadList.addEventListener('click', (e) => {
+    // Coach inbox: tapping a client row opens the existing coach-convo overlay.
+    const coachThreadList = document.getElementById('chat-coach-thread-list');
+    if (coachThreadList) {
+      coachThreadList.addEventListener('click', (e) => {
         const row = e.target.closest('[data-client-id]');
         if (row) openClientConvo(row.dataset.clientId);
       });
     }
 
-    // Paywall CTA → Stripe checkout for the coaching subscription.
-    const paywallCta = document.getElementById('chat-paywall-cta');
-    if (paywallCta) paywallCta.addEventListener('click', () => {
+    // Inbox (everyone-not-coach): pinned coach OR friend rows open the
+    // generic DM overlay with the right peer.
+    const inboxList = document.getElementById('inbox-thread-list');
+    if (inboxList) {
+      inboxList.addEventListener('click', (e) => {
+        const row = e.target.closest('[data-thread]');
+        if (!row) return;
+        const peerId = row.dataset.peerId;
+        if (row.dataset.peerKind === 'coach') {
+          openDm(peerId, coachPeerInfo);
+        } else {
+          const t = friendThreads.find(x => x.user.id === peerId);
+          openDm(peerId, t ? t.user : { id: peerId });
+        }
+      });
+    }
+    // Coach's friends pane uses the same row format.
+    const coachFriendsList = document.getElementById('coach-friends-list');
+    if (coachFriendsList) {
+      coachFriendsList.addEventListener('click', (e) => {
+        const row = e.target.closest('[data-thread]');
+        if (!row) return;
+        const t = friendThreads.find(x => x.user.id === row.dataset.peerId);
+        openDm(row.dataset.peerId, t ? t.user : { id: row.dataset.peerId });
+      });
+    }
+
+    // Pending request actions (Accept / Decline).
+    function pendingClick(e) {
+      const btn = e.target.closest('[data-pending-action]');
+      if (!btn) return;
+      const row = btn.closest('[data-pending-id]');
+      if (!row) return;
+      const id = row.dataset.pendingId;
+      btn.disabled = true;
+      if (btn.dataset.pendingAction === 'accept') acceptFriend(id);
+      else declineFriend(id);
+    }
+    const inboxPending = document.getElementById('inbox-pending-list');
+    if (inboxPending) inboxPending.addEventListener('click', pendingClick);
+    const coachPending = document.getElementById('coach-pending-list');
+    if (coachPending) coachPending.addEventListener('click', pendingClick);
+
+    // Coach's Clients/Friends toggle.
+    const coachToggle = document.getElementById('coach-toggle');
+    if (coachToggle) coachToggle.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-coach-tab]');
+      if (btn) setCoachPane(btn.dataset.coachTab);
+    });
+
+    // Add-friend buttons on both modes + dot-badge for incoming requests.
+    const inboxAdd = document.getElementById('inbox-add-friend');
+    if (inboxAdd) {
+      inboxAdd.innerHTML += '<span class="pending-dot" hidden></span>';
+      inboxAdd.addEventListener('click', openFriendSearch);
+    }
+    const coachAdd = document.getElementById('coach-add-friend');
+    if (coachAdd) {
+      coachAdd.innerHTML += '<span class="pending-dot" hidden></span>';
+      coachAdd.addEventListener('click', openFriendSearch);
+    }
+
+    // Friend search overlay.
+    const fsBack = document.getElementById('friend-search-back');
+    if (fsBack) fsBack.addEventListener('click', closeFriendSearch);
+    const fsInput = document.getElementById('friend-search-input');
+    if (fsInput) fsInput.addEventListener('input', () => runFriendSearch(fsInput.value));
+    const fsResults = document.getElementById('friend-search-results');
+    if (fsResults) fsResults.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-search-add]');
+      if (btn) sendFriendRequest(btn.dataset.userId, btn);
+    });
+
+    // Promo CTA → Stripe checkout (now a small pinned card, not a takeover).
+    const promoCta = document.getElementById('chat-promo-cta');
+    if (promoCta) promoCta.addEventListener('click', () => {
       window.location.href = 'https://buy.stripe.com/8x200jaqBagadCn3WS77O05';
     });
 
-    // Clear chat badge when switching to chat tab.
+    // Refresh on tab entry.
     document.querySelectorAll('.tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'chat') {
-          setTabBadge('chat', false);
-          // Refresh coach data each time the user enters the chat tab so
-          // presence and last-seen reflect the current state.
-          if (Auth.user && Auth.user.coachingClient) loadClientChat();
-          else if (Auth.user && Auth.user.isCoach) loadCoachThreads();
+        if (btn.dataset.tab !== 'chat') return;
+        setTabBadge('chat', false);
+        const me = Auth.user;
+        if (!me) return;
+        if (me.isCoach) {
+          loadCoachThreads();
         }
+        loadFriends();
+        loadInboxThreads();
       });
     });
   }
@@ -7179,8 +7867,9 @@ const Coaching = (() => {
   return {
     applyUserTabs,
     connect,
-    loadClientChat,
     loadCoachThreads,
+    loadFriends,
+    loadInboxThreads,
     wireEvents,
     openOverlay,
     closeOverlay,
@@ -7229,12 +7918,15 @@ async function boot() {
     console.warn('boot data load failed', e);
   }
 
-  // Wire up real-time WebSocket and load initial chat data.
-  // isCoach takes precedence — even if also tagged coachingClient, run the
-  // coach inbox loader, not the client conversation loader.
+  // Wire up real-time WebSocket and load initial chat data. Every signed-in
+  // user gets a friends inbox + the friendships list (drives the badge on
+  // the add-friend button); the coach also gets their clients inbox.
   Coaching.connect(Auth.user);
-  if (Auth.user && Auth.user.isCoach) Coaching.loadCoachThreads();
-  else if (Auth.user && Auth.user.coachingClient) Coaching.loadClientChat();
+  if (Auth.user) {
+    if (Auth.user.isCoach) Coaching.loadCoachThreads();
+    Coaching.loadFriends();
+    Coaching.loadInboxThreads();
+  }
 }
 
 boot();
