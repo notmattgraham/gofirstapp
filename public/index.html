@@ -2188,7 +2188,9 @@
     /* Anchor the + button's dropdown menu (position: absolute below). */
     position: relative;
   }
-  /* "+ button" dropdown — Search for friends / Invite friends. */
+  /* "+ button" dropdown — Search for friends / Invite friends.
+     Springs out from the top-right corner (where the + button lives)
+     with a small bounce so the open feels tactile, not a hard cut. */
   .chat-add-menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -2200,8 +2202,17 @@
     z-index: 30;
     min-width: 220px;
     overflow: hidden;
+    transform-origin: top right;
   }
   .chat-add-menu[hidden] { display: none; }
+  .chat-add-menu:not([hidden]) {
+    animation: addMenuPop 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes addMenuPop {
+    0%   { opacity: 0; transform: scale(0.7) translateY(-4px); }
+    60%  { opacity: 1; transform: scale(1.04) translateY(0); }
+    100% { opacity: 1; transform: scale(1)    translateY(0); }
+  }
   .chat-add-menu button {
     display: block;
     width: 100%;
@@ -7495,7 +7506,7 @@ const Coaching = (() => {
   /* Native share sheet (iOS / Android Chrome) → falls back to clipboard
      copy on browsers that don't expose navigator.share. */
   async function inviteFriends() {
-    const url = (typeof location !== 'undefined' ? location.origin : '') + '/';
+    const url = 'https://notmattgraham.github.io/downloadgofirst/';
     const text = 'Join me on GoFirst — daily task discipline + accountability.';
     if (navigator.share) {
       try {
