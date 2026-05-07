@@ -2185,7 +2185,38 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    /* Anchor the + button's dropdown menu (position: absolute below). */
+    position: relative;
   }
+  /* "+ button" dropdown — Search for friends / Invite friends. */
+  .chat-add-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    z-index: 30;
+    min-width: 220px;
+    overflow: hidden;
+  }
+  .chat-add-menu[hidden] { display: none; }
+  .chat-add-menu button {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .chat-add-menu button:active { background: var(--surface-2); }
+  .chat-add-menu button + button { border-top: 1px solid var(--border); }
   .chat-inbox-title {
     flex: 1;
     font-size: 22px;
@@ -3324,6 +3355,10 @@
             <button class="chat-icon-btn" id="inbox-add-friend" aria-label="Add friend">
               <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
+            <div class="chat-add-menu" id="inbox-add-menu" hidden>
+              <button data-add-action="search">Search for friends</button>
+              <button data-add-action="invite">Invite friends</button>
+            </div>
           </div>
           <div id="inbox-pending-section" hidden>
             <div class="inbox-section-label">Friend requests</div>
@@ -3356,6 +3391,10 @@
             <button class="chat-icon-btn" id="coach-add-friend" aria-label="Add friend">
               <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
+            <div class="chat-add-menu" id="coach-add-menu" hidden>
+              <button data-add-action="search">Search for friends</button>
+              <button data-add-action="invite">Invite friends</button>
+            </div>
           </div>
           <div class="chat-pane" data-coach-pane="clients">
             <ul class="chat-inbox-list coach-thread-list" id="chat-coach-thread-list">
@@ -7422,6 +7461,59 @@ const Coaching = (() => {
     } catch (e) { banner('Could not update request', true); }
   }
 
+  /* ── + button dropdown (Search for friends / Invite friends) ─ */
+  function bindAddMenu(btn, menu) {
+    if (!btn || !menu || btn.dataset.menuWired) return;
+    btn.dataset.menuWired = '1';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Close any other open add-menu before opening this one.
+      document.querySelectorAll('.chat-add-menu').forEach(m => {
+        if (m !== menu) m.hidden = true;
+      });
+      const willOpen = menu.hidden;
+      menu.hidden = !willOpen;
+      if (willOpen) {
+        // One-shot outside-click closer.
+        const onDocClick = (ev) => {
+          if (ev.target.closest('#' + menu.id) || ev.target === btn || btn.contains(ev.target)) return;
+          menu.hidden = true;
+          document.removeEventListener('click', onDocClick);
+        };
+        setTimeout(() => document.addEventListener('click', onDocClick), 0);
+      }
+    });
+    menu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-add-action]');
+      if (!item) return;
+      menu.hidden = true;
+      if (item.dataset.addAction === 'search') openFriendSearch();
+      else if (item.dataset.addAction === 'invite') inviteFriends();
+    });
+  }
+
+  /* Native share sheet (iOS / Android Chrome) → falls back to clipboard
+     copy on browsers that don't expose navigator.share. */
+  async function inviteFriends() {
+    const url = (typeof location !== 'undefined' ? location.origin : '') + '/';
+    const text = 'Join me on GoFirst — daily task discipline + accountability.';
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'GoFirst', text, url });
+        return;
+      } catch (e) {
+        // User dismissed the share sheet — don't fall through to copy.
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      banner('Invite link copied to clipboard!');
+    } catch {
+      banner('Could not copy link', true);
+    }
+  }
+
   /* ── Friend search overlay ─────────────────────────────── */
   let _friendSearchTimer = null;
   function openFriendSearch() {
@@ -8085,17 +8177,17 @@ const Coaching = (() => {
       if (btn) setCoachPane(btn.dataset.coachTab);
     });
 
-    // Add-friend buttons on both modes + dot-badge for incoming requests.
-    const inboxAdd = document.getElementById('inbox-add-friend');
-    if (inboxAdd) {
-      inboxAdd.innerHTML += '<span class="pending-dot" hidden></span>';
-      inboxAdd.addEventListener('click', openFriendSearch);
-    }
-    const coachAdd = document.getElementById('coach-add-friend');
-    if (coachAdd) {
-      coachAdd.innerHTML += '<span class="pending-dot" hidden></span>';
-      coachAdd.addEventListener('click', openFriendSearch);
-    }
+    // Add-friend buttons on both modes — tapping opens a small dropdown
+    // (Search for friends / Invite friends). Pending-dot indicator stays.
+    const inboxAdd  = document.getElementById('inbox-add-friend');
+    const inboxMenu = document.getElementById('inbox-add-menu');
+    if (inboxAdd) inboxAdd.innerHTML += '<span class="pending-dot" hidden></span>';
+    bindAddMenu(inboxAdd, inboxMenu);
+
+    const coachAdd  = document.getElementById('coach-add-friend');
+    const coachMenu = document.getElementById('coach-add-menu');
+    if (coachAdd) coachAdd.innerHTML += '<span class="pending-dot" hidden></span>';
+    bindAddMenu(coachAdd, coachMenu);
 
     // Friend search overlay.
     const fsBack = document.getElementById('friend-search-back');
