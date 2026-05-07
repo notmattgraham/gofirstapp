@@ -2385,10 +2385,52 @@
     text-align: center;
     padding: 32px 16px;
   }
-  .friend-search-body .coach-thread {
-    border-bottom: 1px solid var(--border);
+
+  /* Dedicated Instagram-style search result row — avatar, name, action
+     button. Clean horizontal alignment, no awkward empty preview line. */
+  .search-result-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 4px;
   }
-  .friend-search-body .coach-thread:last-child { border-bottom: none; }
+  .search-result-row + .search-result-row {
+    border-top: 1px solid var(--border);
+  }
+  .search-result-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .search-result-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .search-result-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .search-result-row .search-row-action {
+    height: 30px;
+    padding: 0 16px;
+  }
   /* Pending-request rows — Accept / Decline buttons inline. */
   .pending-row-actions {
     display: inline-flex;
@@ -7418,15 +7460,13 @@ const Coaching = (() => {
           const sent = sentSet.has(u.id);
           // Privacy: never display email. The server search still matches
           // against email server-side, but only the display name is shown.
-          return `<div class="coach-thread">
-            <div class="coach-thread-avatar">${avatarHtml(u, u.name || 'User')}</div>
-            <div class="coach-thread-body">
-              <div class="coach-thread-name">${esc(u.name || 'User')}</div>
-            </div>
+          return `<li class="search-result-row">
+            <span class="search-result-avatar">${avatarHtml(u, u.name || 'User')}</span>
+            <span class="search-result-name">${esc(u.name || 'User')}</span>
             <button class="search-row-action ${sent ? '' : 'primary'}" data-search-add data-user-id="${esc(u.id)}" ${sent ? 'disabled' : ''}>
               ${sent ? 'Requested' : 'Add'}
             </button>
-          </div>`;
+          </li>`;
         }).join('');
         hint.hidden = true;
       } catch (e) {
