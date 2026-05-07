@@ -2358,8 +2358,13 @@
     color: var(--text-dim);
     padding: 12px 18px 4px;
   }
+  /* Empty state for the friends/admin inbox. Lives above the thread list
+     in the DOM so the flex:1 list below absorbs the remaining height —
+     this anchors the message visually in the top third of the chat tab
+     instead of letting an empty <ul> push it down to the bottom. */
   .inbox-empty {
-    padding: 36px 24px;
+    flex-shrink: 0;
+    padding: 18vh 24px 0;
     text-align: center;
     color: var(--text-dim);
   }
@@ -2384,21 +2389,43 @@
     gap: 12px;
   }
   .chat-promo-card[hidden] { display: none; }
+  /* Coach avatar + presence dot. The img fills the circle; the dot is
+     overlaid on the bottom-right corner with a small ring of bg color
+     so it visually separates from the avatar like an iMessage tile. */
   .chat-promo-icon {
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+    position: relative;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: var(--accent-dim);
     color: var(--accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    overflow: visible;
+  }
+  .chat-promo-icon img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
   }
   .chat-promo-icon svg {
     width: 18px; height: 18px;
     stroke: currentColor; fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .chat-promo-online-dot {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid var(--surface);
   }
   .chat-promo-text { flex: 1; min-width: 0; }
   .chat-promo-title { font-size: 14px; font-weight: 700; color: var(--text); }
@@ -3455,14 +3482,15 @@
             <div class="inbox-section-label">Friend requests</div>
             <ul class="chat-inbox-list" id="inbox-pending-list"></ul>
           </div>
-          <ul class="chat-inbox-list coach-thread-list" id="inbox-thread-list"></ul>
           <div class="inbox-empty" id="inbox-empty" hidden>
             <div class="empty-title">No messages yet</div>
             <div>Tap + to find a friend.</div>
           </div>
+          <ul class="chat-inbox-list coach-thread-list" id="inbox-thread-list"></ul>
           <div class="chat-promo-card" id="chat-promo-card" hidden>
             <div class="chat-promo-icon">
-              <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              <img src="/coach.jpg" alt="" referrerpolicy="no-referrer" />
+              <span class="chat-promo-online-dot" aria-label="Online"></span>
             </div>
             <div class="chat-promo-text">
               <div class="chat-promo-title">Get a 1:1 coach</div>
