@@ -113,6 +113,10 @@ model Task {
   category        String?
   // Preferred time of day (24-hour "HH:MM"). Used for Chronological view grouping.
   scheduledTime   String?
+  // Optional free-text notes the user attaches to a task — context, links,
+  // reminders, anything they need to remember. Up to 1000 chars per the
+  // form; stored as String? to allow null when empty.
+  notes           String?
   // DEPRECATED — left in schema so `prisma db push` doesn't have to drop the
   // column on deploy (which requires --accept-data-loss). Never read or
   // written by application code; safe to remove in a future migration window.
