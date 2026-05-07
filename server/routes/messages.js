@@ -7,7 +7,7 @@ const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 
 const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'notmattgraham@gmail.com').toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 const MAX_MESSAGE_LENGTH = 4000;
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
