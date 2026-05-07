@@ -49,6 +49,26 @@ model User {
   quitStreaks    QuitStreak[]
   sentMessages   Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
+  sentFriendships     Friendship[] @relation("SentFriendships")
+  receivedFriendships Friendship[] @relation("ReceivedFriendships")
+}
+
+// In-app social graph. A row exists from the requester (fromUserId) to the
+// target (toUserId). status starts at 'pending' and flips to 'accepted'
+// when the recipient confirms. Either side can delete to unfriend / decline.
+model Friendship {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("SentFriendships", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedFriendships", fields: [toUserId], references: [id], onDelete: Cascade)
+  status     String   // 'pending' | 'accepted'
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
 }
 
 model Message {
