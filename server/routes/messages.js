@@ -192,7 +192,7 @@ router.get('/:clientId', wrap(async (req, res) => {
         // rate, top streaks, etc) without an extra round-trip.
         orderBy: { createdAt: 'desc' },
         take: 200,
-        select: { id: true, text: true, scheduledDate: true, scheduledTime: true, done: true, completedDates: true, category: true, recurrence: true, createdAt: true, trackStreak: true },
+        select: { id: true, text: true, scheduledDate: true, scheduledTime: true, done: true, completedDates: true, category: true, recurrence: true, createdAt: true, trackStreak: true, startedAt: true },
       },
     },
   });
