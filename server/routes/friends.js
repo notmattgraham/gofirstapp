@@ -194,11 +194,11 @@ router.get('/threads', wrap(async (req, res) => {
       toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
     },
   });
-  const friends = friendRows.map(r => otherSide(me.id, r));
-  if (friends.length === 0) return res.json({ threads: [] });
+  if (friendRows.length === 0) return res.json({ threads: [] });
 
   // For each friend, latest message in either direction + my unread count.
-  const threads = await Promise.all(friends.map(async (friend) => {
+  const threads = await Promise.all(friendRows.map(async (row) => {
+    const friend = otherSide(me.id, row);
     const [latestFrom, latestTo, unread] = await Promise.all([
       prisma.message.findFirst({
         where: { fromUserId: friend.id, toUserId: me.id },
@@ -221,7 +221,7 @@ router.get('/threads', wrap(async (req, res) => {
         : { ...latestTo, fromMe: true };
     } else if (latestFrom) latest = { ...latestFrom, fromMe: false };
     else if (latestTo)     latest = { ...latestTo, fromMe: true };
-    return { user: shapeUser(friend), latest, unread };
+    return { user: shapeUser(friend), friendshipId: row.id, latest, unread };
   }));
 
   threads.sort((a, b) => {
