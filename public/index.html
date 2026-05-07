@@ -3647,11 +3647,12 @@
         </div>
 
         <div class="field">
-          <span class="field-label">Repeat <span class="field-req">*</span></span>
+          <span class="field-label">Frequency <span class="field-req">*</span></span>
           <div class="chip-row" id="repeat-toggle">
             <button type="button" class="chip" data-repeat="none">Once</button>
             <button type="button" class="chip" data-repeat="daily">Daily</button>
             <button type="button" class="chip" data-repeat="weekly">Weekly</button>
+            <button type="button" class="chip" data-repeat="monthly">Monthly</button>
             <button type="button" class="chip" data-repeat="custom">Custom</button>
           </div>
         </div>
@@ -4038,8 +4039,12 @@ function uid() {
 const DAY_LONG = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAY_SHORT = ['Su','M','T','W','Th','F','Sa'];
 
-function scheduleLabel(recurrence) {
+function scheduleLabel(recurrence, startedAt) {
   if (!recurrence) return '';
+  if (recurrence.type === 'monthly') {
+    const day = parseInt((startedAt || '').slice(8, 10), 10);
+    return Number.isFinite(day) ? `Monthly · Day ${day}` : 'Monthly';
+  }
   const days = recurrence.daysOfWeek || [];
   if (recurrence.type === 'daily' || days.length === 7) return 'Every day';
   if (days.length === 0) return '';
@@ -4590,6 +4595,9 @@ const TaskForm = {
     els.trackInput.checked = this.track;
   },
 
+  // Monthly recurrence reuses the task's startedAt day-of-month — no
+  // explicit day-of-week chips needed.
+
   updateSubmitEnabled() {
     const hasText = els.taskInput.value.trim().length > 0;
     const hasRepeat = this.repeat !== null;
@@ -4601,6 +4609,7 @@ const TaskForm = {
     this.repeat = type;
     if (type === 'none') this.daysOfWeek = [];
     if (type === 'daily') this.daysOfWeek = [0,1,2,3,4,5,6];
+    if (type === 'monthly') this.daysOfWeek = [];
     if (type === 'weekly') {
       if (!this.daysOfWeek.length) this.daysOfWeek = [todayDow()];
       else this.daysOfWeek = this.daysOfWeek.slice(0, 1);
@@ -4633,6 +4642,7 @@ const TaskForm = {
   toRecurrence() {
     if (this.repeat === null || this.repeat === 'none') return null;
     if (this.repeat === 'daily') return { type: 'daily', daysOfWeek: [0,1,2,3,4,5,6] };
+    if (this.repeat === 'monthly') return { type: 'monthly' };
     const days = this.daysOfWeek.slice().sort();
     if (!days.length) return null;
     return { type: this.repeat, daysOfWeek: days };
@@ -4941,14 +4951,24 @@ function taskScheduledFor(t, dayISO) {
     // Don't show recurring tasks before their creation date
     const startDate = (t.startedAt || '').slice(0, 10);
     if (startDate && dayISO < startDate) return false;
+    if (t.recurrence.type === 'monthly') {
+      // Monthly tasks recur on the same day-of-month as the start date.
+      // Months that don't have that day (e.g. Feb for a day-31 task) are
+      // simply skipped that month.
+      const startDay = parseInt((t.startedAt || '').slice(8, 10), 10);
+      const dayPart  = parseInt(dayISO.slice(8, 10), 10);
+      return startDay === dayPart;
+    }
     const days = (t.recurrence.daysOfWeek) || [];
     return days.includes(new Date(dayISO + 'T00:00:00').getDay());
   }
+  // One-shot tasks: only on their explicit scheduled date. Past undone
+  // ones land in the Missed Tasks list (Profile tab) — they don't roll
+  // forward onto every subsequent day, which used to make "Once" look
+  // like a recurring task.
   const sched = t.scheduledDate;
-  if (!sched) return true; // no scheduled date → always visible
-  if (sched > dayISO) return false; // scheduled for a future day relative to selected date
-  if (t.done && sched < dayISO) return false; // completed on a past day → don't roll forward
-  return true; // incomplete past tasks roll forward into today and beyond
+  if (!sched) return true; // legacy: no scheduled date → always visible
+  return sched === dayISO;
 }
 
 function isTaskDoneOn(t, dayISO) {
@@ -5045,6 +5065,9 @@ function getTaskAnalytics(task, today) {
   if (!recurrence) return null;
   const daysOfWeek = (recurrence.daysOfWeek) || [];
   const startDate = (task.startedAt || '').slice(0, 10) || today;
+  const monthlyDay = recurrence.type === 'monthly'
+    ? parseInt((task.startedAt || '').slice(8, 10), 10)
+    : null;
   const rawDates = task.completedDates || [];
   const completedSet = new Set(rawDates.filter(d => !d.startsWith('skip:')));
   const skippedSet  = new Set(rawDates.filter(d => d.startsWith('skip:')).map(d => d.slice(5)));
@@ -5055,7 +5078,10 @@ function getTaskAnalytics(task, today) {
   const todayDate = new Date(today + 'T00:00:00');
   while (cur <= todayDate) {
     const iso = cur.toISOString().slice(0, 10);
-    if (daysOfWeek.includes(cur.getDay())) allScheduled.push(iso);
+    const isScheduled = recurrence.type === 'monthly'
+      ? (Number.isFinite(monthlyDay) && cur.getDate() === monthlyDay)
+      : daysOfWeek.includes(cur.getDay());
+    if (isScheduled) allScheduled.push(iso);
     cur.setDate(cur.getDate() + 1);
   }
 
@@ -5086,14 +5112,14 @@ function getTaskAnalytics(task, today) {
     else if (d <= today) break; // missed or today not done yet
   }
 
-  return { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate };
+  return { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate, monthlyDay };
 }
 
 function renderAnalyticsPanel(task, today) {
   const openState = analyticsOpen.get(task.id) || { monthOffset: 0 };
   const analytics = getTaskAnalytics(task, today);
   if (!analytics) return '';
-  const { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate } = analytics;
+  const { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate, monthlyDay } = analytics;
 
   // --- Stats row ---
   const pctDisplay = pct === null ? '--' : pct + '%';
@@ -5137,7 +5163,11 @@ function renderAnalyticsPanel(task, today) {
   for (let day = 1; day <= daysInMonth; day++) {
     const iso = year + '-' + String(month + 1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
     const dayOfWeek = new Date(iso + 'T00:00:00').getDay();
-    const isScheduled = daysOfWeek.includes(dayOfWeek) && iso >= startDate;
+    const isScheduled = (
+      monthlyDay != null
+        ? (Number.isFinite(monthlyDay) && day === monthlyDay)
+        : daysOfWeek.includes(dayOfWeek)
+    ) && iso >= startDate;
     const isDone    = completedSet.has(iso);
     const isSkipped = skippedSet.has(iso);
     const isPast    = iso < today;
@@ -5223,7 +5253,7 @@ function renderTasksView(state) {
   const renderRow = (t) => {
     const done = isTaskDoneOn(t, dayISO);
     const exiting = _exitingTasks.has(t.id);
-    const schedule = scheduleLabel(t.recurrence);
+    const schedule = scheduleLabel(t.recurrence, t.startedAt);
     const badges = [];
     if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
     if (t.trackStreak) {
@@ -5478,30 +5508,43 @@ function countTaskInRange(t, start, end) {
   const createdISO = toISO(new Date(t.createdAt));
   let scheduled = 0, completed = 0;
   if (!t.recurrence) {
-    if (createdISO >= start && createdISO <= effectiveEnd) {
+    // One-shots are scheduled on their committed day (scheduledDate).
+    // Falls back to created day for legacy rows that predate scheduledDate.
+    const onISO = t.scheduledDate || createdISO;
+    if (onISO >= start && onISO <= effectiveEnd) {
       scheduled = 1;
       if (t.done) completed = 1;
     }
   } else {
-    const days = t.recurrence.daysOfWeek || [];
-    if (days.length) {
-      const doneSet = new Set(t.completedDates || []);
-      const startCursor = createdISO > start ? createdISO : start;
-      // If the user "stopped repeating" the task, recurrence ends before
-      // recurrence.endsBefore — clamp the end of the count window.
-      const endsBefore = t.recurrence.endsBefore;
-      let cursorEnd = effectiveEnd;
-      if (endsBefore && endsBefore <= cursorEnd) {
-        cursorEnd = addDaysISO(endsBefore, -1);
-      }
+    const doneSet = new Set(t.completedDates || []);
+    const startCursor = createdISO > start ? createdISO : start;
+    const endsBefore = t.recurrence.endsBefore;
+    let cursorEnd = effectiveEnd;
+    if (endsBefore && endsBefore <= cursorEnd) {
+      cursorEnd = addDaysISO(endsBefore, -1);
+    }
+    if (t.recurrence.type === 'monthly') {
+      const startDay = parseInt((t.startedAt || createdISO).slice(8, 10), 10);
       let cursor = startCursor;
       while (cursor <= cursorEnd) {
-        const dow = new Date(cursor + 'T00:00:00').getDay();
-        if (days.includes(dow)) {
+        if (parseInt(cursor.slice(8, 10), 10) === startDay) {
           scheduled++;
           if (doneSet.has(cursor)) completed++;
         }
         cursor = addDaysISO(cursor, 1);
+      }
+    } else {
+      const days = t.recurrence.daysOfWeek || [];
+      if (days.length) {
+        let cursor = startCursor;
+        while (cursor <= cursorEnd) {
+          const dow = new Date(cursor + 'T00:00:00').getDay();
+          if (days.includes(dow)) {
+            scheduled++;
+            if (doneSet.has(cursor)) completed++;
+          }
+          cursor = addDaysISO(cursor, 1);
+        }
       }
     }
   }
@@ -7950,10 +7993,15 @@ const Coaching = (() => {
     // for today's day-of-week + one-shots scheduled for today.
     const today = todayISO();
     const dow = new Date().getDay();
-    const todayTasks = (_clientGlanceTasks || []).filter(t =>
-      t.scheduledDate === today
-        || (t.recurrence && (t.recurrence.daysOfWeek || []).includes(dow))
-    );
+    const todayDay = parseInt(today.slice(8, 10), 10);
+    const todayTasks = (_clientGlanceTasks || []).filter(t => {
+      if (t.scheduledDate === today) return true;
+      if (!t.recurrence) return false;
+      if (t.recurrence.type === 'monthly') {
+        return parseInt((t.startedAt || '').slice(8, 10), 10) === todayDay;
+      }
+      return (t.recurrence.daysOfWeek || []).includes(dow);
+    });
 
     const dataKey = JSON.stringify({
       period,

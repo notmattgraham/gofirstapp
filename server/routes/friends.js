@@ -45,18 +45,28 @@ function countTaskOnDay(t, dayISO, todayISO) {
   if (dayISO > todayISO) return { scheduled: 0, completed: 0 };
   const createdISO = utcISO(new Date(t.createdAt));
   if (!t.recurrence) {
-    if (createdISO === dayISO) return { scheduled: 1, completed: t.done ? 1 : 0 };
+    // One-shots are scheduled on their committed day (scheduledDate),
+    // not the day they were created. Falls back to createdISO for legacy
+    // rows that predate scheduledDate.
+    const onISO = t.scheduledDate || createdISO;
+    if (onISO === dayISO) return { scheduled: 1, completed: t.done ? 1 : 0 };
     return { scheduled: 0, completed: 0 };
   }
   if (createdISO > dayISO) return { scheduled: 0, completed: 0 };
   if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return { scheduled: 0, completed: 0 };
+  const cd = t.completedDates || [];
+  if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
+  if (t.recurrence.type === 'monthly') {
+    const startDay = parseInt((t.startedAt || '').slice(8, 10), 10);
+    const dayPart  = parseInt(dayISO.slice(8, 10), 10);
+    if (!Number.isFinite(startDay) || startDay !== dayPart) return { scheduled: 0, completed: 0 };
+    return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
+  }
   const days = t.recurrence.daysOfWeek || [];
   if (!days.length) return { scheduled: 0, completed: 0 };
   const [y, m, d] = dayISO.split('-').map(Number);
   const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   if (!days.includes(dow)) return { scheduled: 0, completed: 0 };
-  const cd = t.completedDates || [];
-  if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
   return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
 }
 
@@ -267,6 +277,7 @@ router.get('/threads', wrap(async (req, res) => {
     select: {
       userId: true, scheduledDate: true, done: true,
       completedDates: true, recurrence: true, createdAt: true,
+      startedAt: true,
     },
   });
   const tasksByUser = {};
@@ -332,7 +343,7 @@ router.get('/:userId/glance', wrap(async (req, res) => {
     where: { userId: friendId },
     select: {
       scheduledDate: true, done: true, completedDates: true,
-      recurrence: true, createdAt: true,
+      recurrence: true, createdAt: true, startedAt: true,
     },
   });
 

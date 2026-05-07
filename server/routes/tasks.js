@@ -49,10 +49,18 @@ async function todayCompletionState(user) {
   const tasks = await prisma.task.findMany({ where: { userId: user.id } });
   let total = 0, incomplete = 0;
   const dow = new Date(today + 'T00:00:00').getDay();
+  const todayDay = parseInt(today.slice(8, 10), 10);
   for (const t of tasks) {
     if (t.recurrence) {
-      const days = (t.recurrence.daysOfWeek) || [];
-      if (days.includes(dow)) {
+      let scheduled = false;
+      if (t.recurrence.type === 'monthly') {
+        const startDay = parseInt((t.startedAt || '').slice(8, 10), 10);
+        scheduled = Number.isFinite(startDay) && startDay === todayDay;
+      } else {
+        const days = (t.recurrence.daysOfWeek) || [];
+        scheduled = days.includes(dow);
+      }
+      if (scheduled) {
         total++;
         if (!(t.completedDates || []).includes(today)) incomplete++;
       }
