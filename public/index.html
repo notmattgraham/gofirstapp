@@ -1477,6 +1477,20 @@
     color: var(--text-dim);
   }
 
+  /* Inline notes preview under a task row — small italic line, single-
+     line ellipsis so the row stays tidy. Full text lives in edit mode. */
+  .row-notes {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 4px;
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .row.done .row-notes { opacity: 0.6; }
+
   .row-sub {
     font-size: 12px;
     color: var(--text-faint);
@@ -1802,6 +1816,15 @@
     overflow-y: auto;
   }
   .task-options[hidden] { display: none; }
+  /* Notes textarea inside the new-task dock — bigger and resize:none. */
+  .task-notes-input {
+    min-height: 72px;
+    padding: 10px 12px;
+    line-height: 1.4;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .task-notes-input::placeholder { color: var(--text-faint); }
   .field-req {
     color: var(--danger);
     margin-left: 2px;
@@ -3623,11 +3646,6 @@
           </div>
         </div>
 
-        <div class="field" id="time-field-task">
-          <span class="field-label">Deadline <span class="field-opt">(optional)</span></span>
-          <input type="time" class="field-input" id="task-time-input" />
-        </div>
-
         <div class="field">
           <span class="field-label">Repeat <span class="field-req">*</span></span>
           <div class="chip-row" id="repeat-toggle">
@@ -3649,6 +3667,22 @@
             <button type="button" class="chip day" data-day="5">F</button>
             <button type="button" class="chip day" data-day="6">S</button>
           </div>
+        </div>
+
+        <div class="field" id="time-field-task">
+          <span class="field-label">Deadline <span class="field-opt">(optional)</span></span>
+          <input type="time" class="field-input" id="task-time-input" />
+        </div>
+
+        <div class="field">
+          <span class="field-label">Notes <span class="field-opt">(optional)</span></span>
+          <textarea
+            id="task-notes-input"
+            class="field-input task-notes-input"
+            placeholder="Any details you want to remember about this task"
+            maxlength="1000"
+            rows="3"
+          ></textarea>
         </div>
 
         <div class="field" id="track-field" hidden>
@@ -4233,11 +4267,12 @@ const Store = (() => {
       };
     },
 
-    async addTask({ text, recurrence, trackStreak, startedAt, category, scheduledDate, scheduledTime }) {
+    async addTask({ text, recurrence, trackStreak, startedAt, category, scheduledDate, scheduledTime, notes }) {
       const t = (text || '').trim();
       if (!t) return;
       const tmpId = 'tmp:' + uid();
       const isDaily = recurrence && recurrence.type === 'daily';
+      const trimmedNotes = typeof notes === 'string' && notes.trim() ? notes.trim().slice(0, 1000) : null;
       const optimistic = {
         id: tmpId,
         text: t,
@@ -4248,6 +4283,7 @@ const Store = (() => {
         trackStreak: !!(isDaily && trackStreak),
         category: category || null,
         scheduledTime: scheduledTime || null,
+        notes: trimmedNotes,
         done: false,
         completedDates: [],
       };
@@ -4261,6 +4297,7 @@ const Store = (() => {
         trackStreak: optimistic.trackStreak,
         category: optimistic.category,
         scheduledTime: optimistic.scheduledTime,
+        notes: optimistic.notes,
       };
       setPendingTasks([...getPendingTasks(), { tmpId, payload: pendingPayload }]);
       await mutate(
@@ -4450,6 +4487,7 @@ const els = {
   trackField: document.getElementById('track-field'),
   trackInput: document.getElementById('track-toggle'),
   taskTimeInput: document.getElementById('task-time-input'),
+  taskNotesInput: document.getElementById('task-notes-input'),
   viewModeBar: document.getElementById('view-mode-bar'),
   editBanner: document.getElementById('edit-banner'),
   editBannerText: document.getElementById('edit-banner-text'),
@@ -4475,6 +4513,7 @@ const TaskForm = {
   track: false,
   category: '',         // '' until user taps a chip; else Family|Fitness|Career|Self-Improvement|Other
   time: '',             // 'HH:MM' or ''
+  notes: '',            // optional free-text task notes
 
   reset() {
     this.editingId = null;
@@ -4483,8 +4522,10 @@ const TaskForm = {
     this.track = false;
     this.category = '';
     this.time = '';
+    this.notes = '';
     els.taskInput.value = '';
     els.taskTimeInput.value = '';
+    if (els.taskNotesInput) els.taskNotesInput.value = '';
     els.taskSubmit.textContent = '+';
     // Collapse the category row back to just 4 chips + "+".
     const plus = document.getElementById('category-expand');
@@ -4511,8 +4552,10 @@ const TaskForm = {
     this.track = !!task.trackStreak;
     this.category = task.category || '';
     this.time = task.scheduledTime || '';
+    this.notes = task.notes || '';
     els.trackInput.checked = this.track;
     els.taskTimeInput.value = this.time;
+    if (els.taskNotesInput) els.taskNotesInput.value = this.notes;
     // If this task uses "Other", pre-expand the row so the chip is visible.
     const plus = document.getElementById('category-expand');
     const other = document.getElementById('category-other');
@@ -5196,6 +5239,9 @@ function renderTasksView(state) {
       badges.push(`<span class="badge">${h12}:${String(m).padStart(2,'0')} ${ampm}</span>`);
     }
     const sub = badges.length ? `<div class="row-sub">${badges.join('')}</div>` : '';
+    const notesLine = (t.notes && t.notes.trim())
+      ? `<div class="row-notes">${esc(t.notes.trim())}</div>`
+      : '';
     const isOpen = analyticsOpen.has(t.id);
     const analyticsBtn = t.recurrence
       ? `<button class="icon-btn${isOpen ? ' active' : ''}" data-action="task-analytics" aria-label="View task data">${barChartIcon}</button>`
@@ -5211,6 +5257,7 @@ function renderTasksView(state) {
         <div class="row-body">
           <div class="row-text">${esc(t.text)}</div>
           ${sub}
+          ${notesLine}
         </div>
         ${analyticsBtn}${editBtn}${deleteBtn}
       </li>`;
@@ -6117,6 +6164,13 @@ els.trackInput.addEventListener('change', () => {
   TaskForm.track = els.trackInput.checked;
 });
 
+// --- Notes textarea — keep TaskForm state in sync as the user types. ---
+if (els.taskNotesInput) {
+  els.taskNotesInput.addEventListener('input', () => {
+    TaskForm.notes = els.taskNotesInput.value;
+  });
+}
+
 // --- Task form submit (add or edit) ---
 els.taskForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -6127,15 +6181,18 @@ els.taskForm.addEventListener('submit', (e) => {
   const category = TaskForm.category || null;
   const scheduledTime = els.taskTimeInput.value || null;
   TaskForm.time = scheduledTime || '';
+  const notesRaw = els.taskNotesInput ? els.taskNotesInput.value : '';
+  const notes = notesRaw && notesRaw.trim() ? notesRaw.trim().slice(0, 1000) : null;
+  TaskForm.notes = notes || '';
   const state = Store.get();
   // The new task goes on the date currently selected in the date navigator.
   const scheduledDate = recurrence ? null : (selectedDateISO || state.today);
-  const updates = { text, recurrence, trackStreak: TaskForm.track, category, scheduledDate, scheduledTime };
+  const updates = { text, recurrence, trackStreak: TaskForm.track, category, scheduledDate, scheduledTime, notes };
 
   if (TaskForm.editingId) {
     Store.updateTask(TaskForm.editingId, updates);
   } else {
-    Store.addTask({ text, recurrence, trackStreak: TaskForm.track, category, scheduledDate, scheduledTime });
+    Store.addTask({ text, recurrence, trackStreak: TaskForm.track, category, scheduledDate, scheduledTime, notes });
   }
 
   TaskForm.reset();
@@ -6402,14 +6459,18 @@ setInterval(() => {
 }, 60000);
 
 /* ============================================================
-   Countdown bar — visible in the last 4 hours before midnight,
-   turns red in the final hour. Nudges the user to close out tasks
-   and plan tomorrow before the day locks.
+   Countdown bar — DISABLED until push notifications ship.
+   The day-lock + nightly-planning flow this nudges the user toward
+   only makes sense once we can wake them with a 9pm reminder. Once
+   notifications are wired through Xcode / the App Store build, the
+   tick() loop below can be re-enabled by removing the early return.
    ============================================================ */
 (() => {
   const bar = document.getElementById('countdown-bar');
+  if (bar) bar.hidden = true;
+  return;
+  // eslint-disable-next-line no-unreachable
   const txt = document.getElementById('countdown-text');
-  if (!bar || !txt) return;
   function tick() {
     const now = new Date();
     const midnight = new Date(now);

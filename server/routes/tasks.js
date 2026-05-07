@@ -23,6 +23,7 @@ function shape(t) {
     trackStreak: t.trackStreak,
     category: t.category,
     scheduledTime: t.scheduledTime || null,
+    notes: t.notes || null,
     done: t.done,
     completedDates: t.completedDates,
     createdAt: t.createdAt.getTime ? t.createdAt.getTime() : t.createdAt,
@@ -32,6 +33,13 @@ function shape(t) {
 function sanitizeTime(v) {
   // Accept HH:MM in 24-hour format only
   return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+}
+
+function sanitizeNotes(v) {
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 1000);
 }
 
 // "Today is complete" → no remaining incomplete tasks scheduled for today.
@@ -89,7 +97,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { text, startedAt, recurrence, trackStreak, category, scheduledDate, scheduledTime } = req.body || {};
+  const { text, startedAt, recurrence, trackStreak, category, scheduledDate, scheduledTime, notes } = req.body || {};
   const trimmed = typeof text === 'string' ? text.trim() : '';
   if (!trimmed) return res.status(400).json({ error: 'text required' });
 
@@ -115,6 +123,7 @@ router.post('/', async (req, res) => {
       trackStreak: !!(isDaily && trackStreak),
       category: sanitizeCategory(category),
       scheduledTime: sanitizeTime(scheduledTime),
+      notes: sanitizeNotes(notes),
       done: false,
       completedDates: [],
     },
@@ -128,7 +137,7 @@ router.patch('/:id', async (req, res) => {
   if (!existing || existing.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
 
   const data = {};
-  const allowed = ['text', 'startedAt', 'recurrence', 'trackStreak', 'done', 'completedDates', 'category', 'scheduledDate', 'scheduledTime'];
+  const allowed = ['text', 'startedAt', 'recurrence', 'trackStreak', 'done', 'completedDates', 'category', 'scheduledDate', 'scheduledTime', 'notes'];
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(req.body || {}, key)) data[key] = req.body[key];
   }
@@ -137,6 +146,9 @@ router.patch('/:id', async (req, res) => {
   }
   if (Object.prototype.hasOwnProperty.call(data, 'scheduledTime')) {
     data.scheduledTime = sanitizeTime(data.scheduledTime);
+  }
+  if (Object.prototype.hasOwnProperty.call(data, 'notes')) {
+    data.notes = sanitizeNotes(data.notes);
   }
 
   // Lock check — but completion-only updates (done / completedDates) bypass the lock,
