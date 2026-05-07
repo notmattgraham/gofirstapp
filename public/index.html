@@ -2328,19 +2328,48 @@
   }
   .chat-promo-cta:active { background: var(--accent-hover); }
 
-  /* Friend-search overlay body — input + scrolling result list. */
+  /* Friend-search overlay body — input + scrolling result list.
+     Header title is centered iOS-style; the back button stays on the
+     left without nudging the title. */
+  #friend-search-overlay .coach-overlay-header {
+    position: relative;
+    justify-content: center;
+  }
+  #friend-search-overlay .back-btn {
+    position: absolute;
+    left: 16px;
+    top: calc(var(--safe-top) + 14px);
+  }
+  #friend-search-overlay .coach-overlay-title {
+    flex: 0 0 auto;
+    text-align: center;
+  }
   .friend-search-body {
     flex: 1;
     overflow-y: auto;
-    padding: 14px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
+  }
+  .friend-search-input-wrap {
+    flex-shrink: 0;
+    position: relative;
+  }
+  .friend-search-input-wrap svg {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    stroke: var(--text-faint); fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    pointer-events: none;
   }
   .friend-search-input {
-    flex-shrink: 0;
-    height: 40px;
-    padding: 0 14px;
+    width: 100%;
+    height: 42px;
+    padding: 0 16px 0 38px;
     border-radius: 22px;
     border: 1px solid var(--border);
     background: var(--surface);
@@ -2354,8 +2383,12 @@
     font-size: 13px;
     color: var(--text-faint);
     text-align: center;
-    padding: 24px 16px;
+    padding: 32px 16px;
   }
+  .friend-search-body .coach-thread {
+    border-bottom: 1px solid var(--border);
+  }
+  .friend-search-body .coach-thread:last-child { border-bottom: none; }
   /* Pending-request rows — Accept / Decline buttons inline. */
   .pending-row-actions {
     display: inline-flex;
@@ -3623,6 +3656,18 @@
           <span class="presence-text" id="dm-presence-text"></span>
         </div>
       </div>
+      <details class="client-summary-wrap" id="dm-glance-wrap" hidden>
+        <summary class="client-summary-toggle"><span id="dm-glance-title">Friend's data</span></summary>
+        <div class="client-summary-body" id="dm-glance-body">
+          <div class="week-bar" id="dm-glance-week"></div>
+          <div class="client-glance-hero">
+            <div class="client-glance-ring" id="dm-glance-ring">
+              <div class="client-glance-pct" id="dm-glance-pct">—</div>
+            </div>
+            <div class="client-glance-sub" id="dm-glance-sub">Loading…</div>
+          </div>
+        </div>
+      </details>
       <div class="chat-messages" id="dm-messages"></div>
       <div class="typing-indicator" id="dm-typing" hidden>
         <span></span><span></span><span></span>
@@ -3647,16 +3692,19 @@
         <span class="coach-overlay-title">Add friend</span>
       </div>
       <div class="friend-search-body">
-        <input
-          id="friend-search-input"
-          class="friend-search-input"
-          type="text"
-          placeholder="Search by name or email"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="words"
-          spellcheck="false"
-        />
+        <div class="friend-search-input-wrap">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input
+            id="friend-search-input"
+            class="friend-search-input"
+            type="text"
+            placeholder="Search by name"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="words"
+            spellcheck="false"
+          />
+        </div>
         <ul class="chat-inbox-list" id="friend-search-results"></ul>
         <div class="friend-search-hint" id="friend-search-hint">Type at least 2 characters.</div>
       </div>
@@ -6812,7 +6860,9 @@ const Coaching = (() => {
   }
 
   function avatarHtml(u, fallback) {
-    const name = (u && u.name) || (u && u.email) || fallback || '?';
+    // Email is no longer sent for friend-facing endpoints, so the only
+    // initial source is the display name (or the supplied fallback).
+    const name = (u && u.name) || fallback || '?';
     const initial = name.trim().charAt(0).toUpperCase() || '?';
     return u && u.picture
       ? `<img src="${esc(u.picture)}" alt="" referrerpolicy="no-referrer" />`
@@ -6831,10 +6881,29 @@ const Coaching = (() => {
     dmPeerInfo = peerInfo || dmPeerInfo;
     hideTyping('dm');
     updateDmHeader();
+
+    // The "Friend's data" dropdown is friend-only. The user's own coach
+    // doesn't get one — that wouldn't make sense (coach has access to
+    // the client's data, not the other way around).
+    const me = Auth.user;
+    const isCoachPeer = !!(me && me.coachingClient && coachPeerInfo && peerId === coachPeerInfo.id);
+    const glanceWrap = document.getElementById('dm-glance-wrap');
+    if (glanceWrap) {
+      glanceWrap.hidden = isCoachPeer;
+      // Reset to closed each open so the user has to tap to expand.
+      glanceWrap.removeAttribute('open');
+    }
+    if (!isCoachPeer) {
+      const fname = (dmPeerInfo && dmPeerInfo.name || '').trim().split(/\s+/)[0] || 'Friend';
+      const t = document.getElementById('dm-glance-title');
+      if (t) t.textContent = `${fname}'s data`;
+    }
+
     // Render any cached messages immediately, then fetch fresh.
     renderDmMessages();
     openOverlay('dm-overlay');
     await loadDmMessages(peerId);
+    if (!isCoachPeer) loadFriendGlance(peerId);
   }
   function closeDm() {
     closeOverlay('dm-overlay');
@@ -6851,14 +6920,13 @@ const Coaching = (() => {
     const txt = document.getElementById('dm-presence-text');
     const input = document.getElementById('dm-input');
     if (av) av.innerHTML = avatarHtml(info, info.name || 'Friend');
-    if (nameEl) nameEl.textContent = info.name || info.email || 'Friend';
+    if (nameEl) nameEl.textContent = info.name || 'Friend';
     if (statusEl) statusEl.textContent = info.subline || '';
     const ms = info.lastSeenAt ? Date.now() - new Date(info.lastSeenAt).getTime() : Infinity;
     if (dot) dot.classList.toggle('active', ms < 90_000);
     if (txt) txt.textContent = presenceText(info.lastSeenAt);
     if (input) {
-      const fname = (info.name || '').trim().split(/\s+/)[0]
-        || (info.email || '').split('@')[0] || 'them';
+      const fname = (info.name || '').trim().split(/\s+/)[0] || 'them';
       input.placeholder = `Message ${fname}...`;
     }
   }
@@ -6988,6 +7056,85 @@ const Coaching = (() => {
     }
   }
 
+  /* ── Friend "at a glance" panel inside the DM overlay ──────
+     Shows the friend's today exec rate + a Sun-Sat week-bar with
+     the same color tiers used elsewhere. The server-side endpoint
+     returns aggregate percentages only — no individual task data
+     ever leaves the friend's account. */
+  let _dmGlanceRaf = null;
+  async function loadFriendGlance(friendId) {
+    try {
+      const data = await api('GET', `/api/friends/${friendId}/glance`);
+      // The peer might have switched while we were waiting; bail if so.
+      if (dmPeerId !== friendId) return;
+      renderFriendGlance(data);
+    } catch (e) { console.warn('[friend glance]', e); }
+  }
+  function renderFriendGlance(data) {
+    const ringEl = document.getElementById('dm-glance-ring');
+    const pctEl  = document.getElementById('dm-glance-pct');
+    const subEl  = document.getElementById('dm-glance-sub');
+    const weekEl = document.getElementById('dm-glance-week');
+    if (!ringEl || !pctEl || !weekEl) return;
+    const heroRate = (data && data.todayRate != null) ? data.todayRate : null;
+    if (heroRate == null) {
+      pctEl.textContent = '—';
+      pctEl.dataset.animateRate = '0';
+      if (subEl) subEl.textContent = 'Nothing scheduled today';
+      ringEl.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
+    } else {
+      pctEl.dataset.animateRate = String(heroRate);
+      if (subEl) subEl.textContent = "Today's execution rate";
+      ringEl.style.background = `conic-gradient(${rateColor(0)} 0deg, var(--surface-2) 0deg)`;
+      pctEl.textContent = '0%';
+    }
+    const days = (data && data.weekDays) || [];
+    weekEl.innerHTML = days.map(d => {
+      const cls = `week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`;
+      const ringAttr = d.rate == null ? '' : String(d.rate);
+      return `
+        <div class="${cls}">
+          <div class="week-day-ring" data-animate-ring="${ringAttr}">
+            <div class="week-day-letter">${d.letter}</div>
+          </div>
+        </div>`;
+    }).join('');
+    weekEl.querySelectorAll('.week-day-ring').forEach(r => paintTinyRing(r, null));
+    // Animate ring + week + percent on this scoped subtree.
+    if (_dmGlanceRaf) cancelAnimationFrame(_dmGlanceRaf);
+    requestAnimationFrame(() => runDmGlanceAnimation());
+  }
+
+  function runDmGlanceAnimation() {
+    if (_dmGlanceRaf) cancelAnimationFrame(_dmGlanceRaf);
+    const scope = document.getElementById('dm-glance-body');
+    if (!scope) return;
+    const heroRing = scope.querySelector('#dm-glance-ring');
+    const heroText = scope.querySelector('#dm-glance-pct');
+    const heroFinal = Number((heroText && heroText.dataset.animateRate) || 0);
+    const ringEls = [...scope.querySelectorAll('[data-animate-ring]')];
+    const start = performance.now();
+    const dur = 900;
+    function step(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      if (heroRing) {
+        const r = heroFinal * eased;
+        heroRing.style.background = `conic-gradient(${rateColor(r)} ${r * 3.6}deg, var(--surface-2) 0deg)`;
+      }
+      if (heroText) heroText.textContent = Math.round(heroFinal * eased) + '%';
+      ringEls.forEach(el => {
+        const raw = el.dataset.animateRing;
+        if (raw === '' || raw == null) { paintTinyRing(el, null); return; }
+        const f = Number(raw);
+        paintTinyRing(el, isFinite(f) ? f * eased : null);
+      });
+      if (t < 1) _dmGlanceRaf = requestAnimationFrame(step);
+      else _dmGlanceRaf = null;
+    }
+    _dmGlanceRaf = requestAnimationFrame(step);
+  }
+
   /* ── Friends graph + inbox ────────────────────────────────
      loadFriends    — pulls accepted friends + pending requests in/out
      loadInboxThreads — combines pinned coach (clients only) + friends
@@ -7050,7 +7197,7 @@ const Coaching = (() => {
   function threadRowHtml(opts) {
     // opts: { user, latest, unread, pinned }
     const u = opts.user;
-    const name = u.name || u.email || 'Friend';
+    const name = u.name || 'Friend';
     const preview = fmtPreviewMsg(opts.latest);
     const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
     const badge = opts.unread > 0
@@ -7118,7 +7265,7 @@ const Coaching = (() => {
     const coachList = document.getElementById('coach-pending-list');
     const html = pendingIncoming.map(p => {
       const u = p.user;
-      const name = u.name || u.email || 'Someone';
+      const name = u.name || 'Someone';
       return `<div class="coach-thread" data-pending-id="${esc(p.friendshipId)}">
         <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
         <div class="coach-thread-body">
@@ -7196,11 +7343,12 @@ const Coaching = (() => {
         const sentSet = new Set(pendingOutgoing.map(p => p.user.id));
         list.innerHTML = users.map(u => {
           const sent = sentSet.has(u.id);
+          // Privacy: never display email. The server search still matches
+          // against email server-side, but only the display name is shown.
           return `<div class="coach-thread">
             <div class="coach-thread-avatar">${avatarHtml(u, u.name || 'User')}</div>
             <div class="coach-thread-body">
-              <div class="coach-thread-name">${esc(u.name || u.email || 'User')}</div>
-              <div class="coach-thread-preview">${esc(u.email || '')}</div>
+              <div class="coach-thread-name">${esc(u.name || 'User')}</div>
             </div>
             <button class="search-row-action ${sent ? '' : 'primary'}" data-search-add data-user-id="${esc(u.id)}" ${sent ? 'disabled' : ''}>
               ${sent ? 'Requested' : 'Add'}
@@ -7296,16 +7444,14 @@ const Coaching = (() => {
     hideTyping('coach'); // clear any stale indicator from a previous thread
     const thread = coachThreads.find(t => t.client.id === clientId);
     if (!thread) return;
-    const name    = thread.client.name || thread.client.email || 'Client';
+    const name    = thread.client.name || 'Client';
     const initial = name.trim().charAt(0).toUpperCase();
     document.getElementById('coach-client-name').textContent  = name;
-    document.getElementById('coach-client-email').textContent = thread.client.email || '';
+    // Email is no longer surfaced — clients are identified by display name.
+    document.getElementById('coach-client-email').textContent = '';
 
-    // Personalize the at-a-glance panel title with the client's first name
-    // (falls back to the local part of the email, then a generic "Client").
-    const firstName = (thread.client.name || '').trim().split(/\s+/)[0]
-      || (thread.client.email || '').split('@')[0]
-      || 'Client';
+    // Personalize the at-a-glance panel title with the client's first name.
+    const firstName = (thread.client.name || '').trim().split(/\s+/)[0] || 'Client';
     const titleEl = document.getElementById('client-summary-title');
     if (titleEl) titleEl.textContent = `${firstName}'s data`;
     const replyInput = document.getElementById('coach-chat-input');

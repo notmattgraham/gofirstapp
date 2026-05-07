@@ -12,11 +12,12 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Public-shape user record returned by every friends endpoint.
+// Email is intentionally excluded — only the user themselves (via
+// /api/auth/me) and the admin (/api/admin/users) ever see it.
 function shapeUser(u) {
   return {
     id: u.id,
     name: u.name,
-    email: u.email,
     picture: u.picture,
     lastSeenAt: u.lastSeenAt,
   };
@@ -229,6 +230,81 @@ router.get('/threads', wrap(async (req, res) => {
     return tb - ta;
   });
   res.json({ threads });
+}));
+
+// GET /api/friends/:userId/glance
+// Aggregate execution data for a friend: today's exec rate + this week's
+// per-day rates. NO task contents leave the server — the response only
+// carries percentages and dates so a friend can see how disciplined the
+// other person is being without seeing what they're actually working on.
+router.get('/:userId/glance', wrap(async (req, res) => {
+  const me = req.user;
+  const friendId = req.params.userId;
+  if (friendId === me.id) return res.status(400).json({ error: 'cannot_glance_self' });
+  if (!(await areFriendsServer(me.id, friendId))) {
+    return res.status(403).json({ error: 'not_friends' });
+  }
+
+  const tasks = await prisma.task.findMany({
+    where: { userId: friendId },
+    select: {
+      scheduledDate: true, done: true, completedDates: true,
+      recurrence: true, createdAt: true,
+    },
+  });
+
+  // ---- Date helpers (UTC, matching the rest of the server) ----
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function toISO(d) { return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`; }
+  function addDaysISO(iso, n) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + n));
+    return toISO(dt);
+  }
+  const today = new Date();
+  const todayISO = toISO(today);
+
+  // Mirrors the frontend's countTaskInRange for a single day.
+  function countOnDay(t, dayISO) {
+    if (dayISO > todayISO) return { scheduled: 0, completed: 0 };
+    const createdISO = toISO(new Date(t.createdAt));
+    if (!t.recurrence) {
+      if (createdISO === dayISO) return { scheduled: 1, completed: t.done ? 1 : 0 };
+      return { scheduled: 0, completed: 0 };
+    }
+    if (createdISO > dayISO) return { scheduled: 0, completed: 0 };
+    if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return { scheduled: 0, completed: 0 };
+    const days = t.recurrence.daysOfWeek || [];
+    if (!days.length) return { scheduled: 0, completed: 0 };
+    const [y, m, d] = dayISO.split('-').map(Number);
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    if (!days.includes(dow)) return { scheduled: 0, completed: 0 };
+    const cd = t.completedDates || [];
+    if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
+    return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
+  }
+  function dayRate(dayISO) {
+    let s = 0, c = 0;
+    for (const t of tasks) { const r = countOnDay(t, dayISO); s += r.scheduled; c += r.completed; }
+    return s === 0 ? null : Math.round((c / s) * 100);
+  }
+
+  // Week (Sunday → Saturday) containing today.
+  const dow = today.getUTCDay();
+  const sunday = addDaysISO(todayISO, -dow);
+  const letters = ['S','M','T','W','T','F','S'];
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const iso = addDaysISO(sunday, i);
+    return {
+      iso,
+      letter: letters[i],
+      isToday: iso === todayISO,
+      isFuture: iso > todayISO,
+      rate: dayRate(iso),
+    };
+  });
+
+  res.json({ todayISO, todayRate: dayRate(todayISO), weekDays });
 }));
 
 module.exports = router;
