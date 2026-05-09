@@ -4372,6 +4372,25 @@
     </div>
   </div>
 
+  <!-- Push notification soft-ask. Shown once per device on app open
+       when the browser supports push and the user hasn't yet been asked.
+       Reuses the .tour-backdrop / .tour-card visual styling. Tapping
+       Enable triggers the same flow Profile → Notifications would: the
+       browser permission prompt, then the subscription POST. -->
+  <div class="tour-backdrop" id="push-prompt-backdrop" aria-hidden="true" hidden>
+    <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="push-prompt-title">
+      <div class="tour-step-eyebrow">Stay in the loop</div>
+      <div class="tour-step-title" id="push-prompt-title">Get notifications.</div>
+      <div class="tour-step-body">
+        <p>We'll only ping you for things that matter — new messages, friend requests, and updates from the team. You can turn these off in Profile any time.</p>
+      </div>
+      <div class="tour-actions">
+        <button type="button" class="tour-btn" id="push-prompt-skip">Not now</button>
+        <button type="button" class="tour-btn primary" id="push-prompt-enable">Enable</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Welcome tour modal. Lives outside .app so the backdrop covers the
        whole viewport (the .app shell is max-width-clamped on desktop).
        Content rendered into #tour-card-content by Tour.show() from a
@@ -7186,11 +7205,10 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
    The iOS-Safari hint shows when we detect mobile Safari running outside
    of an installed PWA — Apple gates web-push to standalone PWAs only.
    ============================================================ */
-(function setupPush() {
+window.PushNotifications = (function setupPush() {
   const btn      = document.getElementById('push-toggle-btn');
   const sub      = document.getElementById('push-status-sub');
   const iosHint  = document.getElementById('push-ios-hint');
-  if (!btn || !sub) return;
 
   const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
   // iOS Safari before 16.4 — and any iOS Safari that isn't running as
@@ -7200,18 +7218,29 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
   const isIosSafari = /iP(hone|ad|od)/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua);
   const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
                       || navigator.standalone === true;
+  const blockedByIos = isIosSafari && !isStandalone;
 
-  if (!supported) {
-    btn.disabled = true;
-    btn.textContent = 'Unsupported';
-    sub.textContent = 'This browser does not support push notifications.';
-    return;
+  // Profile UI bails out early if we can't possibly subscribe — but the
+  // module is still returned so the soft-ask prompt can read state.
+  if (btn && sub) {
+    if (!supported) {
+      btn.disabled = true;
+      btn.textContent = 'Unsupported';
+      sub.textContent = 'This browser does not support push notifications.';
+    } else if (blockedByIos) {
+      btn.disabled = true;
+      btn.textContent = 'Install first';
+      if (iosHint) iosHint.hidden = false;
+    }
   }
-  if (isIosSafari && !isStandalone) {
-    btn.disabled = true;
-    btn.textContent = 'Install first';
-    if (iosHint) iosHint.hidden = false;
-    return;
+  if (!supported || blockedByIos) {
+    // Return a stub so call sites don't blow up.
+    return {
+      isSupported: false,
+      canPrompt: () => false,
+      enable: async () => false,
+      refreshState: () => {},
+    };
   }
 
   // Convert a base64url VAPID public key into the Uint8Array PushManager
@@ -7323,14 +7352,36 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
     }
   }
 
-  btn.addEventListener('click', () => {
-    if (btn.textContent === 'Disable') disable();
-    else                                enable();
-  });
+  if (btn) {
+    btn.addEventListener('click', () => {
+      if (btn.textContent === 'Disable') disable();
+      else                                enable();
+    });
+  }
 
   // Sync UI state on page load — covers the case where the user enabled
   // push on another device and we want to reflect it here.
   refreshState();
+
+  // Public surface — used by the soft-ask prompt that fires on app open
+  // and any future call site that wants to programmatically subscribe.
+  return {
+    isSupported: true,
+    // True iff we could legitimately show a soft-ask: browser supports
+    // push, isn't iOS-blocked, and the user hasn't already accepted or
+    // declined the system permission prompt.
+    canPrompt() {
+      return Notification.permission === 'default';
+    },
+    // Returns true on success, false if the user denied or the
+    // subscription failed. Always safe to call — refreshState() runs
+    // afterwards so the Profile UI stays in sync.
+    async enable() {
+      await enable();
+      return Notification.permission === 'granted';
+    },
+    refreshState,
+  };
 })();
 
 // Profile → Edit display name (inline prompt for MVP; inline field later)
@@ -9485,6 +9536,12 @@ async function boot() {
   // pops in — feels less jarring than auto-showing mid-mount.
   if (window.Tour) setTimeout(() => Tour.maybeAutoShow(), 350);
 
+  // Push-notification soft-ask — fires after the tour (or immediately if
+  // the user has already dismissed the tour). The prompt's own
+  // maybeAutoShow defers itself if the tour modal is currently open, so
+  // ordering is safe even if the timer fires "early".
+  if (window.PushPrompt) setTimeout(() => PushPrompt.maybeAutoShow(), 1800);
+
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
   try {
@@ -9705,6 +9762,95 @@ window.Tour = (() => {
 
   wire();
 
+  return { open, close, maybeAutoShow };
+})();
+
+/* ============================================================
+   Push notifications soft-ask. One-time per device modal that fires on
+   app open when the browser supports push and we haven't asked yet.
+   Tapping Enable triggers the same flow as Profile → Notifications →
+   Enable. Tapping Not now records a localStorage flag so the prompt
+   doesn't reappear (the user can still flip it on from Profile).
+   Defers itself when another modal — e.g. the welcome tour — is open.
+   ============================================================ */
+window.PushPrompt = (() => {
+  const KEY = 'gofirst.pushAsked';
+  let opened = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function isVisibleModalAlreadyOpen() {
+    const tour = $('tour-backdrop');
+    if (tour && !tour.hidden && tour.classList.contains('open')) return true;
+    return false;
+  }
+
+  function markAsked() {
+    try { localStorage.setItem(KEY, '1'); } catch {}
+  }
+
+  function open() {
+    const bd = $('push-prompt-backdrop');
+    if (!bd) return;
+    opened = true;
+    bd.hidden = false;
+    bd.setAttribute('aria-hidden', 'false');
+    void bd.offsetHeight;
+    bd.classList.add('open');
+  }
+
+  function close() {
+    if (!opened) return;
+    opened = false;
+    const bd = $('push-prompt-backdrop');
+    if (!bd) return;
+    bd.classList.remove('open');
+    bd.setAttribute('aria-hidden', 'true');
+    setTimeout(() => { bd.hidden = true; }, 200);
+  }
+
+  function maybeAutoShow() {
+    // All gates must pass — otherwise silently skip and don't mark asked
+    // (so the user gets re-prompted next session if conditions change).
+    if (typeof Auth === 'undefined' || !Auth.user) return;
+    try { if (localStorage.getItem(KEY) === '1') return; } catch {}
+    if (!window.PushNotifications || !PushNotifications.isSupported) return;
+    if (!PushNotifications.canPrompt()) return;
+    if (isVisibleModalAlreadyOpen()) {
+      // Tour or similar is in front — try again after it closes.
+      setTimeout(maybeAutoShow, 1500);
+      return;
+    }
+    open();
+  }
+
+  function wire() {
+    const enableBtn = $('push-prompt-enable');
+    const skipBtn   = $('push-prompt-skip');
+    const bd        = $('push-prompt-backdrop');
+    if (!enableBtn || !skipBtn || !bd) return;
+    enableBtn.addEventListener('click', async () => {
+      enableBtn.disabled = true;
+      skipBtn.disabled   = true;
+      try {
+        if (window.PushNotifications) await PushNotifications.enable();
+      } finally {
+        markAsked();
+        enableBtn.disabled = false;
+        skipBtn.disabled   = false;
+        close();
+      }
+    });
+    skipBtn.addEventListener('click', () => { markAsked(); close(); });
+    bd.addEventListener('click', (e) => {
+      if (e.target === bd) { markAsked(); close(); }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (opened && e.key === 'Escape') { markAsked(); close(); }
+    });
+  }
+
+  wire();
   return { open, close, maybeAutoShow };
 })();
 
