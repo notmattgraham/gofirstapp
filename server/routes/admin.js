@@ -9,7 +9,7 @@ const { requireAuth } = require('../middleware');
 const { dateInTz } = require('../time');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
-const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
+// Coach status is purely DB-driven — promote via the role picker in /dev.
 
 // Wrap async handlers so any thrown error reaches Express's error middleware
 // (returning a 500) instead of becoming an unhandledRejection that crashes
@@ -20,14 +20,13 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Access gate. 404 (not 403) so the route is invisible to outsiders.
-// Allowed: the admin (DB flag or env-email fallback) OR the coach (DB flag
-// or env-email fallback). Admin and coach are distinct roles now; both can
-// hit the dashboard.
+// Allowed: the admin (DB flag or env-email fallback) OR the coach (DB
+// flag only). Admin and coach are distinct roles; both can hit /dev.
 router.use((req, res, next) => {
   if (!req.user) return res.status(404).json({ error: 'not_found' });
   const email = (req.user.email || '').toLowerCase();
   const isAdmin = !!req.user.isAdmin || email === ADMIN_EMAIL;
-  const isCoach = !!req.user.isCoach || email === COACH_EMAIL;
+  const isCoach = !!req.user.isCoach;
   if (!isAdmin && !isCoach) return res.status(404).json({ error: 'not_found' });
   next();
 });

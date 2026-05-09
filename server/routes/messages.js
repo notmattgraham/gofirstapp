@@ -6,7 +6,6 @@ const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 
-const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 const MAX_MESSAGE_LENGTH = 4000;
 
@@ -14,26 +13,25 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 const router = express.Router();
 router.use(requireAuth);
 
-// Helper: is the given user the coach?
-// DB flag wins; the env-email fallback bootstraps the very first coach
-// before anyone has been flagged via /dev.
+// Helper: is the given user the coach? Coach status is purely DB-driven —
+// flip via the role picker in /dev. No more email fallback.
 function isCoach(user) {
-  return !!user.isCoach || (user.email || '').toLowerCase() === COACH_EMAIL;
+  return !!user.isCoach;
 }
 
-// Helper: is the given user the app-wide admin? Same env-fallback pattern
-// as isCoach. Admin can DM any user without a friend relationship — used
-// both for outgoing 1:1 follow-ups and for receiving replies to broadcasts.
+// Helper: is the given user the app-wide admin? DB flag wins; env-email
+// fallback bootstraps before anyone is flagged. Admin can DM any user
+// without a friend relationship — used both for outgoing 1:1 follow-ups
+// and for receiving replies to broadcasts.
 function isAdmin(user) {
   return !!user.isAdmin || (user.email || '').toLowerCase() === ADMIN_EMAIL;
 }
 
-// Helper: fetch the coach user record. Prefer a user explicitly flagged in
-// the DB; fall back to the env-configured email.
+// Helper: fetch the coach user record (the single user with isCoach=true).
+// Returns null if no one has been promoted in /dev yet — coaching-client
+// endpoints respond with 503 coach_not_found in that case.
 async function fetchCoach() {
-  const flagged = await prisma.user.findFirst({ where: { isCoach: true } });
-  if (flagged) return flagged;
-  return prisma.user.findFirst({ where: { email: { equals: COACH_EMAIL, mode: 'insensitive' } } });
+  return prisma.user.findFirst({ where: { isCoach: true } });
 }
 
 // GET /api/messages/admin-threads — admin-only inbox listing.
@@ -431,7 +429,7 @@ router.post('/', wrap(async (req, res) => {
     if (!recipient) return res.status(404).json({ error: 'recipient_not_found' });
 
     const isCoachToClient = isCoach(me) && recipient.coachingClient;
-    const isClientToCoach = me.coachingClient && (recipient.isCoach || (recipient.email || '').toLowerCase() === COACH_EMAIL);
+    const isClientToCoach = me.coachingClient && !!recipient.isCoach;
     // Admin can DM anyone (outgoing 1:1 follow-ups), and anyone can DM the
     // admin (replying to a broadcast). No friend relationship required.
     const isAdminPair = isAdmin(me) || isAdmin(recipient);
