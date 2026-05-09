@@ -3300,6 +3300,19 @@
     .onb-step-5 .onb-btn.commit { animation: none; }
   }
 
+  /* Same kill switch, on-demand: render() adds .no-anim to the content
+     wrapper for intra-step re-renders (e.g. tapping a preset, "+ Add
+     another") so the cascade only plays when the user actually moves
+     to a new step. The class is removed before the next render. */
+  .onboarding-content.no-anim > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .onboarding-content.no-anim.onb-step-5 .onb-btn.commit {
+    animation: none !important;
+  }
+
   /* Lock-time picker on onboarding step 1. Each preset is a stacked
      label/sub button; the active one gets the accent ring. The custom
      branch reveals an HH:MM <input type="time"> below the grid. */
@@ -10624,12 +10637,16 @@ window.Onboarding = (() => {
 
   function nonEmpty(arr) { return arr.filter((s) => s && s.trim().length > 0); }
 
-  function render() {
+  function render(opts) {
     const c = $('onb-content');
     if (!c) return;
     // Class drives the per-step entrance animations defined in CSS —
     // each step picks up its own cascade timing via .onb-step-{N}.
-    c.className = `onboarding-content onb-step-${STATE.step}`;
+    // `skipAnim: true` from intra-step re-renders (preset toggle,
+    // "+ Add another") suppresses the cascade so it only plays on
+    // actual step transitions.
+    const skipAnim = !!(opts && opts.skipAnim);
+    c.className = `onboarding-content onb-step-${STATE.step}${skipAnim ? ' no-anim' : ''}`;
     c.innerHTML = '';
     if      (STATE.step === 0) c.innerHTML = stepWelcome();
     else if (STATE.step === 1) c.innerHTML = stepHowItWorks();
@@ -10865,20 +10882,20 @@ window.Onboarding = (() => {
         } else if (action === 'add-habit') {
           pullInputsIntoState();
           if (STATE.habits.length < MAX_HABITS) STATE.habits.push('');
-          render();
+          render({ skipAnim: true });
         } else if (action === 'add-task') {
           pullInputsIntoState();
           if (STATE.tasks.length < MAX_TASKS) STATE.tasks.push('');
-          render();
+          render({ skipAnim: true });
         } else if (action === 'lock-set') {
           STATE.lockTime = btn.dataset.value || '00:00';
-          render();
+          render({ skipAnim: true });
         } else if (action === 'lock-custom') {
           // If they tap Custom while one of the fixed presets is active,
           // seed the custom value to a sensible "in-between" time so the
           // time input doesn't snap to a default they didn't intend.
           if (['00:00','03:00','08:00'].includes(STATE.lockTime)) STATE.lockTime = '22:00';
-          render();
+          render({ skipAnim: true });
         } else if (action === 'commit') {
           await commit();
         }
