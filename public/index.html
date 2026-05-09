@@ -3180,6 +3180,48 @@
     margin-top: 4px;
   }
 
+  /* "How it works" step — three numbered rules introducing the
+     plan/lock/execute cycle. Standalone styles so the row layout
+     doesn't compete with the input list on the data-entry steps. */
+  .onb-explain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 4px;
+  }
+  .onb-explain-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .onb-explain-num {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 800;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .onb-explain-body { flex: 1; min-width: 0; }
+  .onb-explain-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .onb-explain-sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.45;
+    margin-top: 4px;
+  }
+
   /* ── Onboarding step entrance animations ─────────────────────
      Every render of #onb-content replaces its children, and the new
      elements pick up these rules — so each step plays its own cascade
@@ -3225,7 +3267,7 @@
      with a soft glowing halo. Multiple animations layer cleanly here:
      the fade-up runs once (inherited from the parent .onb-actions
      wrapper), and the pulse loops indefinitely on the button itself. */
-  .onb-step-4 .onb-btn.commit {
+  .onb-step-5 .onb-btn.commit {
     animation: onb-commit-pulse 1.8s 1.2s ease-in-out infinite;
     box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
   }
@@ -3233,11 +3275,11 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
     50%      { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.07); }
   }
-  [data-theme="light"] .onb-step-4 .onb-btn.commit {
+  [data-theme="light"] .onb-step-5 .onb-btn.commit {
     animation-name: onb-commit-pulse-light;
   }
   @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) .onb-step-4 .onb-btn.commit {
+    :root:not([data-theme="dark"]) .onb-step-5 .onb-btn.commit {
       animation-name: onb-commit-pulse-light;
     }
   }
@@ -3255,7 +3297,7 @@
       transform: none;
     }
     .onb-step-0 > .onb-h1 { transform: none; }
-    .onb-step-4 .onb-btn.commit { animation: none; }
+    .onb-step-5 .onb-btn.commit { animation: none; }
   }
 
   /* Lock-time picker on onboarding step 1. Each preset is a stacked
@@ -10540,7 +10582,7 @@ window.Onboarding = (() => {
   const MAX_TASKS  = 30;
 
   const STATE = {
-    step: 0,           // 0=welcome, 1=lock-time, 2=habits, 3=tasks, 4=commit
+    step: 0,           // 0=welcome, 1=how-it-works, 2=lock-time, 3=habits, 4=tasks, 5=commit
     lockTime: '00:00', // HH:MM, 24-hour. Day-end / lock instant.
     habits: ['', '', ''],
     tasks: ['', '', ''],
@@ -10574,7 +10616,7 @@ window.Onboarding = (() => {
 
   function pullInputsIntoState() {
     // Collect the current input values so they survive a step change.
-    const list = STATE.step === 2 ? 'habits' : STATE.step === 3 ? 'tasks' : null;
+    const list = STATE.step === 3 ? 'habits' : STATE.step === 4 ? 'tasks' : null;
     if (!list) return;
     const inputs = $('onb-content').querySelectorAll('.onb-input');
     STATE[list] = [...inputs].map((el) => el.value);
@@ -10590,14 +10632,15 @@ window.Onboarding = (() => {
     c.className = `onboarding-content onb-step-${STATE.step}`;
     c.innerHTML = '';
     if      (STATE.step === 0) c.innerHTML = stepWelcome();
-    else if (STATE.step === 1) c.innerHTML = stepLockTime();
-    else if (STATE.step === 2) c.innerHTML = stepHabits();
-    else if (STATE.step === 3) c.innerHTML = stepTasks();
-    else if (STATE.step === 4) c.innerHTML = stepCommit();
+    else if (STATE.step === 1) c.innerHTML = stepHowItWorks();
+    else if (STATE.step === 2) c.innerHTML = stepLockTime();
+    else if (STATE.step === 3) c.innerHTML = stepHabits();
+    else if (STATE.step === 4) c.innerHTML = stepTasks();
+    else if (STATE.step === 5) c.innerHTML = stepCommit();
     wireStep();
     // Auto-focus the first empty input on data-entry steps so the
     // keyboard pops on mobile without a second tap.
-    if (STATE.step === 2 || STATE.step === 3) {
+    if (STATE.step === 3 || STATE.step === 4) {
       const inputs = c.querySelectorAll('.onb-input');
       const target = [...inputs].find((el) => !el.value.trim()) || inputs[0];
       if (target) target.focus({ preventScroll: true });
@@ -10618,6 +10661,40 @@ window.Onboarding = (() => {
       </p>
       <div class="onb-actions">
         <button class="onb-btn primary" data-action="next">Begin</button>
+      </div>
+    `;
+  }
+
+  function stepHowItWorks() {
+    return `
+      <div class="onb-eyebrow">How it works</div>
+      <h1 class="onb-h1">Plan, lock, execute.</h1>
+      <div class="onb-explain-list">
+        <div class="onb-explain-row">
+          <div class="onb-explain-num">1</div>
+          <div class="onb-explain-body">
+            <div class="onb-explain-title">Each day, plan the next.</div>
+            <div class="onb-explain-sub">Before your day ends, set tomorrow's list.</div>
+          </div>
+        </div>
+        <div class="onb-explain-row">
+          <div class="onb-explain-num">2</div>
+          <div class="onb-explain-body">
+            <div class="onb-explain-title">Commit. The list locks.</div>
+            <div class="onb-explain-sub">No additions. No deletions. No excuses.</div>
+          </div>
+        </div>
+        <div class="onb-explain-row">
+          <div class="onb-explain-num">3</div>
+          <div class="onb-explain-body">
+            <div class="onb-explain-title">Execute before your day ends.</div>
+            <div class="onb-explain-sub">What you finish counts. What you don't, doesn't.</div>
+          </div>
+        </div>
+      </div>
+      <div class="onb-actions">
+        <button class="onb-btn ghost" data-action="back">Back</button>
+        <button class="onb-btn primary" data-action="next">I get it</button>
       </div>
     `;
   }
@@ -10778,7 +10855,7 @@ window.Onboarding = (() => {
         const action = btn.dataset.action;
         if (action === 'next') {
           pullInputsIntoState();
-          if (STATE.step === 3 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
+          if (STATE.step === 4 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
           STATE.step += 1;
           render();
         } else if (action === 'back') {
@@ -10821,7 +10898,7 @@ window.Onboarding = (() => {
     // STATE.tasks only refreshes when an action button is tapped, so the
     // button stays disabled / shows "Add N more" even after the user has
     // typed in the third task.
-    if (STATE.step === 3) {
+    if (STATE.step === 4) {
       const inputs = c.querySelectorAll('.onb-input');
       const nextBtn = c.querySelector('[data-action="next"]');
       const sync = () => {
