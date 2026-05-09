@@ -63,6 +63,32 @@ model User {
   receivedMessages Message[] @relation("ReceivedMessages")
   sentFriendships     Friendship[] @relation("SentFriendships")
   receivedFriendships Friendship[] @relation("ReceivedFriendships")
+  pushSubscriptions   PushSubscription[]
+}
+
+// Web-push subscription. One row per device the user has enabled
+// notifications on (so phone + laptop = 2 rows). Endpoint is the unique
+// per-browser push URL; p256dh + auth are the encryption keys we encode
+// each push payload against. Rows are removed when web-push reports a
+// 404/410 ("subscription gone") on a send attempt.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+
+  // What kind of device label the client sent (e.g. user-agent shortform).
+  // Diagnostic only — handy when the user has multiple subs and wants to
+  // know which is which.
+  label     String?
+
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime @default(now())
+
+  @@index([userId])
 }
 
 // In-app social graph. A row exists from the requester (fromUserId) to the

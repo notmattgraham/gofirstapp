@@ -496,6 +496,19 @@
       </div>
     </div>
 
+    <div class="section-title" id="push-broadcast-title" hidden>Push notification</div>
+    <div class="card broadcast" id="push-broadcast-card" hidden>
+      <input id="push-broadcast-title-input" type="text" placeholder="Title (shown bold in the OS notification)" maxlength="120"
+             style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);border-radius:10px;font-size:14px;font-family:inherit;" />
+      <textarea id="push-broadcast-body" placeholder="Body — keep it short. Shows below the title." maxlength="500"></textarea>
+      <input id="push-broadcast-url" type="text" placeholder="Open URL on tap (default: /)" maxlength="200"
+             style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);border-radius:10px;font-size:14px;font-family:inherit;" />
+      <div class="row">
+        <div class="meta" id="push-broadcast-meta">Sends an OS-level notification to every user who has push enabled. No in-app trail.</div>
+        <button class="btn primary" id="push-broadcast-send">Send push</button>
+      </div>
+    </div>
+
     <div class="section-title">All users</div>
     <div class="filter-row">
       <input id="user-filter" type="search" placeholder="Search by name or email…" autocomplete="off" />
@@ -614,7 +627,10 @@
     if (amAdmin) {
       $('broadcast-title').hidden = false;
       $('broadcast-card').hidden = false;
+      $('push-broadcast-title').hidden = false;
+      $('push-broadcast-card').hidden = false;
       wireBroadcast();
+      wirePushBroadcast();
     }
 
     // Each section loads independently — one slow endpoint must not block
@@ -852,6 +868,50 @@
       } finally {
         send.disabled = false;
         ta.disabled = false;
+      }
+    });
+  }
+
+  // --- Push broadcast ----------------------------------------------
+  function wirePushBroadcast() {
+    const send  = $('push-broadcast-send');
+    const titleI = $('push-broadcast-title-input');
+    const bodyI  = $('push-broadcast-body');
+    const urlI   = $('push-broadcast-url');
+    const meta   = $('push-broadcast-meta');
+    send.addEventListener('click', async () => {
+      const title = (titleI.value || '').trim();
+      const body  = (bodyI.value || '').trim();
+      const url   = (urlI.value || '').trim();
+      if (!title) { titleI.focus(); return; }
+      if (!confirm(`Send this push to every subscribed user?\n\n${title}\n${body.slice(0, 240)}${body.length > 240 ? '…' : ''}`)) return;
+      send.disabled = true;
+      [titleI, bodyI, urlI].forEach(el => el.disabled = true);
+      meta.className = 'meta';
+      meta.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/admin/push-broadcast', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, body, url: url || undefined }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          if (data.error === 'push_not_configured') throw new Error('Push not configured (set VAPID env vars)');
+          throw new Error(data.error || `status ${r.status}`);
+        }
+        meta.className = 'meta ok';
+        meta.textContent = `Audience ${data.audience} · sent ${data.sent}` +
+          (data.failed ? ` · failed ${data.failed}` : '') +
+          (data.removed ? ` · removed ${data.removed}` : '');
+        titleI.value = ''; bodyI.value = ''; urlI.value = '';
+      } catch (err) {
+        meta.className = 'meta err';
+        meta.textContent = 'Failed: ' + (err.message || err);
+      } finally {
+        send.disabled = false;
+        [titleI, bodyI, urlI].forEach(el => el.disabled = false);
       }
     });
   }
