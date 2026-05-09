@@ -3180,6 +3180,83 @@
     margin-top: 4px;
   }
 
+  /* ── Onboarding step entrance animations ─────────────────────
+     Every render of #onb-content replaces its children, and the new
+     elements pick up these rules — so each step plays its own cascade
+     fresh. The default is a 0.5s fade-up with a per-position stagger;
+     the welcome step (onb-step-0) gets a slower, more cinematic timing
+     and a subtle scale on the title. The commit step's "I commit"
+     button picks up an attention pulse once the cascade finishes. */
+  .onboarding-content > * {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: onb-step-fade-up 0.5s cubic-bezier(0.22, 0.9, 0.4, 1) forwards;
+  }
+  .onboarding-content > *:nth-child(1) { animation-delay: 0.05s; }
+  .onboarding-content > *:nth-child(2) { animation-delay: 0.15s; }
+  .onboarding-content > *:nth-child(3) { animation-delay: 0.25s; }
+  .onboarding-content > *:nth-child(4) { animation-delay: 0.35s; }
+  .onboarding-content > *:nth-child(5) { animation-delay: 0.45s; }
+  .onboarding-content > *:nth-child(6) { animation-delay: 0.55s; }
+  .onboarding-content > *:nth-child(7) { animation-delay: 0.65s; }
+  .onboarding-content > *:nth-child(8) { animation-delay: 0.75s; }
+  @keyframes onb-step-fade-up {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Welcome — slower, weightier. Title gets its own keyframe so the
+     subtle scale lands on a clean 1.0 instead of jumping. */
+  .onb-step-0 > * { animation-duration: 0.7s; }
+  .onb-step-0 > *:nth-child(1) { animation-delay: 0.20s; }
+  .onb-step-0 > *:nth-child(2) { animation-delay: 0.50s; }
+  .onb-step-0 > *:nth-child(3) { animation-delay: 0.95s; }
+  .onb-step-0 > *:nth-child(4) { animation-delay: 1.25s; }
+  .onb-step-0 > *:nth-child(5) { animation-delay: 1.55s; }
+  .onb-step-0 > .onb-h1 {
+    transform: translateY(14px) scale(0.96);
+    animation-name: onb-step-rise;
+  }
+  @keyframes onb-step-rise {
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Commit step — once the summary settles, draw the eye to the button
+     with a soft glowing halo. Multiple animations layer cleanly here:
+     the fade-up runs once (inherited from the parent .onb-actions
+     wrapper), and the pulse loops indefinitely on the button itself. */
+  .onb-step-3 .onb-btn.commit {
+    animation: onb-commit-pulse 1.8s 1.2s ease-in-out infinite;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+  @keyframes onb-commit-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    50%      { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.07); }
+  }
+  [data-theme="light"] .onb-step-3 .onb-btn.commit {
+    animation-name: onb-commit-pulse-light;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .onb-step-3 .onb-btn.commit {
+      animation-name: onb-commit-pulse-light;
+    }
+  }
+  @keyframes onb-commit-pulse-light {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+    50%      { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0.07); }
+  }
+
+  /* Respect reduced-motion preference — kill every onboarding animation
+     so the steps just appear in place. */
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-content > * {
+      animation: none !important;
+      opacity: 1;
+      transform: none;
+    }
+    .onb-step-0 > .onb-h1 { transform: none; }
+    .onb-step-3 .onb-btn.commit { animation: none; }
+  }
+
   /* ── Commit ceremony ─────────────────────────────────────────
      Plays for ~2.4s after a successful commit, then the page
      reloads into the user's fresh task list. The pop + check-draw
@@ -10391,6 +10468,9 @@ window.Onboarding = (() => {
   function render() {
     const c = $('onb-content');
     if (!c) return;
+    // Class drives the per-step entrance animations defined in CSS —
+    // each step picks up its own cascade timing via .onb-step-{N}.
+    c.className = `onboarding-content onb-step-${STATE.step}`;
     c.innerHTML = '';
     if (STATE.step === 0) c.innerHTML = stepWelcome();
     else if (STATE.step === 1) c.innerHTML = stepHabits();
