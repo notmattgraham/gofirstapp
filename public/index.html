@@ -2410,6 +2410,10 @@
     height: 100%;
     border-radius: 50%;
     object-fit: cover;
+    /* Source is portrait (904×1266) and the face sits in the upper third
+       of the frame. Anchoring at 25% pulls the face down toward the
+       circle's center and keeps the top of the head from getting clipped. */
+    object-position: 50% 25%;
     display: block;
   }
   .chat-promo-icon svg {
