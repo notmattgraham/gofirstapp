@@ -10518,10 +10518,6 @@ window.Onboarding = (() => {
         becomes a streak — every day you don't fall back to it counts
         toward something.
       </p>
-      <p class="onb-body" style="font-size:14px;">
-        Leave blank if there's nothing to name yet — but be honest with
-        yourself first.
-      </p>
       <div class="onb-input-list">${inputs}</div>
       <button type="button" class="onb-add" data-action="add-habit"
               ${STATE.habits.length >= MAX_HABITS ? 'disabled' : ''}>
@@ -10547,8 +10543,7 @@ window.Onboarding = (() => {
       <h1 class="onb-h1">What can you do today?</h1>
       <p class="onb-body">
         At least <b>three things</b> you can do today that move you closer
-        to where you want to be. These become your first tasks. They
-        <b>lock at midnight</b>.
+        to where you want to be. These become your first tasks.
       </p>
       <div class="onb-input-list">${inputs}</div>
       <button type="button" class="onb-add" data-action="add-task"
