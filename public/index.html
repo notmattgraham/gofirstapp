@@ -3086,6 +3086,264 @@
     padding-bottom: calc(var(--safe-bottom) + 12px);
   }
 
+  /* ── Stories row ────────────────────────────────────────────
+     Instagram-stories-style horizontal carousel at the top of the
+     Social inbox. Each "story" is a friend's avatar wrapped in a
+     conic-gradient ring whose fill = today's exec rate. Tap → bottom
+     sheet with weekly breakdown + Send Message. The trailing tile is
+     a dashed-circle "+" that proxies the header's add-friend button. */
+  .stories-row {
+    flex-shrink: 0;
+    display: flex;
+    gap: 14px;
+    padding: 14px 16px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .stories-row::-webkit-scrollbar { display: none; }
+  .stories-row[hidden] { display: none; }
+  .story {
+    flex: 0 0 auto;
+    width: 68px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .story-ring {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    /* Painted by paintTinyRing() — defaults to an empty surface-2 ring. */
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-ring::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  .story-avatar {
+    position: relative;
+    width: calc(100% - 10px);
+    height: calc(100% - 10px);
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .story-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .story-name {
+    font-size: 11px;
+    color: var(--text-dim);
+    max-width: 68px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .story:active .story-ring { transform: scale(0.96); transition: transform 0.08s; }
+  /* Trailing "+ add friend" chip. Same footprint as a story but with a
+     dashed border and a plus glyph instead of a photo. */
+  .story-add .story-ring {
+    background: transparent;
+  }
+  .story-add .story-ring::before {
+    inset: 0;
+    border: 1.5px dashed var(--border);
+    background: var(--surface);
+  }
+  .story-add .story-avatar {
+    background: transparent;
+    color: var(--text-dim);
+  }
+  .story-add .story-avatar svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  /* ── Story peek bottom sheet ────────────────────────────────
+     Slides up when a story is tapped. Backdrop dims the rest of the
+     app; the card hosts a big rate ring, a Sun-Sat week bar, and a
+     Send-message CTA that opens the existing DM overlay. */
+  .story-peek {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .story-peek[hidden] { display: none; }
+  .story-peek-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    pointer-events: auto;
+  }
+  .story-peek.open .story-peek-backdrop { opacity: 1; }
+  .story-peek-card {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+    padding: 8px 22px calc(20px + var(--safe-bottom));
+    transform: translateY(100%);
+    transition: transform 0.26s cubic-bezier(0.22, 0.9, 0.28, 1);
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .story-peek.open .story-peek-card { transform: translateY(0); }
+  .story-peek-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-2);
+    margin: 6px auto 8px;
+  }
+  .story-peek-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .story-peek-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .story-peek-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .story-peek-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .story-peek-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .story-peek-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 0;
+  }
+  .story-peek-ring {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .story-peek-ring::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .story-peek-ring span {
+    position: relative;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .story-peek-stats-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .story-peek-stats-meta .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    font-weight: 700;
+  }
+  .story-peek-stats-meta .value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .story-peek-week-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .story-peek-actions {
+    display: flex;
+    gap: 10px;
+  }
+  .story-peek-actions .btn {
+    flex: 1;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .story-peek-actions .btn:hover { background: var(--accent-hover); }
+  .story-peek-actions .btn.ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
   /* Friend-row meta: small ring with today's exec rate + streak text. */
   .thread-day-ring {
     position: relative;
@@ -3581,6 +3839,10 @@
               <button data-add-action="invite">Invite friends</button>
             </div>
           </div>
+          <!-- Stories row — friends' avatars with today-rate rings.
+               Hidden when the user has zero friends; populated by
+               renderStories() from friendThreads. -->
+          <div class="stories-row" id="stories-row" hidden></div>
           <div id="inbox-pending-section" hidden>
             <div class="inbox-section-label">Friend requests</div>
             <ul class="chat-inbox-list" id="inbox-pending-list"></ul>
@@ -3891,15 +4153,20 @@
         </svg>
         Analytics
       </button>
-      <!-- Chat tab — always visible; content per role (coach/client/paywall). -->
+      <!-- Social tab — always visible; content per role (coach/client/paywall).
+           data-tab and id stay "chat" so internal selectors keep working;
+           only the visible label and icon change. -->
       <button class="tab" data-tab="chat" id="tab-chat">
         <span class="tab-icon-wrap">
           <svg viewBox="0 0 24 24">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <circle cx="9" cy="8" r="3.2"/>
+            <path d="M2.5 19a6.5 6.5 0 0 1 13 0"/>
+            <circle cx="17" cy="9.5" r="2.6"/>
+            <path d="M14.5 19a4.5 4.5 0 0 1 7-3.7"/>
           </svg>
           <span class="tab-badge" id="chat-badge" hidden></span>
         </span>
-        Chat
+        Social
       </button>
       <button class="tab" data-tab="profile">
         <span class="tab-icon-wrap">
@@ -4044,6 +4311,44 @@
         </div>
         <ul class="chat-inbox-list" id="friend-search-results"></ul>
         <div class="friend-search-hint" id="friend-search-hint">Type at least 2 characters.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Story peek bottom sheet — shown when a friend's story is tapped.
+       Lives outside .app so the backdrop covers the whole viewport. The
+       inner card holds the friend's name, today's rate ring, this week's
+       breakdown, and a "Send message" CTA that opens the existing DM
+       overlay for that peer. Populated by Stories.openPeek(). -->
+  <div class="story-peek" id="story-peek" hidden aria-hidden="true">
+    <div class="story-peek-backdrop" data-story-close></div>
+    <div class="story-peek-card" role="dialog" aria-modal="true" aria-labelledby="story-peek-name">
+      <div class="story-peek-handle"></div>
+      <div class="story-peek-head">
+        <div class="story-peek-avatar" id="story-peek-avatar">?</div>
+        <div>
+          <div class="story-peek-name" id="story-peek-name">—</div>
+          <div class="story-peek-sub" id="story-peek-sub"></div>
+        </div>
+      </div>
+      <div class="story-peek-stats">
+        <div class="story-peek-ring" id="story-peek-ring"><span id="story-peek-pct">—</span></div>
+        <div class="story-peek-stats-meta">
+          <div>
+            <div class="label">Today's rate</div>
+            <div class="value" id="story-peek-rate-label">—</div>
+          </div>
+          <div>
+            <div class="label">Execution streak</div>
+            <div class="value" id="story-peek-streak">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="story-peek-week-label">This week</div>
+      <div class="week-bar" id="story-peek-week"></div>
+      <div class="story-peek-actions">
+        <button type="button" class="btn ghost" data-story-close>Close</button>
+        <button type="button" class="btn" id="story-peek-send">Send message</button>
       </div>
     </div>
   </div>
@@ -7853,7 +8158,169 @@ const Coaching = (() => {
     paintThreadRowRings(list);
     const hasContent = !!html;
     if (empty) empty.hidden = hasContent;
+    renderStories();
   }
+
+  /* Stories row — Instagram-style horizontal carousel of friend avatars
+     wrapped in a today-rate ring. Hidden when the user has zero friends.
+     The trailing "+" tile delegates to the existing add-friend button. */
+  function renderStories() {
+    const row = document.getElementById('stories-row');
+    if (!row) return;
+    if (!friendThreads.length) { row.hidden = true; row.innerHTML = ''; return; }
+    row.hidden = false;
+    // Match the friends-inbox order (server-sorted by latest activity).
+    const stories = friendThreads.map((t) => {
+      const u = t.user;
+      const fname = (u.name || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+      const rate  = (typeof t.todayRate === 'number') ? t.todayRate : null;
+      const rateAttr = rate == null ? '' : String(rate);
+      return `<div class="story" data-story-peer="${esc(u.id)}" data-today-rate="${rateAttr}">
+        <div class="story-ring">
+          <div class="story-avatar">${avatarHtml(u, fname)}</div>
+        </div>
+        <div class="story-name">${esc(fname)}</div>
+      </div>`;
+    });
+    // Trailing add-friend chip — fires the same dropdown the header + uses.
+    stories.push(`<div class="story story-add" data-story-add aria-label="Add friend">
+      <div class="story-ring">
+        <div class="story-avatar">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </div>
+      <div class="story-name">Add</div>
+    </div>`);
+    row.innerHTML = stories.join('');
+    // Paint each ring from its data-today-rate (null → empty surface ring).
+    row.querySelectorAll('.story:not(.story-add) .story-ring').forEach((ring) => {
+      const story = ring.closest('.story');
+      const raw = story && story.dataset.todayRate;
+      paintTinyRing(ring, raw === '' || raw == null ? null : Number(raw));
+    });
+  }
+
+  /* Story peek bottom sheet — opens when a friend's story is tapped.
+     Reuses the /api/friends/:id/glance endpoint that already powers the
+     in-DM "Friend's data" panel. "Send message" closes the sheet and
+     hands off to openDm() for the rest of the conversation. */
+  let storyPeekPeer = null;
+  let _storyPeekRaf = null;
+
+  async function openStoryPeek(peer) {
+    storyPeekPeer = peer;
+    const sheet = document.getElementById('story-peek');
+    if (!sheet) return;
+    // Seed the sheet with what we already know from the inbox row so it
+    // never opens completely blank — the live glance fetch then refines.
+    const fname = (peer.name || 'Friend').trim().split(/\s+/)[0] || 'Friend';
+    document.getElementById('story-peek-avatar').innerHTML = avatarHtml(peer, fname);
+    document.getElementById('story-peek-name').textContent = peer.name || 'Friend';
+    document.getElementById('story-peek-sub').textContent = presenceText(peer.lastSeenAt);
+    document.getElementById('story-peek-rate-label').textContent = '—';
+    document.getElementById('story-peek-streak').textContent = '—';
+    document.getElementById('story-peek-pct').textContent = '—';
+    const ring = document.getElementById('story-peek-ring');
+    ring.style.background = `conic-gradient(var(--surface-2) 0deg, var(--surface-2) 0deg)`;
+    document.getElementById('story-peek-week').innerHTML = '';
+
+    sheet.hidden = false;
+    sheet.setAttribute('aria-hidden', 'false');
+    void sheet.offsetHeight; // force reflow so the slide-up transition fires
+    sheet.classList.add('open');
+
+    // Live data — week breakdown + today's rate + execution streak.
+    let data;
+    try { data = await api('GET', `/api/friends/${peer.id}/glance`); }
+    catch (e) { console.warn('[story peek glance]', e); return; }
+    if (storyPeekPeer !== peer) return; // user closed/switched mid-fetch
+
+    const heroRate = (data && data.todayRate != null) ? data.todayRate : null;
+    document.getElementById('story-peek-rate-label').textContent =
+      heroRate == null ? 'Nothing today' : (heroRate + '%');
+    document.getElementById('story-peek-streak').textContent =
+      `${data.executionStreak || 0} day${data.executionStreak === 1 ? '' : 's'}`;
+
+    const days = (data && data.weekDays) || [];
+    const weekEl = document.getElementById('story-peek-week');
+    weekEl.innerHTML = days.map(d => {
+      const cls = `week-day${d.isToday ? ' is-today' : ''}${d.isFuture ? ' is-future' : ''}`;
+      const ringAttr = d.rate == null ? '' : String(d.rate);
+      return `<div class="${cls}">
+        <div class="week-day-ring" data-animate-ring="${ringAttr}">
+          <div class="week-day-letter">${d.letter}</div>
+        </div>
+      </div>`;
+    }).join('');
+    weekEl.querySelectorAll('.week-day-ring').forEach(r => paintTinyRing(r, null));
+
+    // Animate the hero ring + percent + week rings on a fresh frame.
+    if (_storyPeekRaf) cancelAnimationFrame(_storyPeekRaf);
+    const heroFinal = heroRate == null ? 0 : heroRate;
+    const pctEl = document.getElementById('story-peek-pct');
+    const ringEls = [...weekEl.querySelectorAll('[data-animate-ring]')];
+    const start = performance.now();
+    const dur = 800;
+    function step(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const r = heroFinal * eased;
+      ring.style.background = `conic-gradient(${rateColor(r)} ${r * 3.6}deg, var(--surface-2) 0deg)`;
+      pctEl.textContent = heroRate == null ? '—' : (Math.round(r) + '%');
+      ringEls.forEach(el => {
+        const raw = el.dataset.animateRing;
+        if (raw === '' || raw == null) return;
+        paintTinyRing(el, Number(raw) * eased);
+      });
+      if (t < 1) _storyPeekRaf = requestAnimationFrame(step);
+      else _storyPeekRaf = null;
+    }
+    _storyPeekRaf = requestAnimationFrame(step);
+  }
+
+  function closeStoryPeek() {
+    const sheet = document.getElementById('story-peek');
+    if (!sheet || sheet.hidden) return;
+    sheet.classList.remove('open');
+    sheet.setAttribute('aria-hidden', 'true');
+    setTimeout(() => { sheet.hidden = true; storyPeekPeer = null; }, 240);
+  }
+
+  // Wire stories row + peek sheet once. Click delegation on the row so we
+  // don't have to rebind on every renderStories() call.
+  (function wireStories() {
+    const row = document.getElementById('stories-row');
+    if (row) {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-story-add]')) {
+          // Same dropdown the header + opens.
+          const headerAdd = document.getElementById('inbox-add-friend');
+          if (headerAdd) headerAdd.click();
+          return;
+        }
+        const story = e.target.closest('.story[data-story-peer]');
+        if (!story) return;
+        const peerId = story.dataset.storyPeer;
+        const t = friendThreads.find(x => x.user.id === peerId);
+        if (t) openStoryPeek(t.user);
+      });
+    }
+    const sheet = document.getElementById('story-peek');
+    if (sheet) {
+      sheet.addEventListener('click', (e) => {
+        if (e.target.closest('[data-story-close]')) closeStoryPeek();
+      });
+      const send = document.getElementById('story-peek-send');
+      if (send) send.addEventListener('click', () => {
+        const peer = storyPeekPeer;
+        closeStoryPeek();
+        if (peer) openDm(peer.id, peer);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !sheet.hidden) closeStoryPeek();
+      });
+    }
+  })();
 
   function renderCoachFriendsPane() {
     const list = document.getElementById('coach-friends-list');
