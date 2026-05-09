@@ -2990,6 +2990,182 @@
     opacity: 0.5;
   }
 
+  /* ── Commitment onboarding ───────────────────────────────────
+     Full-viewport takeover for first-login users. Replaces the
+     explanatory tabs tour (which still exists, replayable from
+     Profile) with a 4-step ritual: opener → bad habits → today's
+     tasks → final commit. Visual tone is heavier than the regular
+     app — bigger type, more breathing room, single CTA per step.
+     Lives outside .app so it sits on top of the entire SPA shell. */
+  .onboarding {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: var(--bg);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--safe-top) + 24px) 26px calc(var(--safe-bottom) + 24px);
+  }
+  .onboarding[hidden] { display: none; }
+  .onboarding-content {
+    flex: 1;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px 0;
+  }
+  .onb-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .onb-h1 {
+    font-size: clamp(28px, 7vw, 38px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+    margin: 0;
+  }
+  .onb-body {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin: 0;
+  }
+  .onb-body b { color: var(--text); font-weight: 700; }
+  .onb-input-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .onb-input {
+    width: 100%;
+    height: 52px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 14px;
+    font-size: 16px;
+    font-family: inherit;
+  }
+  .onb-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .onb-add {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    padding: 6px 0;
+    margin-top: 4px;
+    cursor: pointer;
+    align-self: flex-start;
+  }
+  .onb-add:hover { color: var(--text); }
+  .onb-add:disabled { opacity: 0.4; cursor: default; }
+  .onb-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .onb-btn {
+    appearance: none;
+    border: 0;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    height: 56px;
+    padding: 0 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.08s ease;
+  }
+  .onb-btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    flex: 1;
+  }
+  .onb-btn.primary:hover { background: var(--accent-hover); }
+  .onb-btn.primary:disabled { opacity: 0.4; cursor: default; }
+  .onb-btn.ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 0 22px;
+  }
+  .onb-btn.ghost:hover { color: var(--text); border-color: var(--text-dim); }
+  .onb-btn.commit {
+    background: var(--text);
+    color: var(--bg);
+    flex: 1;
+    letter-spacing: 0.01em;
+  }
+  .onb-btn.commit:active { transform: scale(0.98); }
+  .onb-btn.commit:disabled { opacity: 0.5; cursor: default; }
+  .onb-summary-section { margin-top: 4px; }
+  .onb-summary-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .onb-summary-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .onb-summary-list li {
+    font-size: 16px;
+    color: var(--text);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .onb-summary-list li:last-child { border-bottom: none; }
+  .onb-summary-list li::before {
+    content: "—";
+    color: var(--text-faint);
+    margin-right: 12px;
+  }
+  .onb-summary-list.empty {
+    font-size: 14px;
+    color: var(--text-faint);
+    font-style: italic;
+  }
+  .onb-fineprint {
+    font-size: 13px;
+    color: var(--text-faint);
+    line-height: 1.5;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .onb-error {
+    color: var(--danger);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
   /* ── Welcome tour ─────────────────────────────────────────────
      5-card carousel shown once on first login (gated by `tutorialSeen`
      on the user record). Centered modal with a tinted backdrop, dot
@@ -4498,6 +4674,15 @@
         <button type="button" class="btn" id="story-peek-send">Send message</button>
       </div>
     </div>
+  </div>
+
+  <!-- Commitment-onboarding takeover. Fires once for accounts with no
+       prior tasks/streaks. The 4-step flow is rendered into
+       #onb-content by the Onboarding module — DOM swaps per step rather
+       than slide animations to keep keyboard focus and viewport math
+       simple on mobile. -->
+  <div class="onboarding" id="onboarding" hidden aria-hidden="true">
+    <div class="onboarding-content" id="onb-content"></div>
   </div>
 
   <!-- Push notification soft-ask. Shown once per device on app open
@@ -9802,9 +9987,14 @@ async function boot() {
   setTopAction();
   render(Store.get()); // instant render from cache (or empty on first boot)
 
-  // First-login welcome tour. No-op for users who've already seen it.
-  // Defer slightly so the tab/render finishes painting before the modal
-  // pops in — feels less jarring than auto-showing mid-mount.
+  // Commitment-onboarding takeover — fires immediately for accounts that
+  // haven't been through the ritual yet. Highest priority of the
+  // first-login modals; tour and push-prompt defer behind it.
+  if (window.Onboarding) Onboarding.maybeAutoShow();
+
+  // First-login welcome tour. No-op for users who've already seen it
+  // (and the commitment endpoint sets tutorialSeen=true on success, so
+  // freshly-onboarded users skip the tabs tour entirely).
   if (window.Tour) setTimeout(() => Tour.maybeAutoShow(), 350);
 
   // Push-notification soft-ask — fires after the tour (or immediately if
@@ -10034,10 +10224,270 @@ window.Tour = (() => {
     const u = (typeof Auth !== 'undefined') ? Auth.user : null;
     if (!u) return;
     if (u.tutorialSeen) return;
+    // Defer behind the commitment-onboarding takeover. After the user
+    // commits, that path also flips tutorialSeen=true, so for those
+    // users the tour silently never fires.
+    const onb = document.getElementById('onboarding');
+    if (onb && !onb.hidden) { setTimeout(maybeAutoShow, 1500); return; }
     open();
   }
 
   wire();
+
+  return { open, close, maybeAutoShow };
+})();
+
+/* ============================================================
+   Commitment-onboarding takeover. Four-step ritual that fires once
+   per account on first sign-in (gated by Auth.user.onboardedAt). The
+   user lists habits to quit + at least three actions for today, hits
+   "I commit", and the server creates the QuitStreaks + Tasks in one
+   transaction. Not skippable — they either commit or close the app.
+   ============================================================ */
+window.Onboarding = (() => {
+  const MIN_TASKS = 3;
+  const MAX_HABITS = 20;
+  const MAX_TASKS  = 30;
+
+  const STATE = {
+    step: 0,           // 0=welcome, 1=habits, 2=tasks, 3=commit
+    habits: ['', '', ''],
+    tasks: ['', '', ''],
+    submitting: false,
+    error: null,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const escHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+  function open() {
+    const root = $('onboarding');
+    if (!root) return;
+    STATE.step = 0;
+    STATE.error = null;
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    render();
+  }
+
+  function close() {
+    const root = $('onboarding');
+    if (!root) return;
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function pullInputsIntoState() {
+    // Collect the current input values so they survive a step change.
+    const list = STATE.step === 1 ? 'habits' : STATE.step === 2 ? 'tasks' : null;
+    if (!list) return;
+    const inputs = $('onb-content').querySelectorAll('.onb-input');
+    STATE[list] = [...inputs].map((el) => el.value);
+  }
+
+  function nonEmpty(arr) { return arr.filter((s) => s && s.trim().length > 0); }
+
+  function render() {
+    const c = $('onb-content');
+    if (!c) return;
+    c.innerHTML = '';
+    if (STATE.step === 0) c.innerHTML = stepWelcome();
+    else if (STATE.step === 1) c.innerHTML = stepHabits();
+    else if (STATE.step === 2) c.innerHTML = stepTasks();
+    else if (STATE.step === 3) c.innerHTML = stepCommit();
+    wireStep();
+    // Auto-focus the first empty input on data-entry steps so the
+    // keyboard pops on mobile without a second tap.
+    if (STATE.step === 1 || STATE.step === 2) {
+      const inputs = c.querySelectorAll('.onb-input');
+      const target = [...inputs].find((el) => !el.value.trim()) || inputs[0];
+      if (target) target.focus({ preventScroll: true });
+    }
+  }
+
+  function stepWelcome() {
+    return `
+      <div class="onb-eyebrow">Begin</div>
+      <h1 class="onb-h1">This is the moment.</h1>
+      <p class="onb-body">
+        You're not signing up for another to-do app. You're committing to
+        action — a contract with yourself.
+      </p>
+      <p class="onb-body">
+        In the next two minutes you'll name what's been holding you back
+        and decide what you'll <b>do today</b>. Then you'll lock it in.
+      </p>
+      <div class="onb-actions">
+        <button class="onb-btn primary" data-action="next">Begin</button>
+      </div>
+    `;
+  }
+
+  function stepHabits() {
+    const inputs = STATE.habits.map((v, i) => `
+      <input class="onb-input" type="text" maxlength="200"
+             value="${escHtml(v)}"
+             placeholder="${i === 0 ? 'e.g. doom scrolling' : 'another…'}" />
+    `).join('');
+    return `
+      <div class="onb-eyebrow">Step 1 of 3</div>
+      <h1 class="onb-h1">What's been holding you back?</h1>
+      <p class="onb-body">
+        List the habits you're <b>walking away from</b> today. Each one
+        becomes a streak — every day you don't fall back to it counts
+        toward something.
+      </p>
+      <p class="onb-body" style="font-size:14px;">
+        Leave blank if there's nothing to name yet — but be honest with
+        yourself first.
+      </p>
+      <div class="onb-input-list">${inputs}</div>
+      <button type="button" class="onb-add" data-action="add-habit"
+              ${STATE.habits.length >= MAX_HABITS ? 'disabled' : ''}>
+        + Add another
+      </button>
+      <div class="onb-actions">
+        <button class="onb-btn ghost" data-action="back">Back</button>
+        <button class="onb-btn primary" data-action="next">Continue</button>
+      </div>
+    `;
+  }
+
+  function stepTasks() {
+    const inputs = STATE.tasks.map((v, i) => `
+      <input class="onb-input" type="text" maxlength="200"
+             value="${escHtml(v)}"
+             placeholder="Task ${i + 1}" />
+    `).join('');
+    const filled = nonEmpty(STATE.tasks).length;
+    const enough = filled >= MIN_TASKS;
+    return `
+      <div class="onb-eyebrow">Step 2 of 3</div>
+      <h1 class="onb-h1">What can you do today?</h1>
+      <p class="onb-body">
+        At least <b>three things</b> you can do today that move you closer
+        to where you want to be. These become your first tasks. They
+        <b>lock at midnight</b>.
+      </p>
+      <div class="onb-input-list">${inputs}</div>
+      <button type="button" class="onb-add" data-action="add-task"
+              ${STATE.tasks.length >= MAX_TASKS ? 'disabled' : ''}>
+        + Add another
+      </button>
+      <div class="onb-actions">
+        <button class="onb-btn ghost" data-action="back">Back</button>
+        <button class="onb-btn primary" data-action="next" ${enough ? '' : 'disabled'}>
+          ${enough ? 'Continue' : `Add ${MIN_TASKS - filled} more`}
+        </button>
+      </div>
+    `;
+  }
+
+  function stepCommit() {
+    const habits = nonEmpty(STATE.habits);
+    const tasks  = nonEmpty(STATE.tasks);
+    const habitsHtml = habits.length
+      ? `<ul class="onb-summary-list">${habits.map(h => `<li>${escHtml(h)}</li>`).join('')}</ul>`
+      : `<div class="onb-summary-list empty">Nothing named today.</div>`;
+    const tasksHtml = `<ul class="onb-summary-list">${tasks.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul>`;
+    const errorHtml = STATE.error ? `<div class="onb-error">${escHtml(STATE.error)}</div>` : '';
+    return `
+      <div class="onb-eyebrow">Step 3 of 3</div>
+      <h1 class="onb-h1">Your commitment.</h1>
+      <div class="onb-summary-section">
+        <div class="onb-summary-label">Walking away from</div>
+        ${habitsHtml}
+      </div>
+      <div class="onb-summary-section">
+        <div class="onb-summary-label">Today, you'll do</div>
+        ${tasksHtml}
+      </div>
+      <div class="onb-fineprint">
+        The list locks at midnight. The streaks start now. You can edit
+        the list before midnight tonight, but tomorrow it's history.
+      </div>
+      ${errorHtml}
+      <div class="onb-actions">
+        <button class="onb-btn ghost" data-action="back" ${STATE.submitting ? 'disabled' : ''}>Back</button>
+        <button class="onb-btn commit" data-action="commit" ${STATE.submitting ? 'disabled' : ''}>
+          ${STATE.submitting ? 'Committing…' : 'I commit'}
+        </button>
+      </div>
+    `;
+  }
+
+  function wireStep() {
+    const c = $('onb-content');
+    if (!c) return;
+    c.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const action = btn.dataset.action;
+        if (action === 'next') {
+          pullInputsIntoState();
+          if (STATE.step === 2 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
+          STATE.step += 1;
+          render();
+        } else if (action === 'back') {
+          pullInputsIntoState();
+          STATE.step -= 1;
+          render();
+        } else if (action === 'add-habit') {
+          pullInputsIntoState();
+          if (STATE.habits.length < MAX_HABITS) STATE.habits.push('');
+          render();
+        } else if (action === 'add-task') {
+          pullInputsIntoState();
+          if (STATE.tasks.length < MAX_TASKS) STATE.tasks.push('');
+          render();
+        } else if (action === 'commit') {
+          await commit();
+        }
+      });
+    });
+  }
+
+  async function commit() {
+    if (STATE.submitting) return;
+    STATE.submitting = true;
+    STATE.error = null;
+    render();
+    try {
+      const r = await fetch('/api/auth/onboarding-commit', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          habits: nonEmpty(STATE.habits),
+          tasks: nonEmpty(STATE.tasks),
+        }),
+      });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        throw new Error(data.error || `status_${r.status}`);
+      }
+      // Reload the page so Store / streaks / etc. are fully fresh and
+      // the user lands on Tasks with their new list visible. Avoids a
+      // race between Auth.user updating and Store still holding the
+      // old empty state.
+      location.reload();
+    } catch (e) {
+      STATE.error = `Couldn't save. ${e.message || ''}`.trim();
+      STATE.submitting = false;
+      render();
+    }
+  }
+
+  function maybeAutoShow() {
+    const u = (typeof Auth !== 'undefined') ? Auth.user : null;
+    if (!u) return;
+    if (u.onboardedAt) return;
+    open();
+  }
 
   return { open, close, maybeAutoShow };
 })();
@@ -10059,6 +10509,8 @@ window.PushPrompt = (() => {
   function isVisibleModalAlreadyOpen() {
     const tour = $('tour-backdrop');
     if (tour && !tour.hidden && tour.classList.contains('open')) return true;
+    const onb = $('onboarding');
+    if (onb && !onb.hidden) return true;
     return false;
   }
 
