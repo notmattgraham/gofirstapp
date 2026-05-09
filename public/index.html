@@ -8997,7 +8997,9 @@ window.Tour = (() => {
     // we'll re-show on next load, but the tour itself is harmless to repeat.
     try {
       await fetch('/api/auth/tutorial-seen', { method: 'POST', credentials: 'same-origin' });
-      if (window.Auth && window.Auth.user) window.Auth.user.tutorialSeen = true;
+      // Auth is a script-scope const declared earlier in this same <script>
+      // block — access via lexical scope, not via window.
+      if (typeof Auth !== 'undefined' && Auth.user) Auth.user.tutorialSeen = true;
     } catch {}
   }
 
@@ -9046,7 +9048,9 @@ window.Tour = (() => {
   }
 
   function maybeAutoShow() {
-    const u = window.Auth && window.Auth.user;
+    // Same lexical-scope rule as markSeen() — Auth is in this script's
+    // scope, not on window.
+    const u = (typeof Auth !== 'undefined') ? Auth.user : null;
     if (!u) return;
     if (u.tutorialSeen) return;
     open();
