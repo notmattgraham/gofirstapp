@@ -10623,13 +10623,13 @@ window.Onboarding = (() => {
   }
 
   function stepLockTime() {
-    // Pre-built presets — covers ~95% of real users with one tap.
-    // The custom branch reveals an HH:MM input pre-populated with
-    // whatever they last entered.
+    // Pre-built presets keyed off when the user actually goes to sleep.
+    // "Day ends" = the moment today's list locks, which lines up with
+    // when they wind down for the night. Custom covers everyone else.
     const presets = [
-      { label: '12 AM',         sub: 'Midnight (most people)', value: '00:00' },
-      { label: '6 AM',          sub: 'Early riser',            value: '06:00' },
-      { label: '6 PM',          sub: 'Night shift',            value: '18:00' },
+      { label: '12 AM', sub: 'Most people',     value: '00:00' },
+      { label: '3 AM',  sub: 'Up late',         value: '03:00' },
+      { label: '8 AM',  sub: 'Overnight shift', value: '08:00' },
     ];
     const isCustom = !presets.some(p => p.value === STATE.lockTime);
     const buttons = presets.map(p => `
@@ -10652,9 +10652,10 @@ window.Onboarding = (() => {
       <div class="onb-eyebrow">Step 1 of 4</div>
       <h1 class="onb-h1">When does your day end?</h1>
       <p class="onb-body">
-        Each day, your tasks <b>lock at this time</b> and the streaks
-        count up. Most people pick midnight — change it if you work
-        nights or wake up before dawn.
+        Pick the time you usually <b>go to sleep</b>. That's when today's
+        list locks and tomorrow begins. Most people pick midnight — go
+        later if you stay up past it, or much later (8 AM) if you work
+        overnight.
       </p>
       <div class="onb-lock-presets">
         ${buttons}
@@ -10797,9 +10798,9 @@ window.Onboarding = (() => {
           render();
         } else if (action === 'lock-custom') {
           // If they tap Custom while one of the fixed presets is active,
-          // seed the custom value with that preset so the time input
-          // doesn't snap to a default they didn't pick.
-          if (['00:00','06:00','18:00'].includes(STATE.lockTime)) STATE.lockTime = '07:00';
+          // seed the custom value to a sensible "in-between" time so the
+          // time input doesn't snap to a default they didn't intend.
+          if (['00:00','03:00','08:00'].includes(STATE.lockTime)) STATE.lockTime = '22:00';
           render();
         } else if (action === 'commit') {
           await commit();
