@@ -52,6 +52,13 @@ model User {
   // sessions. Users can re-trigger the tour from Profile regardless.
   tutorialSeen        Boolean  @default(false)
 
+  // Timestamp of the moment the user finished the commitment-onboarding
+  // ritual (listing bad habits to quit + their first three tasks). Null
+  // means "still needs onboarding". Users with existing tasks/streaks at
+  // the time of the migration get auto-backfilled with their createdAt
+  // so they're never asked to onboard retroactively.
+  onboardedAt         DateTime?
+
   // Per-event push toggles. All default true so a freshly-subscribed user
   // gets every kind of notification until they specifically opt out from
   // Profile → Notifications. The toggles bucket events into three groups:

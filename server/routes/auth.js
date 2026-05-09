@@ -1,6 +1,7 @@
 const express = require('express');
 const passport = require('../auth');
 const prisma = require('../db');
+const { userToday } = require('../time');
 
 const router = express.Router();
 
@@ -35,6 +36,7 @@ function shape(u) {
     isCoach: !!u.isCoach,
     isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
     tutorialSeen: !!u.tutorialSeen,
+    onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
     // Coalesce nullables defensively for users created before these
     // columns existed — Prisma returns the column as the default `true`
     // once the migration runs, but a stale shape returned mid-deploy
@@ -46,9 +48,29 @@ function shape(u) {
 }
 
 // Who am I?  Returns { user: null } when signed out.
-router.get('/me', (req, res) => {
+//
+// Side effect: existing users (any task or streak in the DB) who don't
+// have onboardedAt set yet get it back-filled to their createdAt. The
+// commitment-onboarding ritual only fires for accounts where there's
+// truly nothing yet — we don't want to ask a 6-month user to "list
+// the habits you're quitting" all over again. Done lazily on the first
+// /me hit after the migration so we don't need a one-shot script.
+router.get('/me', async (req, res) => {
   if (!req.user) return res.json({ user: null });
-  res.json({ user: shape(req.user) });
+  let user = req.user;
+  if (user.onboardedAt == null) {
+    const [taskCount, streakCount] = await Promise.all([
+      prisma.task.count({ where: { userId: user.id } }),
+      prisma.quitStreak.count({ where: { userId: user.id } }),
+    ]);
+    if (taskCount + streakCount > 0) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { onboardedAt: user.createdAt || new Date() },
+      });
+    }
+  }
+  res.json({ user: shape(user) });
 });
 
 // Update the signed-in user's display name / avatar / timezone.
@@ -88,6 +110,71 @@ router.post('/tutorial-seen', async (req, res) => {
     data: { tutorialSeen: true },
   });
   res.json({ user: shape(user) });
+});
+
+// POST /api/auth/onboarding-commit — the commitment-ritual write.
+// Body: { habits: string[], tasks: string[] }
+//   habits → one QuitStreak per non-empty entry (any count, capped at 20).
+//   tasks  → one one-shot Task per non-empty entry, scheduled for "today"
+//            in the user's timezone. At least 3 required.
+// Sets User.onboardedAt = now and User.tutorialSeen = true (the
+// commitment ritual replaces the explanatory tabs tour for these users).
+// Idempotent on the flag — calling again with onboardedAt already set
+// returns 409 without writing anything.
+const ONBOARD_MAX_HABITS = 20;
+const ONBOARD_MAX_TASKS  = 30;
+const ONBOARD_MIN_TASKS  = 3;
+const ONBOARD_MAX_TEXT   = 200;
+
+router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'unauthenticated' });
+  if (req.user.onboardedAt) return res.status(409).json({ error: 'already_onboarded' });
+
+  const cleanList = (arr, max) => {
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((s) => (typeof s === 'string' ? s.trim().slice(0, ONBOARD_MAX_TEXT) : ''))
+      .filter(Boolean)
+      .slice(0, max);
+  };
+  const habits = cleanList(req.body && req.body.habits, ONBOARD_MAX_HABITS);
+  const tasks  = cleanList(req.body && req.body.tasks,  ONBOARD_MAX_TASKS);
+  if (tasks.length < ONBOARD_MIN_TASKS) {
+    return res.status(400).json({ error: 'min_three_tasks_required' });
+  }
+
+  const today = userToday(req.user);
+  // Local-time "now" for startedAt — same format the SPA uses (YYYY-MM-DDTHH:MM).
+  // We don't have the user's exact wall-clock down to the minute on the
+  // server, so we approximate using their TZ-localized date + 00:00. The
+  // SPA will tweak this when needed; what matters is the date is correct.
+  const startedAt = `${today}T00:00`;
+  const now = new Date();
+
+  // One transaction so a half-write never leaves the user partially
+  // onboarded with an empty task list.
+  const [updated] = await prisma.$transaction([
+    prisma.user.update({
+      where: { id: req.user.id },
+      data: { onboardedAt: now, tutorialSeen: true },
+    }),
+    ...habits.map((name) =>
+      prisma.quitStreak.create({
+        data: { userId: req.user.id, name, startAt: startedAt },
+      })
+    ),
+    ...tasks.map((text) =>
+      prisma.task.create({
+        data: {
+          userId: req.user.id,
+          text,
+          startedAt,
+          scheduledDate: today,
+        },
+      })
+    ),
+  ]);
+  res.json({ user: shape(updated), habits: habits.length, tasks: tasks.length });
 });
 
 // PATCH /api/auth/notify-prefs — flip per-event push toggles. Body may
