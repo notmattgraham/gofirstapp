@@ -133,7 +133,118 @@ async function _fanOut(subs, payload) {
   return { sent, failed, removed, skipped: false };
 }
 
+// ─── Active-thread tracker ─────────────────────────────────────────────
+//
+// Suppression policy for DM pushes: if the recipient currently has the
+// sender's DM thread open (any device), we skip the push. The map below
+// is updated by the WebSocket 'viewing' message handler in server/index.js.
+//
+//   key = recipient userId
+//   val = Set of peerIds the recipient is currently viewing (one per WS
+//         connection — multiple devices/tabs can each have their own peer
+//         open). Set is removed entirely when empty so a stale entry
+//         never accumulates.
+const _viewing = new Map();
+
+function setViewingPeer(userId, peerId, prevPeerId) {
+  if (prevPeerId) {
+    const set = _viewing.get(userId);
+    if (set) {
+      set.delete(prevPeerId);
+      if (set.size === 0) _viewing.delete(userId);
+    }
+  }
+  if (peerId) {
+    let set = _viewing.get(userId);
+    if (!set) { set = new Set(); _viewing.set(userId, set); }
+    set.add(peerId);
+  }
+}
+
+function clearViewingPeer(userId, peerId) {
+  if (!peerId) return;
+  const set = _viewing.get(userId);
+  if (!set) return;
+  set.delete(peerId);
+  if (set.size === 0) _viewing.delete(userId);
+}
+
+function isViewingPeer(userId, peerId) {
+  const set = _viewing.get(userId);
+  return !!(set && set.has(peerId));
+}
+
+// ─── Event-driven push helpers ─────────────────────────────────────────
+//
+// Each helper:
+//   - reads the recipient's per-event pref (defaulting on),
+//   - skips if not configured,
+//   - returns silently on any error so a failed push never trips the
+//     calling endpoint.
+
+function _truncate(s, max) {
+  const t = (s || '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max - 1) + '…' : t;
+}
+
+// Inbound DM (friend↔friend, coach↔client, broadcast reply landing on
+// admin). `senderUser` is the message author; `recipientUser` carries
+// the per-event pref. `isSystem` true → uses notifySystem instead of
+// notifyMessages (admin in-app broadcast pushes route here).
+async function pushForMessage({ senderUser, recipientUser, content, hasAttachment, isSystem = false }) {
+  if (!configured) return;
+  if (!recipientUser) return;
+  const prefKey = isSystem ? 'notifySystem' : 'notifyMessages';
+  if (recipientUser[prefKey] === false) return;
+  // Suppress when the recipient is currently looking at this exact thread —
+  // they already see the WS-delivered message land in real time.
+  if (isViewingPeer(recipientUser.id, senderUser.id)) return;
+  const senderName = (senderUser.name || '').trim() || 'GoFirst';
+  let body;
+  if (content && content.trim()) body = _truncate(content, 80);
+  else if (hasAttachment)        body = 'Sent a photo.';
+  else                           body = 'Sent a message.';
+  return sendPushToUser(recipientUser.id, {
+    title: senderName,
+    body,
+    url: `/?dm=${senderUser.id}`,
+    tag: `dm:${senderUser.id}`,
+  });
+}
+
+// Friend request received — fires for the target of a new request.
+async function pushForFriendRequest({ requesterUser, targetUser }) {
+  if (!configured) return;
+  if (!targetUser || targetUser.notifyFriends === false) return;
+  const requesterName = (requesterUser.name || '').trim() || 'Someone';
+  return sendPushToUser(targetUser.id, {
+    title: 'New friend request',
+    body: `${requesterName} wants to add you as a friend.`,
+    url: '/?social=requests',
+    tag: 'friend-request',
+  });
+}
+
+// Friend request accepted — fires for the original requester.
+async function pushForFriendAccepted({ accepterUser, requesterUser }) {
+  if (!configured) return;
+  if (!requesterUser || requesterUser.notifyFriends === false) return;
+  const accepterName = (accepterUser.name || '').trim() || 'Someone';
+  return sendPushToUser(requesterUser.id, {
+    title: `${accepterName} accepted your friend request`,
+    body: 'You\'re now friends. Tap to send a message.',
+    url: `/?dm=${accepterUser.id}`,
+    tag: 'friend-accepted',
+  });
+}
+
 module.exports = router;
 module.exports.sendPushToUser = sendPushToUser;
 module.exports.sendPushToUsers = sendPushToUsers;
 module.exports.isConfigured = () => configured;
+module.exports.pushForMessage = pushForMessage;
+module.exports.pushForFriendRequest = pushForFriendRequest;
+module.exports.pushForFriendAccepted = pushForFriendAccepted;
+module.exports.setViewingPeer = setViewingPeer;
+module.exports.clearViewingPeer = clearViewingPeer;
+module.exports.isViewingPeer = isViewingPeer;

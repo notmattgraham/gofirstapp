@@ -340,7 +340,7 @@ router.post('/broadcast', wrap(async (req, res) => {
 
   const recipients = await prisma.user.findMany({
     where: { id: { not: req.user.id } },
-    select: { id: true },
+    select: { id: true, notifySystem: true },
   });
   if (recipients.length > MAX_BROADCAST_RECIPIENTS) {
     return res.status(413).json({ error: 'too_many_recipients', count: recipients.length });
@@ -379,6 +379,24 @@ router.post('/broadcast', wrap(async (req, res) => {
       });
     }
   }
+
+  // Fan-out OS-level pushes — bucketed under notifySystem (not notifyMessages)
+  // so users can opt out of system updates while still receiving friend DMs.
+  // Fire-and-forget; failures don't stall the response.
+  (async () => {
+    const sender = { id: req.user.id, name: req.user.name };
+    for (const r of recipients) {
+      try {
+        await pushModule.pushForMessage({
+          senderUser: sender,
+          recipientUser: r,
+          content: trimmed,
+          hasAttachment,
+          isSystem: true,
+        });
+      } catch (e) { console.warn('[push/broadcast] failed for', r.id, e.message); }
+    }
+  })();
 
   res.json({ sent: recipients.length });
 }));

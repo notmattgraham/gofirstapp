@@ -5,6 +5,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
+const pushModule = require('./push');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 const MAX_MESSAGE_LENGTH = 4000;
@@ -475,6 +476,25 @@ router.post('/', wrap(async (req, res) => {
     // Also echo back to sender on other open tabs.
     global.wsBroadcast(me.id, { type: 'message', message });
   }
+
+  // OS-level push to the recipient (skipped if they're actively viewing
+  // this thread, or have notifyMessages off). Fire-and-forget — never
+  // blocks the response, never bubbles errors to the API caller.
+  (async () => {
+    try {
+      const recipientFull = await prisma.user.findUnique({
+        where: { id: recipientId },
+        select: { id: true, notifyMessages: true, notifySystem: true },
+      });
+      await pushModule.pushForMessage({
+        senderUser: { id: me.id, name: me.name },
+        recipientUser: recipientFull,
+        content: trimmed,
+        hasAttachment,
+        isSystem: false,
+      });
+    } catch (e) { console.warn('[push/dm] failed', e.message); }
+  })();
 
   res.status(201).json({ message });
 }));

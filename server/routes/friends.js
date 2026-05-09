@@ -6,6 +6,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
+const pushModule = require('./push');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const router = express.Router();
@@ -219,12 +220,39 @@ router.post('/request', wrap(async (req, res) => {
       where: { id: existing.id },
       data: { status: 'accepted', acceptedAt: new Date() },
     });
+    // Original requester gets a push: their pending request just turned
+    // into an accepted friendship.
+    (async () => {
+      try {
+        const requester = await prisma.user.findUnique({
+          where: { id: existing.fromUserId },
+          select: { id: true, notifyFriends: true },
+        });
+        await pushModule.pushForFriendAccepted({
+          accepterUser: { id: me.id, name: me.name },
+          requesterUser: requester,
+        });
+      } catch (e) { console.warn('[push/friend-accepted-auto] failed', e.message); }
+    })();
     return res.status(200).json({ friendshipId: accepted.id, status: 'accepted', autoAccepted: true });
   }
 
   const created = await prisma.friendship.create({
     data: { fromUserId: me.id, toUserId, status: 'pending' },
   });
+  // Push the recipient — they have a pending request waiting.
+  (async () => {
+    try {
+      const target = await prisma.user.findUnique({
+        where: { id: toUserId },
+        select: { id: true, notifyFriends: true },
+      });
+      await pushModule.pushForFriendRequest({
+        requesterUser: { id: me.id, name: me.name },
+        targetUser: target,
+      });
+    } catch (e) { console.warn('[push/friend-request] failed', e.message); }
+  })();
   res.status(201).json({ friendshipId: created.id, status: 'pending' });
 }));
 
@@ -238,6 +266,19 @@ router.post('/accept/:id', wrap(async (req, res) => {
     where: { id: row.id },
     data: { status: 'accepted', acceptedAt: new Date() },
   });
+  // Notify the original requester that their request was accepted.
+  (async () => {
+    try {
+      const requester = await prisma.user.findUnique({
+        where: { id: row.fromUserId },
+        select: { id: true, notifyFriends: true },
+      });
+      await pushModule.pushForFriendAccepted({
+        accepterUser: { id: me.id, name: me.name },
+        requesterUser: requester,
+      });
+    } catch (e) { console.warn('[push/friend-accepted] failed', e.message); }
+  })();
   res.json({ friendshipId: updated.id, status: 'accepted' });
 }));
 
