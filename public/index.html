@@ -2934,6 +2934,60 @@
     stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
   }
 
+  /* ── iOS-style toggle switch ──────────────────────────────────
+     Native <input type="checkbox"> renders inconsistently across
+     browsers and barely shows up at all in dark mode on iOS. The
+     visible switch is the .toggle-track + ::after pseudo (the
+     thumb); the underlying checkbox stays in the DOM so existing
+     change-event wiring keeps working. */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 30px;
+    flex-shrink: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-2);
+    border-radius: 999px;
+    transition: background 0.2s ease;
+    pointer-events: none;
+  }
+  .toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  }
+  .toggle-switch input:checked + .toggle-track {
+    background: #34c759; /* iOS system green */
+  }
+  .toggle-switch input:checked + .toggle-track::after {
+    transform: translateX(20px);
+  }
+  .toggle-switch input:disabled + .toggle-track {
+    opacity: 0.5;
+  }
+
   /* ── Welcome tour ─────────────────────────────────────────────
      5-card carousel shown once on first login (gated by `tutorialSeen`
      on the user record). Centered modal with a tinted backdrop, dot
@@ -4016,21 +4070,30 @@
                 <div class="setting-title">Direct messages</div>
                 <div class="setting-sub">DMs from friends and your coach.</div>
               </div>
-              <input type="checkbox" class="setting-toggle" id="notify-pref-messages" />
+              <label class="toggle-switch" aria-label="Toggle direct message notifications">
+                <input type="checkbox" id="notify-pref-messages" />
+                <span class="toggle-track"></span>
+              </label>
             </div>
             <div class="setting-row">
               <div class="setting-copy">
                 <div class="setting-title">Friend requests</div>
                 <div class="setting-sub">Someone sends or accepts a request.</div>
               </div>
-              <input type="checkbox" class="setting-toggle" id="notify-pref-friends" />
+              <label class="toggle-switch" aria-label="Toggle friend request notifications">
+                <input type="checkbox" id="notify-pref-friends" />
+                <span class="toggle-track"></span>
+              </label>
             </div>
             <div class="setting-row">
               <div class="setting-copy">
                 <div class="setting-title">System updates</div>
                 <div class="setting-sub">Announcements from the GoFirst team.</div>
               </div>
-              <input type="checkbox" class="setting-toggle" id="notify-pref-system" />
+              <label class="toggle-switch" aria-label="Toggle system update notifications">
+                <input type="checkbox" id="notify-pref-system" />
+                <span class="toggle-track"></span>
+              </label>
             </div>
           </div>
         </div>
@@ -9627,6 +9690,12 @@ async function boot() {
   // maybeAutoShow defers itself if the tour modal is currently open, so
   // ordering is safe even if the timer fires "early".
   if (window.PushPrompt) setTimeout(() => PushPrompt.maybeAutoShow(), 1800);
+
+  // Now that Auth.user is populated, re-run the push-module's state sync
+  // so the per-event toggle switches reflect the user's saved prefs. The
+  // module's IIFE runs before auth resolves, so without this the toggles
+  // start out unchecked even when notifyMessages/Friends/System are true.
+  if (window.PushNotifications) PushNotifications.refreshState();
 
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
