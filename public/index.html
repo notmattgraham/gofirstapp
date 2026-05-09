@@ -3200,6 +3200,7 @@
   .onboarding-content > *:nth-child(6) { animation-delay: 0.55s; }
   .onboarding-content > *:nth-child(7) { animation-delay: 0.65s; }
   .onboarding-content > *:nth-child(8) { animation-delay: 0.75s; }
+  .onboarding-content > *:nth-child(9) { animation-delay: 0.85s; }
   @keyframes onb-step-fade-up {
     to { opacity: 1; transform: translateY(0); }
   }
@@ -3224,7 +3225,7 @@
      with a soft glowing halo. Multiple animations layer cleanly here:
      the fade-up runs once (inherited from the parent .onb-actions
      wrapper), and the pulse loops indefinitely on the button itself. */
-  .onb-step-3 .onb-btn.commit {
+  .onb-step-4 .onb-btn.commit {
     animation: onb-commit-pulse 1.8s 1.2s ease-in-out infinite;
     box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
   }
@@ -3232,11 +3233,11 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
     50%      { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.07); }
   }
-  [data-theme="light"] .onb-step-3 .onb-btn.commit {
+  [data-theme="light"] .onb-step-4 .onb-btn.commit {
     animation-name: onb-commit-pulse-light;
   }
   @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) .onb-step-3 .onb-btn.commit {
+    :root:not([data-theme="dark"]) .onb-step-4 .onb-btn.commit {
       animation-name: onb-commit-pulse-light;
     }
   }
@@ -3254,7 +3255,47 @@
       transform: none;
     }
     .onb-step-0 > .onb-h1 { transform: none; }
-    .onb-step-3 .onb-btn.commit { animation: none; }
+    .onb-step-4 .onb-btn.commit { animation: none; }
+  }
+
+  /* Lock-time picker on onboarding step 1. Each preset is a stacked
+     label/sub button; the active one gets the accent ring. The custom
+     branch reveals an HH:MM <input type="time"> below the grid. */
+  .onb-lock-presets {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .onb-lock-preset {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 14px;
+    padding: 14px 14px;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .onb-lock-preset:hover { border-color: var(--text-dim); }
+  .onb-lock-preset.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .onb-lock-preset-label {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .onb-lock-preset-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+  .onb-lock-input {
+    /* Stretches under the preset grid when Custom is selected. */
+    margin-top: 8px;
   }
 
   /* ── Commit ceremony ─────────────────────────────────────────
@@ -4380,6 +4421,17 @@
           </div>
         </div>
 
+        <div class="section-title">Day end</div>
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <div class="setting-title">Tasks lock at</div>
+              <div class="setting-sub" id="lock-time-sub">Each day's list locks at this time and the streaks count up.</div>
+            </div>
+            <input type="time" id="profile-lock-time" class="field-input setting-select" style="height:32px;font-size:13px;padding:0 8px;width:auto;" />
+          </div>
+        </div>
+
         <div class="section-title">Overrides</div>
         <div class="card">
           <div class="setting-row">
@@ -4996,8 +5048,31 @@ const Auth = {
    ============================================================ */
 function pad(n) { return String(n).padStart(2, '0'); }
 function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function todayISO() { return toISO(new Date()); }
-function todayDow() { return new Date().getDay(); } // 0..6, Sun..Sat
+
+// Parse a "HH:MM" lockTime into minutes-since-midnight. Defensive against
+// missing / malformed input — anything we can't parse falls back to 0
+// (equivalent to "lock at midnight", which is the original behaviour).
+function lockMinutes() {
+  const raw = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
+  const m = String(raw).match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return 0;
+  const h  = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
+  const mm = Math.max(0, Math.min(59, parseInt(m[2], 10) || 0));
+  return h * 60 + mm;
+}
+
+// "Today" respects the user's lockTime. Shifting `now` backwards by
+// lockTime minutes makes the calendar date roll over at exactly the
+// user's chosen lock instant, instead of at clock midnight. Mirrors
+// userToday() in server/time.js.
+function todayISO() {
+  const shift = lockMinutes() * 60_000;
+  return toISO(new Date(Date.now() - shift));
+}
+function todayDow() {
+  const shift = lockMinutes() * 60_000;
+  return new Date(Date.now() - shift).getDay();
+}
 function addDaysISO(iso, n) {
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + n);
@@ -7611,6 +7686,10 @@ function renderProfile() {
   nameEl.textContent = u.name || '(no name)';
   emailEl.textContent = u.email || '';
   if (nameSubEl) nameSubEl.textContent = u.name || u.email || '';
+  // Notify any setting-row IIFE that depends on Auth.user (e.g. the
+  // lock-time picker) to re-read its value. Cheaper than each one
+  // polling the auth state on its own.
+  document.dispatchEvent(new CustomEvent('auth:userloaded'));
 }
 
 function renderOverrides(state) {
@@ -7678,6 +7757,43 @@ document.getElementById('profile-logout').addEventListener('click', async () => 
 document.getElementById('profile-show-tour').addEventListener('click', () => {
   if (window.Tour) Tour.open({ replay: true });
 });
+
+// Profile → Day-end lock time. Initial value is seeded from Auth.user
+// once it's populated; PATCHes /api/auth/me on change. Page is NOT
+// reloaded — the SPA's todayISO already reads Auth.user.lockTime
+// directly, so the new boundary takes effect immediately.
+(function wireLockTimeSetting() {
+  const input = document.getElementById('profile-lock-time');
+  const sub   = document.getElementById('lock-time-sub');
+  if (!input) return;
+  function fmt(s) {
+    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return '12:00 AM';
+    let h = parseInt(m[1], 10);
+    const mm = m[2];
+    const period = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return `${h}:${mm} ${period}`;
+  }
+  function refresh() {
+    const t = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
+    input.value = t;
+    if (sub) sub.textContent = `Currently ${fmt(t)} — change anytime.`;
+  }
+  // Initial render — wait until Auth resolves. boot() calls renderProfile
+  // after auth, so a microtask delay is enough; otherwise refresh manually.
+  refresh();
+  document.addEventListener('auth:userloaded', refresh);
+  input.addEventListener('change', async () => {
+    const v = input.value;
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(v)) return;
+    try {
+      const data = await api('PATCH', '/api/auth/me', { lockTime: v });
+      if (data && data.user) Auth.user = data.user;
+      refresh();
+    } catch (e) { console.warn('[lock-time] save failed', e); }
+  });
+})();
 
 /* ============================================================
    Push notifications — Profile toggle.
@@ -10424,7 +10540,8 @@ window.Onboarding = (() => {
   const MAX_TASKS  = 30;
 
   const STATE = {
-    step: 0,           // 0=welcome, 1=habits, 2=tasks, 3=commit
+    step: 0,           // 0=welcome, 1=lock-time, 2=habits, 3=tasks, 4=commit
+    lockTime: '00:00', // HH:MM, 24-hour. Day-end / lock instant.
     habits: ['', '', ''],
     tasks: ['', '', ''],
     submitting: false,
@@ -10457,7 +10574,7 @@ window.Onboarding = (() => {
 
   function pullInputsIntoState() {
     // Collect the current input values so they survive a step change.
-    const list = STATE.step === 1 ? 'habits' : STATE.step === 2 ? 'tasks' : null;
+    const list = STATE.step === 2 ? 'habits' : STATE.step === 3 ? 'tasks' : null;
     if (!list) return;
     const inputs = $('onb-content').querySelectorAll('.onb-input');
     STATE[list] = [...inputs].map((el) => el.value);
@@ -10472,14 +10589,15 @@ window.Onboarding = (() => {
     // each step picks up its own cascade timing via .onb-step-{N}.
     c.className = `onboarding-content onb-step-${STATE.step}`;
     c.innerHTML = '';
-    if (STATE.step === 0) c.innerHTML = stepWelcome();
-    else if (STATE.step === 1) c.innerHTML = stepHabits();
-    else if (STATE.step === 2) c.innerHTML = stepTasks();
-    else if (STATE.step === 3) c.innerHTML = stepCommit();
+    if      (STATE.step === 0) c.innerHTML = stepWelcome();
+    else if (STATE.step === 1) c.innerHTML = stepLockTime();
+    else if (STATE.step === 2) c.innerHTML = stepHabits();
+    else if (STATE.step === 3) c.innerHTML = stepTasks();
+    else if (STATE.step === 4) c.innerHTML = stepCommit();
     wireStep();
     // Auto-focus the first empty input on data-entry steps so the
     // keyboard pops on mobile without a second tap.
-    if (STATE.step === 1 || STATE.step === 2) {
+    if (STATE.step === 2 || STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const target = [...inputs].find((el) => !el.value.trim()) || inputs[0];
       if (target) target.focus({ preventScroll: true });
@@ -10504,6 +10622,63 @@ window.Onboarding = (() => {
     `;
   }
 
+  function stepLockTime() {
+    // Pre-built presets — covers ~95% of real users with one tap.
+    // The custom branch reveals an HH:MM input pre-populated with
+    // whatever they last entered.
+    const presets = [
+      { label: '12 AM',         sub: 'Midnight (most people)', value: '00:00' },
+      { label: '6 AM',          sub: 'Early riser',            value: '06:00' },
+      { label: '6 PM',          sub: 'Night shift',            value: '18:00' },
+    ];
+    const isCustom = !presets.some(p => p.value === STATE.lockTime);
+    const buttons = presets.map(p => `
+      <button type="button" class="onb-lock-preset${STATE.lockTime === p.value ? ' active' : ''}" data-action="lock-set" data-value="${p.value}">
+        <div class="onb-lock-preset-label">${p.label}</div>
+        <div class="onb-lock-preset-sub">${p.sub}</div>
+      </button>
+    `).join('');
+    const customRow = `
+      <button type="button" class="onb-lock-preset${isCustom ? ' active' : ''}" data-action="lock-custom">
+        <div class="onb-lock-preset-label">Custom</div>
+        <div class="onb-lock-preset-sub">${isCustom ? formatLockLabel(STATE.lockTime) : 'Pick any time'}</div>
+      </button>
+    `;
+    const customInput = isCustom ? `
+      <input class="onb-input onb-lock-input" type="time"
+             value="${escHtml(STATE.lockTime)}" data-lock-input />
+    ` : '';
+    return `
+      <div class="onb-eyebrow">Step 1 of 4</div>
+      <h1 class="onb-h1">When does your day end?</h1>
+      <p class="onb-body">
+        Each day, your tasks <b>lock at this time</b> and the streaks
+        count up. Most people pick midnight — change it if you work
+        nights or wake up before dawn.
+      </p>
+      <div class="onb-lock-presets">
+        ${buttons}
+        ${customRow}
+      </div>
+      ${customInput}
+      <div class="onb-actions">
+        <button class="onb-btn ghost" data-action="back">Back</button>
+        <button class="onb-btn primary" data-action="next">Continue</button>
+      </div>
+    `;
+  }
+
+  // Pretty-print "HH:MM" 24h → "h:MM AM/PM" for the Custom preset's sub.
+  function formatLockLabel(s) {
+    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return '12:00 AM';
+    let h = parseInt(m[1], 10);
+    const mm = m[2];
+    const period = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return `${h}:${mm} ${period}`;
+  }
+
   function stepHabits() {
     const inputs = STATE.habits.map((v, i) => `
       <input class="onb-input" type="text" maxlength="200"
@@ -10511,7 +10686,7 @@ window.Onboarding = (() => {
              placeholder="${i === 0 ? 'e.g. doom scrolling' : 'another…'}" />
     `).join('');
     return `
-      <div class="onb-eyebrow">Step 1 of 3</div>
+      <div class="onb-eyebrow">Step 2 of 4</div>
       <h1 class="onb-h1">What's been holding you back?</h1>
       <p class="onb-body">
         List the habits you're <b>walking away from</b> today. Each one
@@ -10539,7 +10714,7 @@ window.Onboarding = (() => {
     const filled = nonEmpty(STATE.tasks).length;
     const enough = filled >= MIN_TASKS;
     return `
-      <div class="onb-eyebrow">Step 2 of 3</div>
+      <div class="onb-eyebrow">Step 3 of 4</div>
       <h1 class="onb-h1">What can you do today?</h1>
       <p class="onb-body">
         At least <b>three things</b> you can do today that move you closer
@@ -10568,7 +10743,7 @@ window.Onboarding = (() => {
     const tasksHtml = `<ul class="onb-summary-list">${tasks.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul>`;
     const errorHtml = STATE.error ? `<div class="onb-error">${escHtml(STATE.error)}</div>` : '';
     return `
-      <div class="onb-eyebrow">Step 3 of 3</div>
+      <div class="onb-eyebrow">Step 4 of 4</div>
       <h1 class="onb-h1">Your commitment.</h1>
       <div class="onb-summary-section">
         <div class="onb-summary-label">Walking away from</div>
@@ -10579,8 +10754,9 @@ window.Onboarding = (() => {
         ${tasksHtml}
       </div>
       <div class="onb-fineprint">
-        The list locks at midnight. The streaks start now. You can edit
-        the list before midnight tonight, but tomorrow it's history.
+        The list locks at <b>${escHtml(formatLockLabel(STATE.lockTime))}</b>.
+        The streaks start now. You can edit the list before then, but
+        once it locks, it's history.
       </div>
       ${errorHtml}
       <div class="onb-actions">
@@ -10601,7 +10777,7 @@ window.Onboarding = (() => {
         const action = btn.dataset.action;
         if (action === 'next') {
           pullInputsIntoState();
-          if (STATE.step === 2 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
+          if (STATE.step === 3 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
           STATE.step += 1;
           render();
         } else if (action === 'back') {
@@ -10616,17 +10792,35 @@ window.Onboarding = (() => {
           pullInputsIntoState();
           if (STATE.tasks.length < MAX_TASKS) STATE.tasks.push('');
           render();
+        } else if (action === 'lock-set') {
+          STATE.lockTime = btn.dataset.value || '00:00';
+          render();
+        } else if (action === 'lock-custom') {
+          // If they tap Custom while one of the fixed presets is active,
+          // seed the custom value with that preset so the time input
+          // doesn't snap to a default they didn't pick.
+          if (['00:00','06:00','18:00'].includes(STATE.lockTime)) STATE.lockTime = '07:00';
+          render();
         } else if (action === 'commit') {
           await commit();
         }
       });
     });
 
+    // Custom HH:MM input (only present when Custom is selected). Updates
+    // STATE.lockTime live so the summary on the commit step reflects it.
+    const lockInput = c.querySelector('[data-lock-input]');
+    if (lockInput) {
+      lockInput.addEventListener('input', () => {
+        if (lockInput.value) STATE.lockTime = lockInput.value;
+      });
+    }
+
     // Live-update the Continue button on the tasks step. Without this,
     // STATE.tasks only refreshes when an action button is tapped, so the
     // button stays disabled / shows "Add N more" even after the user has
     // typed in the third task.
-    if (STATE.step === 2) {
+    if (STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const nextBtn = c.querySelector('[data-action="next"]');
       const sync = () => {
@@ -10655,6 +10849,7 @@ window.Onboarding = (() => {
         body: JSON.stringify({
           habits: nonEmpty(STATE.habits),
           tasks: nonEmpty(STATE.tasks),
+          lockTime: STATE.lockTime,
         }),
       });
       if (!r.ok) {

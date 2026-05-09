@@ -20,6 +20,14 @@ model User {
   // Drives midnight calculations and lock enforcement server-side.
   timezone    String?
 
+  // Time-of-day at which "today" rolls over for this user — i.e. when
+  // their list locks and a fresh day begins. Stored as "HH:MM" in their
+  // local timezone. Default 00:00 (midnight) matches the original
+  // behaviour. Lets night-shift workers set e.g. "18:00" so their
+  // commitment day runs from 6 PM to 6 PM. Set during onboarding;
+  // changeable from Profile.
+  lockTime    String   @default("00:00")
+
   // Override (a.k.a. mulligan) bookkeeping. 3 free per rolling month.
   overridesUsed       Int      @default(0)
   // First day of the current month-long quota window. Reset every 30 days.
