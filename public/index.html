@@ -2012,51 +2012,33 @@
     margin-bottom: 40px;
     display: flex;
     justify-content: center;
-    /* Mask the streak shapes with a moving linear gradient to give the
-       logo a subtle "shimmer" sweep — feels like motion on the streaks. */
-    perspective: 800px;
   }
   .splash-brand img {
-    /* Streaks-only mark (no wordmark) — animated to suggest forward
-       motion. Looped pulse + slight lean so it never sits perfectly
-       still while the splash is on screen. */
-    height: 92px;
+    /* Streaks-only mark (no wordmark). Sized to land just under the
+       Continue-with-Google button's width visually. Static — the only
+       motion is the soft glow pulse below. */
+    height: 64px;
     width: auto;
     display: block;
-    transform-origin: center;
-    animation: logo-pulse 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation: logo-glow 2.6s ease-in-out infinite;
   }
-  @keyframes logo-pulse {
-    0%, 100% {
-      transform: scale(1) translateX(0);
-      filter: drop-shadow(0 0 0 transparent);
-    }
-    45% {
-      transform: scale(1.06) translateX(3px);
-      filter: drop-shadow(0 6px 18px rgba(255, 255, 255, 0.18));
-    }
-    55% {
-      transform: scale(1.06) translateX(3px);
-      filter: drop-shadow(0 6px 18px rgba(255, 255, 255, 0.18));
+  @keyframes logo-glow {
+    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+    50%      { filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.55)); }
+  }
+  /* In light mode the white halo disappears — swap to a soft dark glow. */
+  [data-theme="light"] .splash-brand img {
+    animation-name: logo-glow-light;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .splash-brand img {
+      animation-name: logo-glow-light;
     }
   }
-  [data-theme="light"] .splash-brand img,
-  :root:not([data-theme="dark"]) .splash-brand img {
-    /* In light mode the white-glow shadow vanishes — swap to a subtle
-       dark drop-shadow so the pulse still reads. */
-    animation-name: logo-pulse-light;
+  @keyframes logo-glow-light {
+    0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+    50%      { filter: drop-shadow(0 0 18px rgba(0, 0, 0, 0.25)); }
   }
-  @keyframes logo-pulse-light {
-    0%, 100% {
-      transform: scale(1) translateX(0);
-      filter: drop-shadow(0 0 0 transparent);
-    }
-    45%, 55% {
-      transform: scale(1.06) translateX(3px);
-      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.18));
-    }
-  }
-  /* Pause the pulse if the user prefers reduced motion. */
   @media (prefers-reduced-motion: reduce) {
     .splash-brand img { animation: none; }
   }
