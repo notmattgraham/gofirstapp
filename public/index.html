@@ -2379,7 +2379,9 @@
      longer takes over the whole chat tab like the old paywall. */
   .chat-promo-card {
     flex-shrink: 0;
-    margin: 12px 14px calc(2px + var(--safe-bottom));
+    /* Bottom margin is just visual breathing room — the tabbar already
+       owns the home-indicator safe area, so we don't add it here. */
+    margin: 8px 14px 6px;
     padding: 12px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
@@ -8384,66 +8386,25 @@ const Coaching = (() => {
   }
 
   function threadRowHtml(opts) {
-    // opts: { user, latest, unread, pinned, friendshipId, todayRate, executionStreak, admin, adminPin }
+    // opts: { user, latest, unread, kind, friendshipId, todayRate, executionStreak }
+    //   kind ∈ 'friend' | 'coach-pin' | 'admin-pin' | 'admin'
+    // Visual rule: any row with a `latest` message uses the preview + time
+    // layout (iMessage-style); rows without a recent message fall back to
+    // the friend streak + exec-ring layout. The pinned-coach variant gets
+    // a "· Coach" suffix and a star, the rest don't get any special chrome.
     const u = opts.user;
     const name = u.name || 'Friend';
-    // Friendship id + name carried on the row so swipe-to-remove can
-    // confirm + DELETE without an extra lookup.
     const fidAttr = opts.friendshipId ? ` data-friendship-id="${esc(opts.friendshipId)}"` : '';
     const nameAttr = ` data-peer-name="${esc(name)}"`;
-    const kind = opts.admin ? 'admin'
-      : opts.adminPin ? 'admin-pin'
-        : opts.pinned ? 'coach'
-          : 'friend';
+    const peerKind = opts.kind || 'friend';
+    const badge = opts.unread > 0
+      ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
 
-    // Admin reply rows: same compact layout as the pinned coach entry but
-    // visible only to the admin themselves. No streak ring.
-    if (opts.admin) {
+    // Coach pin keeps its distinct chrome — the user expects a labelled,
+    // pinned slot for "this is your coach", separate from peer DMs.
+    if (peerKind === 'coach-pin') {
       const preview = fmtPreviewMsg(opts.latest);
       const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
-      const badge = opts.unread > 0
-        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
-      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="admin"${nameAttr}>
-        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
-        <div class="coach-thread-body">
-          <div class="coach-thread-name">${esc(name)}</div>
-          <div class="coach-thread-preview">${esc(preview)}</div>
-        </div>
-        <div class="coach-thread-meta">
-          <span class="coach-thread-time">${esc(time)}</span>
-          ${badge}
-        </div>
-      </div>`;
-    }
-
-    // Pinned-admin row (user's view of the admin). Same shape as pinned
-    // coach but with a "GoFirst" subline. Routes to admin DM on tap.
-    if (opts.adminPin) {
-      const preview = fmtPreviewMsg(opts.latest);
-      const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
-      const badge = opts.unread > 0
-        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
-      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="admin-pin"${nameAttr}>
-        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
-        <div class="coach-thread-body">
-          <div class="coach-thread-name">${esc(name)} · GoFirst</div>
-          <div class="coach-thread-preview">${esc(preview)}</div>
-        </div>
-        <div class="coach-thread-meta">
-          <span class="coach-thread-time">${esc(time)}</span>
-          <span class="coach-thread-time" title="Pinned">★</span>
-          ${badge}
-        </div>
-      </div>`;
-    }
-
-    if (opts.pinned) {
-      // Pinned coach entry keeps the message-preview / unread layout —
-      // exec data isn't a thing for a coach in this context.
-      const preview = fmtPreviewMsg(opts.latest);
-      const time = opts.latest ? fmtAgo(opts.latest.createdAt) : '';
-      const badge = opts.unread > 0
-        ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
       return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="coach"${nameAttr}>
         <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
         <div class="coach-thread-body">
@@ -8458,14 +8419,32 @@ const Coaching = (() => {
       </div>`;
     }
 
-    // Friend row: name + "X day streak" + today's exec ring.
+    // Active conversation — show preview + relative time, regardless of
+    // whether the peer is a friend, the admin, or the broadcast-reply
+    // counterpart. peerKind drives only the click handler routing.
+    if (opts.latest) {
+      const preview = fmtPreviewMsg(opts.latest);
+      const time = fmtAgo(opts.latest.createdAt);
+      return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${peerKind}"${fidAttr}${nameAttr}>
+        <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
+        <div class="coach-thread-body">
+          <div class="coach-thread-name">${esc(name)}</div>
+          <div class="coach-thread-preview">${esc(preview)}</div>
+        </div>
+        <div class="coach-thread-meta">
+          <span class="coach-thread-time">${esc(time)}</span>
+          ${badge}
+        </div>
+      </div>`;
+    }
+
+    // No conversation yet — friend-list-style row with streak text and
+    // today's exec-rate ring.
     const streak = opts.executionStreak || 0;
     const streakLabel = `${streak} day streak`;
     const todayRate = opts.todayRate;
     const ringText = todayRate == null ? '—' : (todayRate + '%');
-    const badge = opts.unread > 0
-      ? `<span class="coach-thread-badge">${opts.unread}</span>` : '';
-    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${kind}"${fidAttr}${nameAttr}>
+    return `<div class="coach-thread" data-thread data-peer-id="${esc(u.id)}" data-peer-kind="${peerKind}"${fidAttr}${nameAttr}>
       <div class="coach-thread-avatar">${avatarHtml(u, name)}</div>
       <div class="coach-thread-body">
         <div class="coach-thread-name">${esc(name)}</div>
@@ -8494,49 +8473,75 @@ const Coaching = (() => {
     const empty = document.getElementById('inbox-empty');
     if (!list) return;
     const me = Auth.user;
-    let html = '';
-    // Pinned coach entry first for active coaching clients.
-    if (me && me.coachingClient && coachPeerInfo) {
-      html += threadRowHtml({
+    if (!me) return;
+
+    // Build a single threads list and sort chronologically by latest
+    // message. The coach pin always stays at the top (it's a relationship,
+    // not a conversation, and the user pays for the slot). Everything else
+    // — friends, admin DMs, admin broadcast replies — gets ordered by the
+    // most recent message. Threads with no messages drop to the bottom and
+    // tie-break alphabetically.
+    const threads = [];
+    const seen = new Set();
+
+    if (me.coachingClient && coachPeerInfo) {
+      threads.push({
         user: coachPeerInfo,
         latest: coachInboxMsgPreview,
         unread: coachInboxUnread,
-        pinned: true,
+        kind: 'coach-pin',
+        _pinTop: true,
       });
+      seen.add(coachPeerInfo.id);
     }
-    // Pinned-admin entry for any user who has message history with admin
-    // (server only returns it when there's at least one). The admin
-    // doesn't get themselves pinned.
-    if (me && !me.isAdmin && adminPeerInfo) {
-      html += threadRowHtml({
-        user: adminPeerInfo,
-        latest: adminInboxMsgPreview,
-        unread: adminInboxUnread,
-        adminPin: true,
-      });
-    }
-    // Admin's broadcast-reply threads next (only present when me.isAdmin).
-    // Filter out anyone who's also a friend — that thread already shows up
-    // below with the friend chrome, no need to render it twice.
-    const friendIds = new Set(friendThreads.map(t => t.user.id));
-    for (const t of adminThreads) {
-      if (friendIds.has(t.user.id)) continue;
-      html += threadRowHtml({
-        user: t.user, latest: t.latest, unread: t.unread, admin: true,
-      });
-    }
-    // Friends below, newest-first (server already sorted).
+
+    // Friends.
     for (const t of friendThreads) {
-      html += threadRowHtml({
-        user: t.user, latest: t.latest, unread: t.unread, pinned: false,
+      if (seen.has(t.user.id)) continue;
+      threads.push({
+        user: t.user, latest: t.latest, unread: t.unread, kind: 'friend',
         friendshipId: t.friendshipId,
         todayRate: t.todayRate, executionStreak: t.executionStreak,
       });
+      seen.add(t.user.id);
     }
+
+    // Admin's view of broadcast-reply threads (admin only — these are the
+    // people who replied to a broadcast).
+    if (me.isAdmin) {
+      for (const t of adminThreads) {
+        if (seen.has(t.user.id)) continue;
+        threads.push({
+          user: t.user, latest: t.latest, unread: t.unread, kind: 'admin',
+        });
+        seen.add(t.user.id);
+      }
+    }
+
+    // Non-admin user's view of the admin (only if there's a thread). If
+    // they're already a friend the friend row covers it; skip the dupe.
+    if (!me.isAdmin && adminPeerInfo && !seen.has(adminPeerInfo.id)) {
+      threads.push({
+        user: adminPeerInfo,
+        latest: adminInboxMsgPreview,
+        unread: adminInboxUnread,
+        kind: 'admin-pin',
+      });
+    }
+
+    threads.sort((a, b) => {
+      if (a._pinTop && !b._pinTop) return -1;
+      if (b._pinTop && !a._pinTop) return 1;
+      const aT = a.latest ? new Date(a.latest.createdAt).getTime() : 0;
+      const bT = b.latest ? new Date(b.latest.createdAt).getTime() : 0;
+      if (aT !== bT) return bT - aT;
+      return ((a.user.name || '').localeCompare(b.user.name || ''));
+    });
+
+    const html = threads.map(threadRowHtml).join('');
     list.innerHTML = html;
     paintThreadRowRings(list);
-    const hasContent = !!html;
-    if (empty) empty.hidden = hasContent;
+    if (empty) empty.hidden = !!html;
     renderStories();
   }
 
