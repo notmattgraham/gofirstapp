@@ -3166,6 +3166,110 @@
     margin-top: 4px;
   }
 
+  /* ── Commit ceremony ─────────────────────────────────────────
+     Plays for ~2.4s after a successful commit, then the page
+     reloads into the user's fresh task list. The pop + check-draw
+     are timed to feel like a single physical "click" of a lock,
+     followed by the confetti burst. */
+  .onb-celebration {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    overflow: hidden;
+    padding: 24px;
+  }
+  .onb-celebration[hidden] { display: none; }
+  .onb-celebration-icon {
+    width: 116px;
+    height: 116px;
+    border-radius: 50%;
+    background: #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: scale(0);
+    animation: ceremony-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s forwards;
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.35);
+  }
+  .onb-celebration-icon svg {
+    width: 64px; height: 64px;
+    stroke: #ffffff;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+  .onb-celebration-icon svg path {
+    stroke-dasharray: 32;
+    stroke-dashoffset: 32;
+    animation: ceremony-check-draw 0.45s 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  .onb-celebration-title {
+    font-size: clamp(34px, 9vw, 48px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin: 0;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: ceremony-fade-up 0.5s 0.7s ease-out forwards;
+  }
+  .onb-celebration-sub {
+    font-size: 16px;
+    color: var(--text-dim);
+    text-align: center;
+    margin: 0;
+    max-width: 320px;
+    line-height: 1.45;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: ceremony-fade-up 0.5s 0.95s ease-out forwards;
+  }
+  @keyframes ceremony-pop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  @keyframes ceremony-check-draw { to { stroke-dashoffset: 0; } }
+  @keyframes ceremony-fade-up    { to { opacity: 1; transform: translateY(0); } }
+
+  /* Confetti — radial burst from the icon's center, with gravity bias
+     so pieces fall back down. Each piece's distance/angle/rotation is
+     written as a CSS variable when the JS spawns it. */
+  .onb-confetti {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+  .onb-confetti-piece {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 14px;
+    border-radius: 1px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    animation: confetti-burst 1.6s cubic-bezier(0.22, 0.9, 0.4, 1) forwards;
+  }
+  @keyframes confetti-burst {
+    0%   { opacity: 0; transform: translate(-50%, -50%) rotate(0deg); }
+    8%   { opacity: 1; }
+    100% {
+      opacity: 0;
+      transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) rotate(var(--rot, 0deg));
+    }
+  }
+
   /* ── Welcome tour ─────────────────────────────────────────────
      5-card carousel shown once on first login (gated by `tutorialSeen`
      on the user record). Centered modal with a tinted backdrop, dot
@@ -4683,6 +4787,20 @@
        simple on mobile. -->
   <div class="onboarding" id="onboarding" hidden aria-hidden="true">
     <div class="onboarding-content" id="onb-content"></div>
+  </div>
+
+  <!-- Commit ceremony overlay. Hidden until the commit POST resolves
+       successfully, then revealed for ~2.4s before the page reloads.
+       The confetti container is populated at runtime — each piece gets
+       its trajectory as inline CSS variables so the keyframes stay
+       generic. -->
+  <div class="onb-celebration" id="onb-celebration" hidden aria-hidden="true">
+    <div class="onb-celebration-icon">
+      <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h1 class="onb-celebration-title">Committed.</h1>
+    <p class="onb-celebration-sub" id="onb-celebration-sub"></p>
+    <div class="onb-confetti" id="onb-confetti"></div>
   </div>
 
   <!-- Push notification soft-ask. Shown once per device on app open
@@ -10449,6 +10567,25 @@ window.Onboarding = (() => {
         }
       });
     });
+
+    // Live-update the Continue button on the tasks step. Without this,
+    // STATE.tasks only refreshes when an action button is tapped, so the
+    // button stays disabled / shows "Add N more" even after the user has
+    // typed in the third task.
+    if (STATE.step === 2) {
+      const inputs = c.querySelectorAll('.onb-input');
+      const nextBtn = c.querySelector('[data-action="next"]');
+      const sync = () => {
+        const filled = [...inputs].filter((el) => el.value.trim().length > 0).length;
+        const enough = filled >= MIN_TASKS;
+        if (nextBtn) {
+          nextBtn.disabled = !enough;
+          nextBtn.textContent = enough ? 'Continue' : `Add ${MIN_TASKS - filled} more`;
+        }
+      };
+      inputs.forEach((el) => el.addEventListener('input', sync));
+      sync();
+    }
   }
 
   async function commit() {
@@ -10470,16 +10607,60 @@ window.Onboarding = (() => {
         const data = await r.json().catch(() => ({}));
         throw new Error(data.error || `status_${r.status}`);
       }
-      // Reload the page so Store / streaks / etc. are fully fresh and
-      // the user lands on Tasks with their new list visible. Avoids a
-      // race between Auth.user updating and Store still holding the
-      // old empty state.
-      location.reload();
+      // Play the commit ceremony, then reload so Store / streaks / etc.
+      // are fully fresh and the user lands on Tasks with their new list
+      // visible. The reload also avoids a race between Auth.user
+      // updating and Store still holding the old empty state.
+      playCeremony();
+      setTimeout(() => location.reload(), 2400);
     } catch (e) {
       STATE.error = `Couldn't save. ${e.message || ''}`.trim();
       STATE.submitting = false;
       render();
     }
+  }
+
+  // Reveal the celebration overlay on top of the onboarding takeover,
+  // populate the sub-line with the commitment counts, and spawn a
+  // radial confetti burst. Pure DOM — animations live in CSS, this
+  // just drops the pieces and lets keyframes do the work.
+  function playCeremony() {
+    const cel = $('onb-celebration');
+    const sub = $('onb-celebration-sub');
+    const conf = $('onb-confetti');
+    if (!cel) return;
+    const habits = nonEmpty(STATE.habits).length;
+    const tasks  = nonEmpty(STATE.tasks).length;
+    const hPart = habits === 0
+      ? null
+      : `${habits} habit${habits === 1 ? '' : 's'} walked away from`;
+    const tPart = `${tasks} action${tasks === 1 ? '' : 's'} for today`;
+    if (sub) sub.textContent = hPart ? `${hPart} · ${tPart}.` : `${tPart}.`;
+    if (conf) {
+      conf.innerHTML = '';
+      const colors = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#a855f7', '#ec4899', '#22d3ee', '#facc15'];
+      const N = 30;
+      for (let i = 0; i < N; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'onb-confetti-piece';
+        // Distribute around a circle with a touch of randomness so the
+        // burst isn't too perfectly even, then bias dy positive so
+        // pieces drift down (gravity).
+        const angle = (Math.PI * 2 * i) / N + (Math.random() - 0.5) * 0.4;
+        const dist  = 220 + Math.random() * 140;
+        const dx    = Math.cos(angle) * dist;
+        const dy    = Math.sin(angle) * dist + 110;
+        const rot   = (Math.random() - 0.5) * 720;
+        piece.style.setProperty('--dx',  dx  + 'px');
+        piece.style.setProperty('--dy',  dy  + 'px');
+        piece.style.setProperty('--rot', rot + 'deg');
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDelay = (0.55 + Math.random() * 0.35) + 's';
+        conf.appendChild(piece);
+      }
+    }
+    cel.hidden = false;
+    cel.setAttribute('aria-hidden', 'false');
   }
 
   function maybeAutoShow() {
