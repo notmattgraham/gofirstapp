@@ -7,6 +7,7 @@ const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { dateInTz } = require('../time');
+const pushModule = require('./push');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 // Coach status is purely DB-driven — promote via the role picker in /dev.
@@ -380,6 +381,44 @@ router.post('/broadcast', wrap(async (req, res) => {
   }
 
   res.json({ sent: recipients.length });
+}));
+
+// POST /api/admin/push-broadcast — admin-only system push to every user
+// who has at least one active push subscription. Body: { title, body, url? }.
+// Different from /broadcast (which creates DM rows in the inbox); this is
+// a one-shot OS-level notification with no in-app trail. Useful for app
+// updates, maintenance windows, etc.
+router.post('/push-broadcast', wrap(async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
+  if (!pushModule.isConfigured()) {
+    return res.status(503).json({ error: 'push_not_configured' });
+  }
+  const { title, body, url } = req.body || {};
+  const t = (typeof title === 'string') ? title.trim() : '';
+  const b = (typeof body === 'string')  ? body.trim()  : '';
+  if (!t) return res.status(400).json({ error: 'title_required' });
+  if (t.length > 120) return res.status(400).json({ error: 'title_too_long' });
+  if (b.length > 500) return res.status(400).json({ error: 'body_too_long' });
+  const u = (typeof url === 'string' && url.trim()) ? url.trim() : '/';
+
+  // Distinct user ids that currently have at least one subscription.
+  const subs = await prisma.pushSubscription.findMany({
+    select: { userId: true },
+    distinct: ['userId'],
+  });
+  const userIds = subs.map(s => s.userId);
+  const result = await pushModule.sendPushToUsers(userIds, {
+    title: t,
+    body: b,
+    url: u,
+    tag: 'system',
+  });
+  res.json({
+    audience: userIds.length,
+    sent: result.sent,
+    failed: result.failed,
+    removed: result.removed,
+  });
 }));
 
 // GET /api/admin/coaching-clients — every flagged client with full drill-down.

@@ -7,7 +7,7 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-const CACHE = 'gofirst-v3';
+const CACHE = 'gofirst-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -56,4 +56,47 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
   );
+});
+
+/* ── Push notifications ──────────────────────────────────────────
+ * Server posts a JSON body like:
+ *   { title, body, url?, tag?, icon? }
+ * The handler shows a single notification and (on click) tries to focus
+ * an existing app window or open a fresh one at the supplied URL.
+ * Empty/malformed payloads still surface a generic notification so the
+ * subscription gets the "yes, you're alive" signal instead of a silent
+ * delivery (which some browsers count against the origin's reputation).
+ */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch { data = { title: 'GoFirst', body: (event.data && event.data.text()) || '' }; }
+  const title = data.title || 'GoFirst';
+  const options = {
+    body: data.body || '',
+    icon: data.icon || './icon-192.png',
+    badge: './icon-192.png',
+    // tag groups successive pushes into a single visible notification
+    // (e.g. multiple new messages from the same person collapse).
+    tag: data.tag || undefined,
+    data: { url: data.url || '/' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Reuse a same-origin window if one is open; otherwise pop a new one.
+    for (const c of all) {
+      if (c.url.startsWith(self.location.origin)) {
+        await c.focus();
+        try { await c.navigate(target); } catch {}
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
 });

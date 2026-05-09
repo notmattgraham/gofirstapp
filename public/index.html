@@ -3990,6 +3990,25 @@
           </div>
         </div>
 
+        <div class="section-title">Notifications</div>
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <div class="setting-title">Push notifications</div>
+              <div class="setting-sub" id="push-status-sub">Get nudges, system updates, and message alerts.</div>
+            </div>
+            <button class="action-btn ghost setting-btn" id="push-toggle-btn">Enable</button>
+          </div>
+          <!-- Shown only on iOS Safari when the app isn't running as an
+               installed PWA — Apple gates web-push behind home-screen install. -->
+          <div class="setting-row" id="push-ios-hint" hidden>
+            <div class="setting-copy" style="color: var(--warn)">
+              <div class="setting-title">Install this app first on iPhone</div>
+              <div class="setting-sub">Tap the Share button in Safari, then "Add to Home Screen". Push notifications only work from the installed version on iOS.</div>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Help</div>
         <div class="card">
           <div class="setting-row">
@@ -7153,6 +7172,166 @@ document.getElementById('profile-logout').addEventListener('click', async () => 
 document.getElementById('profile-show-tour').addEventListener('click', () => {
   if (window.Tour) Tour.open({ replay: true });
 });
+
+/* ============================================================
+   Push notifications — Profile toggle.
+   Flow on tap "Enable":
+     1. Permission.request() → if denied, surface a hint.
+     2. Service worker ready → subscribe via PushManager with the
+        server's VAPID public key (fetched from /api/push/vapid-public-key).
+     3. POST the resulting subscription to /api/push/subscribe.
+   Flow on tap "Disable":
+     1. Get current SW subscription, unsubscribe() locally, then
+        POST /api/push/unsubscribe so the server forgets the endpoint.
+   The iOS-Safari hint shows when we detect mobile Safari running outside
+   of an installed PWA — Apple gates web-push to standalone PWAs only.
+   ============================================================ */
+(function setupPush() {
+  const btn      = document.getElementById('push-toggle-btn');
+  const sub      = document.getElementById('push-status-sub');
+  const iosHint  = document.getElementById('push-ios-hint');
+  if (!btn || !sub) return;
+
+  const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+  // iOS Safari before 16.4 — and any iOS Safari that isn't running as
+  // an installed PWA — won't deliver pushes. Detect both cases so we
+  // can show the install hint instead of a confusing failure later.
+  const ua = navigator.userAgent || '';
+  const isIosSafari = /iP(hone|ad|od)/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua);
+  const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+                      || navigator.standalone === true;
+
+  if (!supported) {
+    btn.disabled = true;
+    btn.textContent = 'Unsupported';
+    sub.textContent = 'This browser does not support push notifications.';
+    return;
+  }
+  if (isIosSafari && !isStandalone) {
+    btn.disabled = true;
+    btn.textContent = 'Install first';
+    if (iosHint) iosHint.hidden = false;
+    return;
+  }
+
+  // Convert a base64url VAPID public key into the Uint8Array PushManager
+  // expects. Web-push sends keys in base64url; PushManager wants raw bytes.
+  function urlBase64ToUint8Array(b64) {
+    const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+    const safe = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(safe);
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+
+  let vapidPublicKey = null;
+  let serverEnabled = false;
+
+  async function getVapidKey() {
+    if (vapidPublicKey) return vapidPublicKey;
+    const r = await fetch('/api/push/vapid-public-key', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('vapid_key_fetch_failed');
+    const d = await r.json();
+    vapidPublicKey = d.key;
+    serverEnabled  = !!d.enabled;
+    return vapidPublicKey;
+  }
+
+  async function refreshState() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      const perm = (Notification.permission || 'default');
+      if (existing) {
+        btn.textContent = 'Disable';
+        sub.textContent = 'On — you\'ll get message, friend, and system alerts.';
+      } else if (perm === 'denied') {
+        btn.disabled = true;
+        btn.textContent = 'Blocked';
+        sub.textContent = 'Notifications are blocked in your browser settings.';
+      } else {
+        btn.textContent = 'Enable';
+        sub.textContent = 'Get nudges, system updates, and message alerts.';
+      }
+    } catch (e) {
+      console.warn('[push] refreshState failed', e);
+    }
+  }
+
+  async function enable() {
+    btn.disabled = true;
+    btn.textContent = 'Enabling…';
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') {
+        sub.textContent = 'Notifications denied. Allow them in your browser settings.';
+        return;
+      }
+      const key = await getVapidKey();
+      if (!serverEnabled) {
+        sub.textContent = 'Push isn\'t configured on the server yet. Try again later.';
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+      const json = subscription.toJSON();
+      const r = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: json.keys,
+          label: navigator.userAgent.slice(0, 100),
+        }),
+      });
+      if (!r.ok) throw new Error('subscribe_post_failed_' + r.status);
+    } catch (e) {
+      console.warn('[push] enable failed', e);
+      sub.textContent = 'Could not enable notifications. ' + (e.message || '');
+    } finally {
+      btn.disabled = false;
+      refreshState();
+    }
+  }
+
+  async function disable() {
+    btn.disabled = true;
+    btn.textContent = 'Disabling…';
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        const endpoint = existing.endpoint;
+        try { await existing.unsubscribe(); } catch {}
+        await fetch('/api/push/unsubscribe', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint }),
+        });
+      }
+    } catch (e) {
+      console.warn('[push] disable failed', e);
+    } finally {
+      btn.disabled = false;
+      refreshState();
+    }
+  }
+
+  btn.addEventListener('click', () => {
+    if (btn.textContent === 'Disable') disable();
+    else                                enable();
+  });
+
+  // Sync UI state on page load — covers the case where the user enabled
+  // push on another device and we want to reflect it here.
+  refreshState();
+})();
 
 // Profile → Edit display name (inline prompt for MVP; inline field later)
 document.getElementById('edit-name-btn').addEventListener('click', async () => {
