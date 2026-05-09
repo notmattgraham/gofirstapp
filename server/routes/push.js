@@ -104,11 +104,20 @@ async function sendPushToUsers(userIds, payload) {
 async function _fanOut(subs, payload) {
   let sent = 0, failed = 0, removed = 0;
   const json = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  // Tell APNs / FCM to prioritise delivery and to drop the message if
+  // the device is offline for more than 4 hours. Without these headers
+  // web-push defaults to "normal" urgency and no TTL, which lets the
+  // push provider batch — observed to add 1–2 minute delays on iOS.
+  const sendOptions = {
+    urgency: 'high',
+    TTL: 4 * 60 * 60, // seconds
+  };
   await Promise.allSettled(subs.map(async (s) => {
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         json,
+        sendOptions,
       );
       sent++;
       // Best-effort: don't await — keeps the per-push round trip lean.
