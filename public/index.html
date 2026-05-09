@@ -4007,6 +4007,32 @@
               <div class="setting-sub">Tap the Share button in Safari, then "Add to Home Screen". Push notifications only work from the installed version on iOS.</div>
             </div>
           </div>
+          <!-- Per-event toggles. Visible only once notifications are enabled
+               (hidden via #notify-prefs-section.hidden). Each is a
+               checkbox-styled control that PATCHes /api/auth/notify-prefs. -->
+          <div id="notify-prefs-section" hidden>
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">Direct messages</div>
+                <div class="setting-sub">DMs from friends and your coach.</div>
+              </div>
+              <input type="checkbox" class="setting-toggle" id="notify-pref-messages" />
+            </div>
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">Friend requests</div>
+                <div class="setting-sub">Someone sends or accepts a request.</div>
+              </div>
+              <input type="checkbox" class="setting-toggle" id="notify-pref-friends" />
+            </div>
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">System updates</div>
+                <div class="setting-sub">Announcements from the GoFirst team.</div>
+              </div>
+              <input type="checkbox" class="setting-toggle" id="notify-pref-system" />
+            </div>
+          </div>
         </div>
 
         <div class="section-title">Help</div>
@@ -7363,6 +7389,55 @@ window.PushNotifications = (function setupPush() {
   // push on another device and we want to reflect it here.
   refreshState();
 
+  // Per-event toggles. Hide them entirely when push isn't subscribed —
+  // setting a pref while push is off has no effect anyway. Refresh runs
+  // both on initial load and after every Enable / Disable round trip.
+  function refreshPrefsSection() {
+    const sec = document.getElementById('notify-prefs-section');
+    if (!sec) return;
+    if (Notification.permission !== 'granted') { sec.hidden = true; return; }
+    sec.hidden = false;
+    const u = (typeof Auth !== 'undefined') ? Auth.user : null;
+    if (!u) return;
+    const m = document.getElementById('notify-pref-messages');
+    const f = document.getElementById('notify-pref-friends');
+    const s = document.getElementById('notify-pref-system');
+    if (m) m.checked = u.notifyMessages !== false;
+    if (f) f.checked = u.notifyFriends  !== false;
+    if (s) s.checked = u.notifySystem   !== false;
+  }
+  async function patchPref(key, val) {
+    try {
+      const r = await fetch('/api/auth/notify-prefs', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: val }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (typeof Auth !== 'undefined' && data.user) Auth.user = data.user;
+      }
+    } catch (e) { console.warn('[push prefs] patch failed', e); }
+  }
+  ['messages','friends','system'].forEach((k) => {
+    const el = document.getElementById(`notify-pref-${k}`);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      const key = 'notify' + k.charAt(0).toUpperCase() + k.slice(1);
+      patchPref(key, el.checked);
+    });
+  });
+  refreshPrefsSection();
+  // Re-show the prefs section after a successful enable() so the user
+  // sees their toggles immediately. We piggy-back on the existing
+  // refreshState() call via a MutationObserver-free approach: wrap.
+  const _origRefresh = refreshState;
+  refreshState = async function patchedRefreshState() {
+    await _origRefresh.apply(this, arguments);
+    refreshPrefsSection();
+  };
+
   // Public surface — used by the soft-ask prompt that fires on app open
   // and any future call site that wants to programmatically subscribe.
   return {
@@ -7879,11 +7954,21 @@ const Coaching = (() => {
   }
 
   /* ── DM overlay (peer = coach for clients, or any friend for anyone) ── */
+  // Tell the server which DM thread is on screen. Server uses this to
+  // suppress OS-level pushes for messages from that peer (we already see
+  // them via the WebSocket). Fire-and-forget; if the WS isn't open yet
+  // the server falls back to firing a push, which is the safe default.
+  function emitViewing(peerId) {
+    if (!ws || ws.readyState !== 1) return;
+    try { ws.send(JSON.stringify({ type: 'viewing', peerId: peerId || null })); } catch {}
+  }
+
   async function openDm(peerId, peerInfo) {
     dmPeerId = peerId;
     dmPeerInfo = peerInfo || dmPeerInfo;
     hideTyping('dm');
     updateDmHeader();
+    emitViewing(peerId);
 
     // The "Friend's data" dropdown is friend-only. The user's own coach
     // doesn't get one — that wouldn't make sense (coach has access to
@@ -7910,6 +7995,7 @@ const Coaching = (() => {
   }
   function closeDm() {
     closeOverlay('dm-overlay');
+    emitViewing(null);
     setTimeout(() => { dmPeerId = null; }, 300);
   }
 

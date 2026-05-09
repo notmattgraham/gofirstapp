@@ -52,6 +52,16 @@ model User {
   // sessions. Users can re-trigger the tour from Profile regardless.
   tutorialSeen        Boolean  @default(false)
 
+  // Per-event push toggles. All default true so a freshly-subscribed user
+  // gets every kind of notification until they specifically opt out from
+  // Profile → Notifications. The toggles bucket events into three groups:
+  //   notifyMessages — inbound DM (friend, coach<->client, broadcast reply).
+  //   notifyFriends  — friend request received OR your request accepted.
+  //   notifySystem   — admin in-app broadcasts and any future system push.
+  notifyMessages      Boolean  @default(true)
+  notifyFriends       Boolean  @default(true)
+  notifySystem        Boolean  @default(true)
+
   // Updated by the trackLastSeen middleware on authenticated requests
   // (throttled to 1 write/min/user). Drives the "Active now / 5m ago"
   // presence display in the chat header.

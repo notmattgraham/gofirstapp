@@ -140,6 +140,7 @@ function wsBroadcast(userId, payload) {
 global.wsBroadcast = wsBroadcast;
 
 const wss = new WebSocketServer({ noServer: true });
+const pushModule = require('./routes/push');
 
 wss.on('connection', (ws, userId, info) => {
   // Register the socket.
@@ -151,29 +152,51 @@ wss.on('connection', (ws, userId, info) => {
   ws._isCoach = !!info?.isCoach;
   ws._isClient = !!info?.coachingClient;
   ws._coachId = info?.coachId || null;
+  ws._viewingPeer = null; // peer id whose DM thread is currently on screen
 
   ws.on('message', async (raw) => {
     let msg;
     try { msg = JSON.parse(String(raw)); } catch { return; }
-    if (!msg || msg.type !== 'typing') return;
+    if (!msg) return;
 
-    // Resolve recipient based on the sender's role:
-    //   coach   → typing to msg.to (a coaching client they're chatting with)
-    //   client  → typing to the coach
-    let to = null;
-    if (ws._isCoach) {
-      to = typeof msg.to === 'string' ? msg.to : null;
-    } else if (ws._isClient) {
-      to = ws._coachId;
+    if (msg.type === 'typing') {
+      // Resolve recipient based on the sender's role:
+      //   coach   → typing to msg.to (a coaching client they're chatting with)
+      //   client  → typing to the coach
+      let to = null;
+      if (ws._isCoach) {
+        to = typeof msg.to === 'string' ? msg.to : null;
+      } else if (ws._isClient) {
+        to = ws._coachId;
+      }
+      if (!to || to === userId) return;
+
+      // Forward — recipient's UI shows the indicator until the trailing
+      // timeout expires. We don't store anything; this is fire-and-forget.
+      wsBroadcast(to, { type: 'typing', from: userId });
+      return;
     }
-    if (!to || to === userId) return;
 
-    // Forward — recipient's UI shows the indicator until the trailing
-    // timeout expires. We don't store anything; this is fire-and-forget.
-    wsBroadcast(to, { type: 'typing', from: userId });
+    if (msg.type === 'viewing') {
+      // Client tells us which DM thread (if any) is currently on screen.
+      // We use this for push-suppression: if a recipient is staring at
+      // the sender's thread, they don't need a notification on top.
+      const next = (typeof msg.peerId === 'string' && msg.peerId) ? msg.peerId : null;
+      const prev = ws._viewingPeer;
+      if (next === prev) return;
+      ws._viewingPeer = next;
+      pushModule.setViewingPeer(userId, next, prev);
+      return;
+    }
   });
 
   ws.on('close', () => {
+    // Clean up the active-thread marker so we don't suppress a future
+    // push for a peer this socket was looking at before disconnecting.
+    if (ws._viewingPeer) {
+      pushModule.clearViewingPeer(userId, ws._viewingPeer);
+      ws._viewingPeer = null;
+    }
     const set = wsClients.get(userId);
     if (set) {
       set.delete(ws);
