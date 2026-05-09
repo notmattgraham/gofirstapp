@@ -37,6 +37,7 @@ function shape(u) {
     isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
+    lockTime: (typeof u.lockTime === 'string' && u.lockTime) || '00:00',
     // Coalesce nullables defensively for users created before these
     // columns existed — Prisma returns the column as the default `true`
     // once the migration runs, but a stale shape returned mid-deploy
@@ -91,6 +92,14 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
     }
     data.picture = req.body.picture || null;
   }
+  if (typeof req.body.lockTime === 'string') {
+    // HH:MM, 24-hour. Anything else is silently ignored.
+    if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(req.body.lockTime)) {
+      // Normalize "9:00" → "09:00" for stable comparisons downstream.
+      const [h, m] = req.body.lockTime.split(':').map(Number);
+      data.lockTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+  }
   if (typeof req.body.timezone === 'string') {
     // Trust IANA-shaped strings only ("Region/City" or fixed names like "UTC").
     if (/^[A-Za-z_+\-/0-9]{3,60}$/.test(req.body.timezone)) data.timezone = req.body.timezone;
@@ -143,7 +152,19 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
     return res.status(400).json({ error: 'min_three_tasks_required' });
   }
 
-  const today = userToday(req.user);
+  // Lock time — required during onboarding (the SPA enforces this, but
+  // we double-check). HH:MM, 24-hour, normalized to two-digit fields.
+  let lockTime = '00:00';
+  if (typeof req.body.lockTime === 'string'
+      && /^([01]?\d|2[0-3]):[0-5]\d$/.test(req.body.lockTime)) {
+    const [h, m] = req.body.lockTime.split(':').map(Number);
+    lockTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  // userToday respects the lock time we're about to save, so apply
+  // it locally first to compute the right "today" for the new tasks.
+  const userWithLock = { ...req.user, lockTime };
+  const today = userToday(userWithLock);
   // Local-time "now" for startedAt — same format the SPA uses (YYYY-MM-DDTHH:MM).
   // We don't have the user's exact wall-clock down to the minute on the
   // server, so we approximate using their TZ-localized date + 00:00. The
@@ -156,7 +177,7 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
   const [updated] = await prisma.$transaction([
     prisma.user.update({
       where: { id: req.user.id },
-      data: { onboardedAt: now, tutorialSeen: true },
+      data: { onboardedAt: now, tutorialSeen: true, lockTime },
     }),
     ...habits.map((name) =>
       prisma.quitStreak.create({
