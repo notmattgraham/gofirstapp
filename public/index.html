@@ -10711,7 +10711,7 @@ window.Onboarding = (() => {
       </div>
       <div class="onb-actions">
         <button class="onb-btn ghost" data-action="back">Back</button>
-        <button class="onb-btn primary" data-action="next">I get it</button>
+        <button class="onb-btn primary" data-action="next">Got it</button>
       </div>
     `;
   }
@@ -10775,18 +10775,25 @@ window.Onboarding = (() => {
   }
 
   function stepHabits() {
-    const inputs = STATE.habits.map((v, i) => `
+    // Per-row placeholder with a concrete example for the first three
+    // slots; anything beyond just shows the numbered label so the
+    // "+ Add another" path doesn't keep reusing examples.
+    const HABIT_EXAMPLES = ['doom scrolling', 'alcohol', 'binge eating'];
+    const inputs = STATE.habits.map((v, i) => {
+      const ex = HABIT_EXAMPLES[i];
+      const placeholder = ex ? `Bad habit #${i + 1} (e.g. ${ex})` : `Bad habit #${i + 1}`;
+      return `
       <input class="onb-input" type="text" maxlength="200"
              value="${escHtml(v)}"
-             placeholder="${i === 0 ? 'e.g. doom scrolling' : 'another…'}" />
-    `).join('');
+             placeholder="${escHtml(placeholder)}" />`;
+    }).join('');
     return `
       <div class="onb-eyebrow">Step 2 of 4</div>
       <h1 class="onb-h1">What's been holding you back?</h1>
       <p class="onb-body">
-        List the habits you're <b>walking away from</b> today. Each one
-        becomes a streak — every day you don't fall back to it counts
-        toward something.
+        Everyone has at least one bad habit holding them back that they
+        need to <b>walk away from</b>. List yours below and track it
+        in the app.
       </p>
       <div class="onb-input-list">${inputs}</div>
       <button type="button" class="onb-add" data-action="add-habit"
