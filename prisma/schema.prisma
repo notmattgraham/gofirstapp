@@ -47,6 +47,11 @@ model User {
   // works before anyone is flagged in the DB.
   isAdmin             Boolean  @default(false)
 
+  // True once the user has finished or skipped the first-login welcome
+  // tour. Used to gate auto-display of the tutorial carousel on subsequent
+  // sessions. Users can re-trigger the tour from Profile regardless.
+  tutorialSeen        Boolean  @default(false)
+
   // Updated by the trackLastSeen middleware on authenticated requests
   // (throttled to 1 write/min/user). Drives the "Active now / 5m ago"
   // presence display in the chat header.

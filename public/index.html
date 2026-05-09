@@ -2934,6 +2934,105 @@
     stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
   }
 
+  /* ── Welcome tour ─────────────────────────────────────────────
+     5-card carousel shown once on first login (gated by `tutorialSeen`
+     on the user record). Centered modal with a tinted backdrop, dot
+     indicators, Skip + Next/Done buttons. Skip and Done both POST the
+     server flag so it doesn't re-appear next session. Profile has a
+     "Show app tour" button to replay it on demand. */
+  .tour-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .tour-backdrop.open { opacity: 1; pointer-events: auto; }
+  .tour-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 22px 22px 16px;
+    transform: translateY(8px);
+    transition: transform 0.22s cubic-bezier(0.22, 0.9, 0.28, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .tour-backdrop.open .tour-card { transform: translateY(0); }
+  .tour-step-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .tour-step-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.2;
+    margin: -2px 0 0;
+  }
+  .tour-step-body {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .tour-step-body p { margin: 0; }
+  .tour-step-body p + p { margin-top: 8px; }
+  .tour-step-body b { color: var(--text); font-weight: 700; }
+  .tour-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 0 2px;
+  }
+  .tour-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    transition: background 0.15s ease, width 0.15s ease;
+  }
+  .tour-dots span.active { background: var(--accent); width: 18px; }
+  .tour-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .tour-btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 4px;
+    cursor: pointer;
+  }
+  .tour-btn:hover { color: var(--text); }
+  .tour-btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-radius: 999px;
+    padding: 10px 22px;
+  }
+  .tour-btn.primary:hover { background: var(--accent-hover); }
+
   /* ── Coach overlay panels ────────────────────────────────────
      Live INSIDE .app so they inherit the centered 480px shell, then
      slide in from the right on top of every other in-app content. */
@@ -3629,6 +3728,17 @@
           </div>
         </div>
 
+        <div class="section-title">Help</div>
+        <div class="card">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <div class="setting-title">App tour</div>
+              <div class="setting-sub">Five quick cards covering each tab. Replay anytime.</div>
+            </div>
+            <button class="action-btn ghost setting-btn" id="profile-show-tour">Show</button>
+          </div>
+        </div>
+
         <div class="section-title">Session</div>
         <div class="card">
           <div class="setting-row">
@@ -3934,6 +4044,21 @@
         </div>
         <ul class="chat-inbox-list" id="friend-search-results"></ul>
         <div class="friend-search-hint" id="friend-search-hint">Type at least 2 characters.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Welcome tour modal. Lives outside .app so the backdrop covers the
+       whole viewport (the .app shell is max-width-clamped on desktop).
+       Content rendered into #tour-card-content by Tour.show() from a
+       fixed steps array; aria-hidden until opened. -->
+  <div class="tour-backdrop" id="tour-backdrop" aria-hidden="true" hidden>
+    <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-step-title">
+      <div id="tour-card-content"></div>
+      <div class="tour-dots" id="tour-dots"></div>
+      <div class="tour-actions">
+        <button type="button" class="tour-btn" id="tour-skip">Skip</button>
+        <button type="button" class="tour-btn primary" id="tour-next">Next</button>
       </div>
     </div>
   </div>
@@ -6718,6 +6843,11 @@ document.getElementById('profile-logout').addEventListener('click', async () => 
   setTab('todo');
 });
 
+// Profile → Show app tour (replay path; doesn't reset the seen flag).
+document.getElementById('profile-show-tour').addEventListener('click', () => {
+  if (window.Tour) Tour.open({ replay: true });
+});
+
 // Profile → Edit display name (inline prompt for MVP; inline field later)
 document.getElementById('edit-name-btn').addEventListener('click', async () => {
   const current = (Auth.user && Auth.user.name) || '';
@@ -8703,6 +8833,11 @@ async function boot() {
   setTopAction();
   render(Store.get()); // instant render from cache (or empty on first boot)
 
+  // First-login welcome tour. No-op for users who've already seen it.
+  // Defer slightly so the tab/render finishes painting before the modal
+  // pops in — feels less jarring than auto-showing mid-mount.
+  if (window.Tour) setTimeout(() => Tour.maybeAutoShow(), 350);
+
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
   try {
@@ -8796,6 +8931,131 @@ function smoothDetails(detailsEl) {
 // Wire every existing details on first paint. Our app has no dynamic
 // <details> elements, so a single pass at boot covers them all.
 document.querySelectorAll('details').forEach(smoothDetails);
+
+/* ============================================================
+   Welcome tour — 5-card carousel shown once on first login.
+   Auto-shows when Auth.user.tutorialSeen === false; users can replay
+   from Profile via the "Show app tour" button. Dismiss (Skip) and
+   completion (Done) both POST /api/auth/tutorial-seen so the modal
+   doesn't reappear next session. The tour does not switch tabs —
+   it's plain prose by design (Option A from the design discussion).
+   ============================================================ */
+window.Tour = (() => {
+  const STEPS = [
+    {
+      eyebrow: 'Welcome',
+      title: 'Build the streak.',
+      body: `<p>GoFirst keeps your daily commitments tight. Quick 30-second tour so you know what each tab does.</p>`,
+    },
+    {
+      eyebrow: 'Tasks',
+      title: 'Plan it, then do it.',
+      body: `<p>Tap <b>+</b> to add a task — one-shot for today, or recurring (daily, weekly, monthly) for habits. Tap a row to mark it done.</p>
+             <p>Today's list <b>locks at midnight</b>. That's the whole point — you commit ahead of time. If life happens, you have <b>3 mulligans a month</b>.</p>`,
+    },
+    {
+      eyebrow: 'Analytics',
+      title: 'Your hit rate, honestly.',
+      body: `<p><b>Execution rate</b> = scheduled tasks you actually finished. The number to beat.</p>
+             <p><b>Execution streak</b> = consecutive days at 100%. Don't break it.</p>`,
+    },
+    {
+      eyebrow: 'Chat',
+      title: 'Accountability, not gossip.',
+      body: `<p>Add friends to see each other's exec rate and streaks — no task contents are shared. Just the score.</p>
+             <p>Want a real human watching? Optional <b>1:1 coaching</b> from the promo card.</p>`,
+    },
+    {
+      eyebrow: 'Profile',
+      title: "You're set.",
+      body: `<p>Your profile is where you change your name, theme, and timezone. <b>Quit streaks</b> tracks days since you stopped doing something — handy for habits you're cutting, not building.</p>
+             <p>Replay this tour anytime from Profile.</p>`,
+    },
+  ];
+
+  let i = 0;
+  let opened = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function render() {
+    const step = STEPS[i];
+    $('tour-card-content').innerHTML = `
+      <div class="tour-step-eyebrow">${step.eyebrow}</div>
+      <div class="tour-step-title" id="tour-step-title">${step.title}</div>
+      <div class="tour-step-body">${step.body}</div>
+    `;
+    $('tour-dots').innerHTML = STEPS
+      .map((_, idx) => `<span class="${idx === i ? 'active' : ''}"></span>`)
+      .join('');
+    $('tour-next').textContent = i === STEPS.length - 1 ? 'Done' : 'Next';
+    $('tour-skip').hidden = i === STEPS.length - 1;
+  }
+
+  async function markSeen() {
+    // Best-effort. If the network call fails the modal still closes —
+    // we'll re-show on next load, but the tour itself is harmless to repeat.
+    try {
+      await fetch('/api/auth/tutorial-seen', { method: 'POST', credentials: 'same-origin' });
+      if (window.Auth && window.Auth.user) window.Auth.user.tutorialSeen = true;
+    } catch {}
+  }
+
+  function open(opts) {
+    i = 0;
+    opened = true;
+    render();
+    const bd = $('tour-backdrop');
+    bd.hidden = false;
+    bd.setAttribute('aria-hidden', 'false');
+    // Force a reflow so the opacity transition fires.
+    void bd.offsetHeight;
+    bd.classList.add('open');
+    // Replay path skips the server flag — the user already finished it once.
+    Tour._persist = !(opts && opts.replay);
+  }
+
+  function close() {
+    if (!opened) return;
+    opened = false;
+    const bd = $('tour-backdrop');
+    bd.classList.remove('open');
+    bd.setAttribute('aria-hidden', 'true');
+    setTimeout(() => { bd.hidden = true; }, 200);
+    if (Tour._persist) markSeen();
+  }
+
+  function next() {
+    if (i < STEPS.length - 1) { i++; render(); }
+    else                       { close(); }
+  }
+
+  function wire() {
+    const next$ = $('tour-next');
+    const skip$ = $('tour-skip');
+    const bd    = $('tour-backdrop');
+    if (!next$ || !skip$ || !bd) return;
+    next$.addEventListener('click', next);
+    skip$.addEventListener('click', close);
+    // Backdrop click dismisses (counts as Skip — flag still gets set).
+    bd.addEventListener('click', (e) => { if (e.target === bd) close(); });
+    // Esc key closes too.
+    document.addEventListener('keydown', (e) => {
+      if (opened && e.key === 'Escape') close();
+    });
+  }
+
+  function maybeAutoShow() {
+    const u = window.Auth && window.Auth.user;
+    if (!u) return;
+    if (u.tutorialSeen) return;
+    open();
+  }
+
+  wire();
+
+  return { open, close, maybeAutoShow };
+})();
 
 // Client-side keepalive: ping the server every 4 minutes while this tab is
 // open, preventing Railway from sleeping mid-session.

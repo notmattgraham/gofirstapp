@@ -35,6 +35,7 @@ function shape(u) {
     // before anyone has been flagged via /dev.
     isCoach: !!u.isCoach || (u.email || '').toLowerCase() === COACH_EMAIL,
     isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
+    tutorialSeen: !!u.tutorialSeen,
   };
 }
 
@@ -68,6 +69,18 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
   }
   if (Object.keys(data).length === 0) return res.json({ user: shape(req.user) });
   const user = await prisma.user.update({ where: { id: req.user.id }, data });
+  res.json({ user: shape(user) });
+});
+
+// POST /api/auth/tutorial-seen — flip the tutorialSeen flag once the
+// user has finished or skipped the first-login welcome tour. Idempotent:
+// already-true stays true; calling again is a no-op.
+router.post('/tutorial-seen', async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'unauthenticated' });
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { tutorialSeen: true },
+  });
   res.json({ user: shape(user) });
 });
 
