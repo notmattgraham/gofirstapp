@@ -4,11 +4,11 @@ const prisma = require('../db');
 
 const router = express.Router();
 
-// The one coach account. Hardcoded as an env-var default so the whole
-// coaching feature can be ripped out by deleting COACH_EMAIL.
-const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
-// The one app-wide admin. Same env-fallback pattern as COACH_EMAIL so the
-// dashboard works on a fresh database before any user has been flagged.
+// Coach status is now purely DB-driven — promote a user via the role
+// picker in /dev. No more email-based fallback.
+//
+// The one app-wide admin still has an env-email fallback so the dashboard
+// works on a fresh database before any user has been flagged.
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 
 // Kick off Google OAuth.
@@ -31,9 +31,8 @@ function shape(u) {
     overrideActiveDate: u.overrideActiveDate,
     // Coaching fields — frontend uses these to switch tab layout + show chat.
     coachingClient: u.coachingClient || false,
-    // DB flag wins; the env-email fallback bootstraps the very first coach
-    // before anyone has been flagged via /dev.
-    isCoach: !!u.isCoach || (u.email || '').toLowerCase() === COACH_EMAIL,
+    // DB flag is the source of truth. Set via /dev role picker.
+    isCoach: !!u.isCoach,
     isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
     tutorialSeen: !!u.tutorialSeen,
   };

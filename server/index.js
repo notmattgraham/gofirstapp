@@ -214,15 +214,15 @@ server.on('upgrade', async (request, socket, head) => {
     // can authorize without a DB hit per keystroke.
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, coachingClient: true, isCoach: true } });
     if (!user) { socket.destroy(); return; }
-    const COACH_EMAIL = (process.env.COACH_EMAIL || 'mattgraham15@gmail.com').toLowerCase();
-    const isCoach = !!user.isCoach || (user.email || '').toLowerCase() === COACH_EMAIL;
+    const isCoach = !!user.isCoach;
 
     // Resolve the coach id once at upgrade time so client-side typing events
-    // can be forwarded without an extra DB hit per keystroke.
+    // can be forwarded without an extra DB hit per keystroke. No coach in
+    // the DB yet → coachId stays null and typing events from this client
+    // simply have no destination.
     let coachId = null;
     if (user.coachingClient && !isCoach) {
-      const coach = await prisma.user.findFirst({ where: { isCoach: true } })
-        || await prisma.user.findFirst({ where: { email: { equals: COACH_EMAIL, mode: 'insensitive' } } });
+      const coach = await prisma.user.findFirst({ where: { isCoach: true } });
       coachId = coach?.id || null;
     }
 
