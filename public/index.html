@@ -6835,12 +6835,13 @@ function renderMissed(state) {
   }).join('');
 }
 
-// Profile → Sign out
+// Profile → Sign out. After clearing the server session, hard-reload the
+// page so all in-memory state (open overlays, chat WS, cached store,
+// active timers) is dropped — guaranteed clean splash on next paint
+// instead of relying on every subsystem to reset itself.
 document.getElementById('profile-logout').addEventListener('click', async () => {
-  await Auth.logout();
-  Store.reset();
-  showSplash();
-  setTab('todo');
+  try { await Auth.logout(); } catch {}
+  location.reload();
 });
 
 // Profile → Show app tour (replay path; doesn't reset the seen flag).
