@@ -3092,22 +3092,21 @@
   .install-prompt[data-variant="chrome"] .install-content-chrome { display: contents; }
   .install-prompt[data-variant="safari"] .install-content-safari { display: contents; }
 
-  .install-arrow { display: none; position: fixed; pointer-events: none; }
-  .install-arrow svg {
-    stroke: var(--text);
-    stroke-width: 6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    fill: none;
+  .install-arrow {
+    display: none;
+    position: fixed;
+    pointer-events: none;
+    color: var(--text); /* drives `currentColor` on the SVG stroke + arrowhead */
   }
+  .install-arrow svg { width: 100%; height: 100%; }
   .install-prompt[data-variant="chrome"] .install-arrow-tr { display: block; }
-  .install-prompt[data-variant="safari"] .install-arrow-b  { display: block; }
+  .install-prompt[data-variant="safari"] .install-arrow-br { display: block; }
 
-  /* Top-right arrow points at Chrome's address-bar share icon. */
+  /* Top-right arrow — points at Chrome's address-bar share icon. */
   .install-arrow-tr {
-    top: calc(var(--safe-top) + 8px);
-    right: 14px;
-    width: 90px; height: 90px;
+    top: calc(var(--safe-top) + 16px);
+    right: 18px;
+    width: 110px; height: 110px;
     animation: install-arrow-tr 1.4s ease-in-out infinite;
   }
   @keyframes install-arrow-tr {
@@ -3115,17 +3114,16 @@
     50%      { transform: translate(8px, -8px); }
   }
 
-  /* Bottom arrow points at Safari's bottom-toolbar share icon. */
-  .install-arrow-b {
-    bottom: calc(var(--safe-bottom) + 60px);
-    right: 50%;
-    transform: translateX(50%);
-    width: 80px; height: 80px;
-    animation: install-arrow-b 1.4s ease-in-out infinite;
+  /* Bottom-right arrow — points at Safari's bottom-toolbar ••• menu. */
+  .install-arrow-br {
+    bottom: calc(var(--safe-bottom) + 70px);
+    right: 4px;
+    width: 110px; height: 110px;
+    animation: install-arrow-br 1.4s ease-in-out infinite;
   }
-  @keyframes install-arrow-b {
-    0%, 100% { transform: translateX(50%) translateY(0); }
-    50%      { transform: translateX(50%) translateY(10px); }
+  @keyframes install-arrow-br {
+    0%, 100% { transform: translate(0, 0); }
+    50%      { transform: translate(8px, 8px); }
   }
 
   /* ── Commitment onboarding ───────────────────────────────────
@@ -5078,19 +5076,36 @@
        navigator.standalone) bypass this entirely. -->
   <div class="install-prompt" id="install-prompt" hidden aria-modal="true" role="dialog">
     <!-- Top-right arrow for Chrome / Firefox / Edge / etc. on iOS — their
-         share button lives in the upper-right of the address bar. -->
+         share button lives in the upper-right of the address bar.
+         The marker auto-orients along the curve's tangent at the tip,
+         so the arrowhead always points correctly regardless of curve. -->
     <div class="install-arrow install-arrow-tr" aria-hidden="true">
       <svg viewBox="0 0 100 100">
-        <path d="M30 75 Q55 75 75 30"/>
-        <path d="M75 30 L60 28 M75 30 L73 45"/>
+        <defs>
+          <marker id="install-arrowhead-tr" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <path d="M20 88 Q20 50 78 22"
+              stroke="currentColor" stroke-width="6" fill="none"
+              stroke-linecap="round" marker-end="url(#install-arrowhead-tr)"/>
       </svg>
     </div>
-    <!-- Bottom arrow for Safari on iPhone — share button lives in the
-         middle of the bottom toolbar. -->
-    <div class="install-arrow install-arrow-b" aria-hidden="true">
+    <!-- Bottom-right arrow for Safari on iPhone — modern Safari's "•••"
+         menu sits at the bottom-right of the address bar at the bottom
+         of the screen, and "Add to Home Screen" lives inside it. -->
+    <div class="install-arrow install-arrow-br" aria-hidden="true">
       <svg viewBox="0 0 100 100">
-        <path d="M50 15 L50 85"/>
-        <path d="M50 85 L25 60 M50 85 L75 60"/>
+        <defs>
+          <marker id="install-arrowhead-br" viewBox="0 0 10 10" refX="8" refY="5"
+                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <path d="M20 12 Q20 50 78 78"
+              stroke="currentColor" stroke-width="6" fill="none"
+              stroke-linecap="round" marker-end="url(#install-arrowhead-br)"/>
       </svg>
     </div>
 
@@ -5117,15 +5132,16 @@
             <div class="install-step-body">Open GoFirst from your home screen — not from Chrome.</div>
           </div>
         </div>
-        <!-- Safari variant: share button at bottom -->
+        <!-- Safari variant: ••• menu in the bottom-right contains
+             "Add to Home Screen" directly on modern iOS. -->
         <div class="install-content install-content-safari">
           <div class="install-step">
             <div class="install-step-num">1</div>
-            <div class="install-step-body">Tap the <b>share icon</b> in the bottom toolbar.</div>
+            <div class="install-step-body">Tap the <b>•••</b> menu in the bottom-right corner.</div>
           </div>
           <div class="install-step">
             <div class="install-step-num">2</div>
-            <div class="install-step-body">Scroll down and choose <b>Add to Home Screen</b>.</div>
+            <div class="install-step-body">Choose <b>Add to Home Screen</b>.</div>
           </div>
           <div class="install-step">
             <div class="install-step-num">3</div>
