@@ -30,15 +30,36 @@ router.post('/', express.json({ limit: '64kb' }), async (req, res) => {
   if (!admin) return res.status(503).json({ error: 'admin_not_found' });
   if (admin.id === me.id) return res.status(400).json({ error: 'cannot_feedback_self' });
 
-  const message = await prisma.message.create({
-    data: {
-      fromUserId: me.id,
-      toUserId: admin.id,
-      content,
-      hiddenFromSenderAt: new Date(),
-    },
-    select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
-  });
+  // Two-step write: create the row through the typed client, then
+  // stamp hiddenFromSenderAt via raw SQL. The client isn't always
+  // regenerated in lockstep with `prisma db push` on the host (Railway
+  // can serve stale client bytes after a schema change), so the typed
+  // create has to stay schema-compatible with the OLD client. The raw
+  // UPDATE only needs the column to exist in the DB, which `db push`
+  // guarantees on boot. Worst case (column genuinely missing), the
+  // UPDATE no-ops and we log — the feedback DM still lands.
+  let message;
+  try {
+    message = await prisma.message.create({
+      data: {
+        fromUserId: me.id,
+        toUserId: admin.id,
+        content,
+      },
+      select: { id: true, fromUserId: true, toUserId: true, content: true, attachment: true, readAt: true, createdAt: true },
+    });
+  } catch (err) {
+    console.error('[feedback] message.create failed', err);
+    return res.status(500).json({ error: 'create_failed' });
+  }
+  try {
+    await prisma.$executeRaw`UPDATE "Message" SET "hiddenFromSenderAt" = NOW() WHERE id = ${message.id}`;
+  } catch (err) {
+    // Column missing or other raw-SQL failure — feedback is delivered
+    // but will be visible in the sender's inbox until the schema
+    // migration catches up. Logged, not fatal.
+    console.warn('[feedback] hide-from-sender failed:', err.message);
+  }
 
   // Real-time WS broadcast to the admin only — we deliberately DON'T
   // echo back to the sender (which is what /api/messages does for
