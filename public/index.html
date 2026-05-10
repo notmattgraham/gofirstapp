@@ -10833,6 +10833,94 @@ const Coaching = (() => {
     setTimeout(() => { currentClientId = null; }, 300);
   }
 
+  /* iOS-style edge swipe-back. Attach to any .coach-overlay element +
+     a close callback; gesture must START within the leftmost 30px of
+     the overlay and be horizontally dominant. Live-tracks the drag
+     against the element's translateX, and on release either snaps
+     back to 0 or animates off-screen (delegating to closeFn for the
+     hide-after-transition cleanup). */
+  function wireSwipeBack(overlayId, closeFn) {
+    const el = document.getElementById(overlayId);
+    if (!el || !closeFn) return;
+    const EDGE_PX = 30;          // touch must start within this many px of the left edge
+    const DIST_RATIO = 0.4;      // dragged this fraction of width → close
+    const VEL_THRESHOLD = 0.4;   // px/ms; flick this fast → close even if short
+    let active = false;          // touch started in the edge zone
+    let dragging = false;        // we've crossed the gesture threshold
+    let startX = 0, startY = 0, startTime = 0;
+
+    el.addEventListener('touchstart', (e) => {
+      if (el.hidden) return;
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const rect = el.getBoundingClientRect();
+      if (t.clientX - rect.left > EDGE_PX) return;
+      active = true;
+      dragging = false;
+      startX = t.clientX;
+      startY = t.clientY;
+      startTime = Date.now();
+    }, { passive: true });
+
+    el.addEventListener('touchmove', (e) => {
+      if (!active) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (!dragging) {
+        // Vertically dominant motion → not a swipe-back, let the scroll happen.
+        if (Math.abs(dy) > Math.abs(dx) * 1.2) { active = false; return; }
+        if (dx < 6) return;
+        dragging = true;
+        el.style.transition = 'none';
+      }
+      if (dx < 0) return;        // only rightward drags
+      el.style.transform = `translateX(${dx}px)`;
+      e.preventDefault();        // stop the browser's own back-swipe + scroll
+    }, { passive: false });
+
+    function release(touch) {
+      if (!active) return;
+      const wasDragging = dragging;
+      active = false;
+      dragging = false;
+      if (!wasDragging) {
+        el.style.transition = '';
+        el.style.transform  = '';
+        return;
+      }
+      const finalX = touch ? touch.clientX : startX;
+      const dx = finalX - startX;
+      const ms = Date.now() - startTime;
+      const velocity = ms > 0 ? dx / ms : 0;
+      const w = el.offsetWidth || window.innerWidth;
+      const shouldClose = dx > w * DIST_RATIO || velocity > VEL_THRESHOLD;
+
+      // Re-enable transitions for the snap animation.
+      el.style.transition = 'transform 0.22s cubic-bezier(0.22, 0.9, 0.28, 1)';
+      if (shouldClose) {
+        el.style.transform = 'translateX(100%)';
+        // closeFn handles class removal + hidden=true. We give the
+        // inline transition just enough time to play, then clear the
+        // inline style so future opens don't inherit it.
+        setTimeout(() => {
+          el.style.transition = '';
+          el.style.transform  = '';
+          closeFn();
+        }, 220);
+      } else {
+        el.style.transform = 'translateX(0px)';
+        setTimeout(() => {
+          el.style.transition = '';
+          el.style.transform  = '';
+        }, 220);
+      }
+    }
+
+    el.addEventListener('touchend',    (e) => release(e.changedTouches[0]), { passive: true });
+    el.addEventListener('touchcancel', () => release(null),                 { passive: true });
+  }
+
   /* ── Helpers ─────────────────────────────────────────────── */
   function buildBubble(m, myId, isNew) {
     const mine = m.fromUserId === myId;
@@ -11146,6 +11234,14 @@ const Coaching = (() => {
     // Coach convo back (still slides over the chat tab when a thread is opened)
     const convoBack = document.getElementById('coach-convo-back');
     if (convoBack) convoBack.addEventListener('click', closeConvo);
+
+    // iOS-style edge swipe-back on the DM overlays. Both the generic
+    // dm-overlay (friend / pinned coach / pinned admin threads) and
+    // the coach-convo-overlay (coach viewing a specific client) get
+    // it — swipe right from the left edge to dismiss without hunting
+    // for the back arrow.
+    wireSwipeBack('dm-overlay',          () => closeOverlay('dm-overlay'));
+    wireSwipeBack('coach-convo-overlay', closeConvo);
 
     // Coach inbox: tapping a client row opens the existing coach-convo overlay.
     const coachThreadList = document.getElementById('chat-coach-thread-list');
