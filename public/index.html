@@ -183,6 +183,60 @@
   }
   .top-action:active { background: var(--surface-2); }
 
+  /* Right-hand cluster on the header: feedback icon + (optional) top-action.
+     Sits in the same slot the top-action used to occupy on its own. */
+  .top-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .feedback-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+  }
+  .feedback-btn:active { background: var(--surface-2); }
+  .feedback-btn svg { width: 18px; height: 18px; display: block; }
+
+  /* Feedback sheet — multiline textarea + Send button. Opens mailto:
+     help@gofirstbrand.com with the typed body when Send is tapped. */
+  .feedback-textarea {
+    width: 100%;
+    min-height: 140px;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 15px;
+    resize: vertical;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+  }
+  .feedback-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .confirm-btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+    font-weight: 600;
+  }
+  .confirm-btn.primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   /* --- Scrollable main ----------------------------------------- */
   /* .main holds a horizontal slider with all views side-by-side.
      Transform on .view-slider animates between tabs so the header
@@ -4409,7 +4463,14 @@
         <img class="brand-dark" src="applogo.svg" alt="GoFirst" />
         <img class="brand-light" src="applogo-black.svg" alt="GoFirst" />
       </div>
-      <button class="top-action" id="top-action" hidden></button>
+      <div class="top-actions">
+        <button class="feedback-btn" id="feedback-btn" aria-label="Share feedback" title="Share feedback">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+        </button>
+        <button class="top-action" id="top-action" hidden></button>
+      </div>
     </header>
     <div class="countdown-bar" id="countdown-bar" hidden>
       <span id="countdown-text"></span>
@@ -8321,6 +8382,58 @@ document.getElementById('profile-logout').addEventListener('click', async () => 
 document.getElementById('profile-show-tour').addEventListener('click', () => {
   if (window.Tour) Tour.open({ replay: true });
 });
+
+// Header → Share Feedback. Opens a bottom sheet with a multiline
+// textarea; tapping Send hands the body off to the OS via mailto:
+// pre-filled to help@gofirstbrand.com with subject "GoFirst feedback".
+// We use mailto rather than a server-side endpoint so we don't need
+// an SMTP integration just to forward a few lines of text.
+function openFeedbackSheet() {
+  const el = document.createElement('div');
+  el.className = 'confirm-overlay';
+  el.innerHTML = `
+    <div class="confirm-sheet">
+      <div class="confirm-title">Share feedback</div>
+      <div class="confirm-msg" style="white-space:normal;overflow:visible;">
+        Anything we can fix, change, or improve? We'd love to hear it.
+      </div>
+      <textarea class="feedback-textarea" id="feedback-textarea"
+                placeholder="What's on your mind?"></textarea>
+      <div class="confirm-actions">
+        <button class="confirm-btn primary" data-choice="send" disabled>Send</button>
+        <button class="confirm-btn muted" data-choice="cancel">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const textarea = el.querySelector('#feedback-textarea');
+  const sendBtn  = el.querySelector('[data-choice="send"]');
+  // Auto-focus on desktop; iOS Safari ignores programmatic focus to
+  // avoid surprise keyboards, but that's fine — the user can tap.
+  setTimeout(() => textarea.focus(), 50);
+  textarea.addEventListener('input', () => {
+    sendBtn.disabled = !textarea.value.trim();
+  });
+  el.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-choice]');
+    const choice = btn ? btn.dataset.choice : (e.target === el ? 'cancel' : null);
+    if (choice === null) return;
+    if (choice === 'send') {
+      const body = textarea.value.trim();
+      if (!body) return;
+      const subject = encodeURIComponent('GoFirst feedback');
+      const mailBody = encodeURIComponent(body);
+      // Open mailto in a temporary anchor — using location.href can be
+      // blocked by some PWA shells. The anchor click is treated as a
+      // user gesture and reliably hands off to the email client.
+      const a = document.createElement('a');
+      a.href = `mailto:help@gofirstbrand.com?subject=${subject}&body=${mailBody}`;
+      a.rel = 'noopener';
+      a.click();
+    }
+    document.body.removeChild(el);
+  });
+}
+document.getElementById('feedback-btn').addEventListener('click', openFeedbackSheet);
 
 // Profile → Day-end lock time. Initial value is seeded from Auth.user
 // once it's populated; PATCHes /api/auth/me on change. Page is NOT
