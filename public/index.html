@@ -8358,7 +8358,7 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
       if (sub) sub.textContent = `Locked at ${fmt(t)}. Available to change in ${available}.`;
     } else {
       input.disabled = false;
-      if (sub) sub.textContent = `Currently ${fmt(t)}. You can only change this once every 14 days.`;
+      if (sub) sub.textContent = `Currently ${fmt(t)}. After you change it, you can't change it again for 14 days.`;
     }
   }
   // Initial render — wait until Auth resolves. boot() calls renderProfile
@@ -11044,24 +11044,36 @@ window.DayState = (() => {
     const tasksEmpty   = document.getElementById('tasks-empty');
     const completedSec = document.getElementById('completed-section');
 
+    // Format an ISO date as "Sat, May 9" — used in the sub line so the
+    // user can always see which calendar date the system thinks they're
+    // looking at. This was added after a confused-day-rollover report
+    // ("it's May 10 but the app says May 9 with 10 tasks left"); making
+    // the date visible removes the guesswork.
+    const fmtBannerDate = (iso) => {
+      try {
+        const d = new Date(iso + 'T00:00:00');
+        return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      } catch { return iso; }
+    };
+
     // Mode-specific copy + visibility.
     let title = '', sub = '', commitLabel = '';
     let showCrushed = false, showCommit = false, showList = true;
     switch (current.mode) {
       case 'planning-today':
-        title = 'Plan today.';
+        title = `Plan today — ${fmtBannerDate(current.today)}.`;
         sub   = 'Add the things you\'re committing to today, then tap Commit.';
         commitLabel = 'Commit today';
         showCommit = (current.todayCount > 0);
         break;
       case 'today-incomplete':
-        title = `${current.todayRemaining} task${current.todayRemaining === 1 ? '' : 's'} left.`;
+        title = `${current.todayRemaining} task${current.todayRemaining === 1 ? '' : 's'} left for ${fmtBannerDate(current.today)}.`;
         sub   = 'Finish today\'s list before you can plan tomorrow.';
         showCommit = false;
         break;
       case 'planning-tomorrow':
         title = 'You crushed today.';
-        sub   = 'Plan tomorrow and commit.';
+        sub   = `Plan tomorrow (${fmtBannerDate(current.tomorrow)}) and commit.`;
         commitLabel = 'Commit tomorrow';
         showCommit = (current.tomorrowCount > 0);
         break;
@@ -11518,8 +11530,8 @@ window.Onboarding = (() => {
         (8 AM) if you work overnight.
       </p>
       <p class="onb-body" style="font-size:13px;color:var(--text-faint);">
-        You can only change this <b>once every 14 days</b> — pick
-        carefully.
+        You get one free adjustment after onboarding to fix this if
+        you pick wrong. After that, it's locked for <b>14 days</b>.
       </p>
       <div class="onb-lock-presets">
         ${buttons}

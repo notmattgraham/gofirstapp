@@ -41,13 +41,19 @@ function shape(u) {
     lockTimeChangedAt: u.lockTimeChangedAt ? (u.lockTimeChangedAt.toISOString?.() || u.lockTimeChangedAt) : null,
     // Computed convenience for the SPA — the earliest moment the user
     // can change their lockTime again. Null if no change has been
-    // recorded yet (i.e., never set, so no cooldown).
-    nextLockChangeAt: u.lockTimeChangedAt
-      ? (() => {
-          const last = u.lockTimeChangedAt instanceof Date ? u.lockTimeChangedAt : new Date(u.lockTimeChangedAt);
-          return new Date(last.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-        })()
-      : null,
+    // recorded yet (i.e., never set, so no cooldown). Mirrors the
+    // PATCH /me logic that treats "lockTimeChangedAt set within 5s of
+    // onboardedAt" as "never changed" — gives the user one free
+    // post-onboarding adjustment.
+    nextLockChangeAt: (() => {
+      if (!u.lockTimeChangedAt) return null;
+      const last = u.lockTimeChangedAt instanceof Date ? u.lockTimeChangedAt : new Date(u.lockTimeChangedAt);
+      if (u.onboardedAt) {
+        const ob = u.onboardedAt instanceof Date ? u.onboardedAt : new Date(u.onboardedAt);
+        if (Math.abs(last.getTime() - ob.getTime()) <= 5000) return null;
+      }
+      return new Date(last.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+    })(),
     // Coalesce nullables defensively for users created before these
     // columns existed — Prisma returns the column as the default `true`
     // once the migration runs, but a stale shape returned mid-deploy
@@ -81,15 +87,11 @@ router.get('/me', async (req, res) => {
       });
     }
   }
-  // Backfill lockTimeChangedAt for users who onboarded before the
-  // 14-day-cooldown feature shipped. Their cooldown clock starts here
-  // — the alternative (instant change allowed) defeats the purpose.
-  if (user.onboardedAt && user.lockTimeChangedAt == null) {
-    user = await prisma.user.update({
-      where: { id: user.id },
-      data: { lockTimeChangedAt: user.onboardedAt },
-    });
-  }
+  // NOTE: deliberately no lockTimeChangedAt backfill here.
+  // Onboarding doesn't set the field anymore — every user gets one
+  // free post-onboarding adjustment to fix a wrong preset pick. The
+  // cooldown clock only starts on the first PATCH to /me with a
+  // genuinely changed lockTime.
   // Backfill DayCommit for users who onboarded TODAY before the
   // commit-lifecycle feature shipped. Their onboarding-commit didn't
   // create the row, so today reads as "uncommitted" and locks them in
@@ -135,7 +137,17 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
       // Only enforce the 14-day cooldown when the value would actually
       // change — re-PATCHing the same value is a harmless no-op.
       if (next !== req.user.lockTime) {
-        const last = req.user.lockTimeChangedAt;
+        let last = req.user.lockTimeChangedAt;
+        // Treat "lockTimeChangedAt set by onboarding" as null so the
+        // user gets one free post-onboarding adjustment to fix a wrong
+        // preset pick. We detect this by lockTimeChangedAt being within
+        // 5 seconds of onboardedAt (they were written in the same
+        // transaction, before this change shipped).
+        if (last && req.user.onboardedAt) {
+          const lastMs = (last instanceof Date ? last : new Date(last)).getTime();
+          const obMs   = (req.user.onboardedAt instanceof Date ? req.user.onboardedAt : new Date(req.user.onboardedAt)).getTime();
+          if (Math.abs(lastMs - obMs) <= 5000) last = null;
+        }
         const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
         if (last) {
           const lastDate = last instanceof Date ? last : new Date(last);
@@ -225,15 +237,17 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
   const now = new Date();
 
   // One transaction so a half-write never leaves the user partially
-  // onboarded with an empty task list. We also commit today's list (via
-  // DayCommit) and stamp lockTimeChangedAt so the 14-day cooldown clock
-  // starts here — the onboarding choice is "change 1".
+  // onboarded with an empty task list. We commit today's list (via
+  // DayCommit) but DELIBERATELY leave lockTimeChangedAt null — the
+  // onboarding pick doesn't burn the user's first cooldown-free
+  // change. They get one free post-onboarding adjustment to fix a
+  // wrong preset choice, and only THAT starts the 14-day clock.
   const [updated] = await prisma.$transaction([
     prisma.user.update({
       where: { id: req.user.id },
       data: {
         onboardedAt: now, tutorialSeen: true,
-        lockTime, lockTimeChangedAt: now,
+        lockTime,
       },
     }),
     ...habits.map((name) =>
