@@ -3004,80 +3004,6 @@
     opacity: 0.5;
   }
 
-  /* ── iOS non-Safari blocker ──────────────────────────────────
-     Apple gates PWA install + web push to Safari only on iOS. Any
-     other iOS browser (Chrome / Firefox / Edge / DuckDuckGo / Opera)
-     gets a full-viewport overlay that won't dismiss — user has to
-     reopen the URL in Safari. The overlay is rendered by index.html
-     and revealed at boot if the UA matches a non-Safari iOS browser. */
-  .safari-block {
-    position: fixed;
-    inset: 0;
-    z-index: 999;
-    background: var(--bg);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: calc(var(--safe-top) + 28px) 26px calc(var(--safe-bottom) + 28px);
-  }
-  .safari-block[hidden] { display: none; }
-  .safari-block-card {
-    width: 100%;
-    max-width: 460px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    text-align: center;
-  }
-  .safari-block-logo {
-    height: 56px;
-    width: auto;
-    align-self: center;
-    margin-bottom: 8px;
-  }
-  .safari-block-title {
-    font-size: clamp(28px, 7vw, 36px);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    margin: 0;
-  }
-  .safari-block-body {
-    color: var(--text-dim);
-    font-size: 16px;
-    line-height: 1.5;
-    margin: 0;
-  }
-  .safari-block-steps {
-    text-align: left;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 22px 18px 38px;
-    color: var(--text);
-    font-size: 15px;
-    line-height: 1.55;
-    margin: 0;
-  }
-  .safari-block-steps li { margin-bottom: 8px; }
-  .safari-block-steps li:last-child { margin-bottom: 0; }
-  .safari-block-steps b { color: var(--text); font-weight: 700; }
-  .safari-block-copy {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text);
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    height: 44px;
-    border-radius: 12px;
-    cursor: pointer;
-  }
-  .safari-block-copy.copied { background: var(--success); color: white; border-color: transparent; }
-
   /* ── Commitment onboarding ───────────────────────────────────
      Full-viewport takeover for first-login users. Replaces the
      explanatory tabs tour (which still exists, replayable from
@@ -5021,28 +4947,6 @@
     </div>
   </div>
 
-  <!-- iOS-non-Safari blocker. Hard-blocks Chrome / Firefox / Edge /
-       DuckDuckGo / Opera on iOS — only Safari can install a PWA on
-       iPhone, so any other browser is a dead end. JS reveals it at
-       boot via UA sniff. There is no escape; user must reopen in
-       Safari for the app to work. -->
-  <div class="safari-block" id="safari-block" hidden aria-modal="true" role="dialog">
-    <div class="safari-block-card">
-      <img class="safari-block-logo" src="applogo.svg" alt="GoFirst" />
-      <h1 class="safari-block-title">Open in Safari</h1>
-      <p class="safari-block-body">
-        GoFirst needs to install to your home screen, and Apple only
-        allows that from Safari on iPhone.
-      </p>
-      <ol class="safari-block-steps">
-        <li>Tap the <b>share icon</b> at the bottom of this browser.</li>
-        <li>Pick <b>Open in Safari</b>.</li>
-        <li>Once Safari loads, tap share again and choose <b>Add to Home Screen</b>.</li>
-      </ol>
-      <button type="button" class="safari-block-copy" id="safari-block-copy">Copy link</button>
-    </div>
-  </div>
-
   <!-- Commitment-onboarding takeover. Fires once for accounts with no
        prior tasks/streaks. The 4-step flow is rendered into
        #onb-content by the Onboarding module — DOM swaps per step rather
@@ -5098,61 +5002,6 @@
 
 <script>
 'use strict';
-
-/* ============================================================
-   iOS non-Safari guard — runs first, before any other JS work.
-   On iOS, Apple gates PWA install + web push to Safari only, so
-   Chrome / Firefox / Edge / DuckDuckGo / Opera on iPhone can never
-   become a real installed app. We hard-block those browsers with a
-   full-screen overlay (rendered hidden in the HTML, revealed here)
-   and a Copy-link affordance that lets the user paste into Safari.
-   ============================================================ */
-(function iosBrowserGuard() {
-  const ua = navigator.userAgent || '';
-  const isIos = /iPhone|iPad|iPod/.test(ua) || (
-    // iPadOS reports as Mac in modern Safari but exposes touch.
-    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-  );
-  if (!isIos) return;
-  // Markers from non-Safari iOS browsers. Safari adds nothing
-  // distinguishing, so absence of these IS Safari.
-  const isNonSafari = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|Yandex|UCBrowser/.test(ua);
-  if (!isNonSafari) return;
-
-  const block = document.getElementById('safari-block');
-  if (!block) return;
-  block.hidden = false;
-  document.body.style.overflow = 'hidden';
-
-  // Copy-link button — easier than asking the user to type the URL.
-  const copyBtn = document.getElementById('safari-block-copy');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', async () => {
-      const url = location.href;
-      let copied = false;
-      try { await navigator.clipboard.writeText(url); copied = true; }
-      catch {
-        // Fallback: a one-off textarea selection. Works on iOS Chrome.
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { copied = document.execCommand('copy'); } catch {}
-        document.body.removeChild(ta);
-      }
-      if (copied) {
-        copyBtn.textContent = 'Copied — paste in Safari';
-        copyBtn.classList.add('copied');
-        setTimeout(() => {
-          copyBtn.textContent = 'Copy link';
-          copyBtn.classList.remove('copied');
-        }, 2200);
-      }
-    });
-  }
-})();
 
 /* ============================================================
    API layer — thin fetch wrapper. Everything goes through JSON
