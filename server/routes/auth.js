@@ -1,7 +1,9 @@
 const express = require('express');
+const crypto = require('node:crypto');
 const passport = require('../auth');
 const prisma = require('../db');
 const { userToday, dateInTz } = require('../time');
+const { verifyIdentityToken } = require('../apple-signin');
 
 const router = express.Router();
 
@@ -20,6 +22,150 @@ router.get('/google/callback',
   passport.authenticate('google', { failureRedirect: '/?auth=error' }),
   (req, res) => res.redirect('/')
 );
+
+// ─── Sign in with Apple ─────────────────────────────────────────────
+// Required by App Store guideline 4.8 (third-party sign-in must offer
+// Sign in with Apple as an alternative). Works in any browser and
+// inside the iOS native shell. For the dedicated native ASAuthorization
+// path, the iOS app POSTs the identityToken directly to
+// /api/auth/apple/native — same verifier, no redirect dance.
+//
+// Required env (set in Apple Developer Portal first, then Railway):
+//   APPLE_CLIENT_ID   — Services ID, e.g. "com.gofirstbrand.web"
+//   BASE_URL          — public origin, e.g. "https://gofirstbrand.com"
+//                       (must match the Return URL configured at Apple)
+
+router.get('/apple', (req, res) => {
+  const clientId = process.env.APPLE_CLIENT_ID;
+  const baseUrl  = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+  if (!clientId) return res.redirect('/?auth=apple_unconfigured');
+  // CSRF defense: random state + nonce stored in session, verified
+  // on the callback. nonce is also baked into the id_token by Apple
+  // and re-checked there.
+  const state = crypto.randomBytes(24).toString('hex');
+  const nonce = crypto.randomBytes(24).toString('hex');
+  req.session.appleAuth = { state, nonce };
+  const callbackUrl = `${baseUrl}/api/auth/apple/callback`;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    response_type: 'code id_token',
+    response_mode: 'form_post',
+    scope: 'name email',
+    state, nonce,
+  });
+  res.redirect(`https://appleid.apple.com/auth/authorize?${params.toString()}`);
+});
+
+// Apple POSTs back here (response_mode=form_post). express.urlencoded
+// is already wired globally in server/index.js so req.body is parsed.
+router.post('/apple/callback', async (req, res, next) => {
+  try {
+    const { id_token, state, user: userJson } = req.body || {};
+    if (!id_token) return res.redirect('/?auth=apple_no_token');
+    // State check — drop the session-stashed values immediately on
+    // first read so a replay can't re-use them.
+    const stashed = (req.session && req.session.appleAuth) || null;
+    if (req.session) req.session.appleAuth = undefined;
+    if (!stashed || stashed.state !== state) return res.redirect('/?auth=apple_state_mismatch');
+
+    const claims = await verifyIdentityToken(id_token);
+    if (claims.nonce && claims.nonce !== stashed.nonce) {
+      return res.redirect('/?auth=apple_nonce_mismatch');
+    }
+
+    // On the FIRST authorization for a Services ID, Apple includes a
+    // `user` form field with { name: { firstName, lastName }, email }.
+    // Subsequent auths omit it — so we have to capture it now or never.
+    let displayName = null;
+    if (typeof userJson === 'string' && userJson.length > 0) {
+      try {
+        const u = JSON.parse(userJson);
+        if (u && u.name) {
+          const parts = [u.name.firstName, u.name.lastName].filter(Boolean);
+          displayName = parts.length ? parts.join(' ').slice(0, 60) : null;
+        }
+      } catch {}
+    }
+
+    const sub   = claims.sub;
+    const email = (typeof claims.email === 'string') ? claims.email.toLowerCase() : null;
+    if (!email) return res.redirect('/?auth=apple_no_email');
+
+    // Find-or-create with email-based consolidation. If a Google
+    // account already exists under this email, we attach appleId to
+    // that record instead of creating a duplicate.
+    let user = await prisma.user.findUnique({ where: { appleId: sub } });
+    if (!user) {
+      const byEmail = await prisma.user.findUnique({ where: { email } });
+      if (byEmail) {
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { appleId: sub },
+        });
+      } else {
+        user = await prisma.user.create({
+          data: { appleId: sub, email, name: displayName },
+        });
+      }
+    }
+
+    req.login(user, (err) => {
+      if (err) return next(err);
+      res.redirect('/');
+    });
+  } catch (err) {
+    console.error('[auth/apple] callback failed', err);
+    res.redirect(`/?auth=apple_failed&detail=${encodeURIComponent(err.message || 'unknown')}`);
+  }
+});
+
+// Native iOS path. The app calls ASAuthorizationAppleIDProvider locally,
+// gets an identityToken back, and POSTs it here. Same verifier — no
+// redirect, no state cookie (we can use the nonce baked into the
+// ID token request by the app itself, passed alongside).
+router.post('/apple/native', express.json(), async (req, res) => {
+  try {
+    const { identityToken, fullName, nonce } = req.body || {};
+    if (!identityToken) return res.status(400).json({ error: 'identity_token_required' });
+    const claims = await verifyIdentityToken(identityToken);
+    if (nonce && claims.nonce && claims.nonce !== nonce) {
+      return res.status(400).json({ error: 'nonce_mismatch' });
+    }
+    const sub   = claims.sub;
+    const email = (typeof claims.email === 'string') ? claims.email.toLowerCase() : null;
+    if (!email) return res.status(400).json({ error: 'apple_no_email' });
+
+    let displayName = null;
+    if (fullName && typeof fullName === 'object') {
+      const parts = [fullName.givenName, fullName.familyName].filter(Boolean);
+      displayName = parts.length ? parts.join(' ').slice(0, 60) : null;
+    }
+
+    let user = await prisma.user.findUnique({ where: { appleId: sub } });
+    if (!user) {
+      const byEmail = await prisma.user.findUnique({ where: { email } });
+      if (byEmail) {
+        user = await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { appleId: sub },
+        });
+      } else {
+        user = await prisma.user.create({
+          data: { appleId: sub, email, name: displayName },
+        });
+      }
+    }
+
+    req.login(user, (err) => {
+      if (err) return res.status(500).json({ error: 'login_failed' });
+      res.json({ ok: true, user: { id: user.id, email: user.email, name: user.name } });
+    });
+  } catch (err) {
+    console.error('[auth/apple/native] failed', err);
+    res.status(500).json({ error: 'apple_native_failed', detail: String(err && err.message || err) });
+  }
+});
 
 function shape(u) {
   return {

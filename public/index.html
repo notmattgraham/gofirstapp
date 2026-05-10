@@ -2228,6 +2228,7 @@
      The logo's own pulse animation IS the loading indicator now — no
      separate spinner. */
   .splash[data-checking] .btn-google,
+  .splash[data-checking] .btn-apple,
   .splash[data-checking] .splash-tag,
   .splash[data-checking] .splash-foot { visibility: hidden; }
   .splash[data-checking] .splash-brand { margin-bottom: 24px; }
@@ -2300,6 +2301,45 @@
   }
   .btn-google:active { transform: translateY(1px); }
   .btn-google svg { width: 20px; height: 20px; }
+
+  /* Sign in with Apple button — Apple's branding rules require black
+     pill, white text, white Apple logo, and a specific aspect ratio.
+     Same physical size as the Google button so they line up. */
+  .btn-apple {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 24px;
+    min-height: 52px;
+    border-radius: 12px;
+    border: 1px solid #000;
+    background: #000;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    margin-top: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .btn-apple:active { transform: translateY(1px); }
+  .btn-apple svg { width: 18px; height: 18px; fill: #fff; }
+  /* In light mode show the inverted variant per Apple HIG. */
+  [data-theme="light"] .btn-apple {
+    background: #fff;
+    color: #000;
+    border-color: #000;
+  }
+  [data-theme="light"] .btn-apple svg { fill: #000; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .btn-apple {
+      background: #fff;
+      color: #000;
+      border-color: #000;
+    }
+    :root:not([data-theme="dark"]) .btn-apple svg { fill: #000; }
+  }
 
   .splash-error {
     margin-top: 20px;
@@ -2686,6 +2726,17 @@
     cursor: pointer;
   }
   .chat-promo-cta:active { background: var(--accent-hover); }
+
+  /* App Store rule (3.1.1): in-app UI may not link to external
+     payment or steer users to a web checkout. When the SPA detects
+     it's running inside the native iOS wrapper, every Stripe/coach-
+     upsell affordance is suppressed. The coaching subscription is
+     still purchasable from the public web; iOS users just don't see
+     the sales pitch. */
+  html[data-native-app="true"] #chat-promo-card,
+  html[data-native-app="true"] .coach-upsell-overlay {
+    display: none !important;
+  }
 
   /* Coach-upsell bottom sheet — same coach.jpg + green-dot tile as the
      Social-tab promo, but presented as a modal that auto-opens when
@@ -5189,6 +5240,14 @@
         </svg>
         Continue with Google
       </a>
+      <!-- Sign in with Apple — App Store guideline 4.8 requires this
+           when other third-party providers are offered. -->
+      <a class="btn-apple" id="btn-apple" href="/api/auth/apple">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19.665 15.93c-.435.998-.95 1.917-1.546 2.762-.812 1.15-1.477 1.948-1.989 2.39-.794.71-1.645 1.073-2.555 1.094-.654 0-1.443-.184-2.362-.557-.922-.371-1.77-.555-2.546-.555-.813 0-1.685.184-2.617.555-.934.373-1.687.567-2.262.586-.872.037-1.743-.336-2.612-1.123-.556-.482-1.25-1.31-2.083-2.486C.624 17.31-.027 16.005-.61 14.51c-.626-1.615-.94-3.18-.94-4.693 0-1.733.375-3.227 1.126-4.481.59-1.007 1.376-1.802 2.357-2.385.98-.584 2.04-.881 3.18-.9.694 0 1.604.215 2.737.638 1.13.424 1.855.638 2.176.638.24 0 1.046-.252 2.412-.755 1.292-.467 2.382-.66 3.276-.585 2.421.196 4.24 1.15 5.452 2.866-2.166 1.314-3.236 3.151-3.215 5.508.019 1.835.685 3.36 1.992 4.572.594.561 1.256.995 1.991 1.301-.16.464-.327.91-.508 1.34zM15.81.34c0 1.293-.473 2.499-1.414 3.616-1.137 1.328-2.51 2.094-4.001 1.972-.019-.155-.03-.318-.03-.49 0-1.241.541-2.57 1.502-3.656.479-.55 1.09-1.008 1.832-1.373.74-.359 1.44-.558 2.097-.594.02.176.03.351.03.524z"/>
+        </svg>
+        Sign in with Apple
+      </a>
       <div class="splash-error" id="splash-error" hidden></div>
       <div class="splash-foot">Your data stays in your account.</div>
     </div>
@@ -5532,6 +5591,21 @@
 'use strict';
 
 /* ============================================================
+   Native iOS detection. The App Store wrapper injects
+   `window.__GoFirstNative` at document_start (an object describing
+   the bundle + version + supported capabilities). When that's
+   present we:
+     - skip the iOS install gate entirely (we ARE the installed app)
+     - tag <html> with data-native-app="true" so CSS / JS can branch
+     - hide every Stripe-checkout link (App Store guideline 3.1.1)
+   On the public web, none of this fires — the PWA stays unchanged.
+   ============================================================ */
+(function detectNativeShell() {
+  if (typeof window.__GoFirstNative !== 'object' || !window.__GoFirstNative) return;
+  document.documentElement.setAttribute('data-native-app', 'true');
+})();
+
+/* ============================================================
    iOS install gate — runs first, before any other JS work.
    On iOS, web push + a real PWA experience only happen once the user
    has added the app to their home screen. So when we detect we're
@@ -5550,6 +5624,10 @@
     navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
   );
   if (!isIos) return;
+
+  // Inside the App Store native wrapper — already "installed", skip
+  // the home-screen prompt entirely.
+  if (window.__GoFirstNative) return;
 
   const isStandalone =
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -7477,6 +7555,9 @@ const CoachUpsell = (() => {
     if (user.coachingClient) return false; // already has a coach
     if (user.isCoach) return false;
     if (user.isAdmin) return false;
+    // Inside the App Store wrapper we cannot link to Stripe per
+    // guideline 3.1.1 — suppress the upsell entirely.
+    if (window.__GoFirstNative) return false;
     return true;
   }
 
