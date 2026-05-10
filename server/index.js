@@ -269,6 +269,12 @@ server.listen(port, () => {
   try { require('./nudges').start(); }
   catch (e) { console.warn('[nudges] failed to start', e.message); }
 
+  // Welcome-DM scheduler — sends a one-time "Thanks for downloading"
+  // DM from admin to each new account once they've been active for
+  // 15+ minutes. Hidden from the admin's inbox until they reply.
+  try { require('./welcome').start(); }
+  catch (e) { console.warn('[welcome] failed to start', e.message); }
+
   // Server-side keepalive: ping ourselves every 5 minutes so Railway never
   // idles the dyno even when no clients are connected.
   const selfUrl = process.env.RAILWAY_PUBLIC_DOMAIN

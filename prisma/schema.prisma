@@ -87,6 +87,14 @@ model User {
   // presence display in the chat header.
   lastSeenAt          DateTime?
 
+  // Stamp set when the auto-welcome DM ("Thank you for downloading…")
+  // has been delivered. The welcome scheduler (server/welcome.js) only
+  // sends to users whose lastSeenAt - createdAt >= 15 min AND whose
+  // welcomeDmSentAt is null. The message itself is created with
+  // hiddenFromAdminAt = now so the admin's inbox stays clean unless
+  // the recipient actually replies.
+  welcomeDmSentAt     DateTime?
+
   tasks          Task[]
   quitStreaks    QuitStreak[]
   sentMessages   Message[] @relation("SentMessages")
