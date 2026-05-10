@@ -406,6 +406,51 @@
   }
   .lock-banner[hidden] { display: none; }
 
+  /* Quit-streak rows on the Analytics tab. Each shows the habit name
+     + days since the user committed to walking away from it. */
+  .quit-streak-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .quit-streak-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .quit-streak-list li:last-child { border-bottom: none; }
+  .quit-streak-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .quit-streak-days {
+    flex-shrink: 0;
+    text-align: right;
+    margin-left: 12px;
+    color: var(--text);
+  }
+  .quit-streak-days .num {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .quit-streak-days .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+
   /* ── Day-mode banner ───────────────────────────────────────────
      Sits at the top of the Tasks tab and tells the user what they
      should be doing right now. Different copy per mode is set in
@@ -4543,6 +4588,17 @@
           <div class="analytics-streak-label" id="analytics-streak-label">days at 100%</div>
         </div>
 
+        <!-- Quit-streaks section. Lists every habit the user committed
+             to walking away from at onboarding (or added since), with a
+             day-count since the streak started. Hidden when the user
+             hasn't declared anything to quit. -->
+        <div id="quit-streaks-section" hidden>
+          <div class="section-title">Walking away from</div>
+          <div class="card" style="padding: 8px 0;">
+            <ul class="quit-streak-list" id="quit-streaks-list"></ul>
+          </div>
+        </div>
+
         <div class="section-title">By category</div>
         <div class="card" id="analytics-categories-card">
           <ul class="category-list" id="analytics-categories"></ul>
@@ -6264,12 +6320,18 @@ function animateRingTo(targetRate) {
   if (!ring) return;
   if (_ringRaf) cancelAnimationFrame(_ringRaf);
   const start = performance.now();
-  const from  = _ringRate;
+  const from  = _ringRate; // current visual position (kept fresh below)
   const dur   = 600;
   function step(now) {
     const t = Math.min(1, (now - start) / dur);
     const eased = 1 - Math.pow(1 - t, 3);
     const cur = from + (targetRate - from) * eased;
+    // Track the visual position EVERY frame, not just at the end. If
+    // a re-render interrupts this animation mid-flight, the next call
+    // to animateRingTo() will start from where the ring actually is
+    // — not from the previous target — so the bar flows smoothly to
+    // the new value instead of bouncing back to the prior anchor.
+    _ringRate = cur;
     ring.style.background = `conic-gradient(var(--accent) ${cur * 3.6}deg, var(--surface-2) 0deg)`;
     if (pct) pct.textContent = Math.round(cur) + '%';
     if (t < 1) _ringRaf = requestAnimationFrame(step);
@@ -7273,11 +7335,56 @@ function renderMonthCal(state) {
   });
 }
 
+// Compute days between a YYYY-MM-DDTHH:MM start and today's local date.
+// Floors to whole days — the count is "X days since you stopped doing it"
+// rather than a precise hour-level measure.
+function daysSinceLocal(startISO, todayISO) {
+  if (!startISO) return 0;
+  const startDate = String(startISO).slice(0, 10); // strip TIME portion
+  const a = new Date(startDate + 'T00:00:00');
+  const b = new Date(todayISO + 'T00:00:00');
+  const ms = b.getTime() - a.getTime();
+  return Math.max(0, Math.floor(ms / 86_400_000));
+}
+
+function renderQuitStreaks(state) {
+  const sec  = document.getElementById('quit-streaks-section');
+  const list = document.getElementById('quit-streaks-list');
+  if (!sec || !list) return;
+  // The QuitStreak rows have no `type` field — the model is dedicated to
+  // quit-tracking. Filter defensively in case legacy rows ever show up.
+  const quits = (state.streaks || []).filter(s => !s.type || s.type === 'quit');
+  if (!quits.length) {
+    sec.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+  sec.hidden = false;
+  const today = state.today || todayISO();
+  list.innerHTML = quits
+    .map(s => ({ ...s, days: daysSinceLocal(s.startAt, today) }))
+    .sort((a, b) => b.days - a.days) // longest first
+    .map(s => `
+      <li>
+        <div class="quit-streak-name">${esc(s.name || '—')}</div>
+        <div class="quit-streak-days">
+          <div class="num">${s.days}</div>
+          <div class="label">${s.days === 1 ? 'day' : 'days'}</div>
+        </div>
+      </li>
+    `).join('');
+}
+
 function renderAnalyticsView(state) {
   // Off-tab? Skip entirely. We don't want to update the snapshot or fire
   // animations the user can't see — when they come back, setTab calls
   // renderAnalyticsView and the snapshot mismatch triggers the count-up.
   if (currentTab !== 'analytics') return;
+
+  // Quit-streaks section. Lists each habit the user committed to walking
+  // away from at onboarding (or added later) with a day-count since the
+  // streak started. Hidden when there's nothing to quit.
+  renderQuitStreaks(state);
 
   // === Compute every section's data ===
   const { completed, scheduled } = computePeriodRate(state, analyticsPeriod);
