@@ -3092,44 +3092,6 @@
   .install-prompt[data-variant="chrome"] .install-content-chrome { display: contents; }
   .install-prompt[data-variant="safari"] .install-content-safari { display: contents; }
 
-  .install-arrow {
-    display: none;
-    position: fixed;
-    pointer-events: none;
-    color: var(--text); /* drives `currentColor` on the SVG stroke + arrowhead */
-  }
-  .install-arrow svg { width: 100%; height: 100%; }
-  .install-prompt[data-variant="chrome"] .install-arrow-tr { display: block; }
-  .install-prompt[data-variant="safari"] .install-arrow-br { display: block; }
-
-  /* Top-right arrow — flush against the top edge of the page, tip
-     touching the page boundary so it's as close to Chrome's share
-     icon as we can physically get (the icon itself is in browser
-     chrome above the page, beyond what we can render onto). */
-  .install-arrow-tr {
-    top: 0;
-    right: 14px;
-    width: 70px; height: 110px;
-    animation: install-arrow-tr 1.4s ease-in-out infinite;
-  }
-  @keyframes install-arrow-tr {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-5px); }
-  }
-
-  /* Bottom-right arrow — same trick, mirrored for Safari's bottom URL
-     bar with the "•••" menu. */
-  .install-arrow-br {
-    bottom: 0;
-    right: 14px;
-    width: 70px; height: 110px;
-    animation: install-arrow-br 1.4s ease-in-out infinite;
-  }
-  @keyframes install-arrow-br {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(5px); }
-  }
-  .install-arrow svg { overflow: visible; }
 
   /* ── Commitment onboarding ───────────────────────────────────
      Full-viewport takeover for first-login users. Replaces the
@@ -5080,42 +5042,6 @@
        show. Installed PWA users (display-mode: standalone OR legacy
        navigator.standalone) bypass this entirely. -->
   <div class="install-prompt" id="install-prompt" hidden aria-modal="true" role="dialog">
-    <!-- Top-right arrow for Chrome / Firefox / Edge / etc. on iOS.
-         The tip sits at the top edge of its viewBox, so when the
-         container is positioned at top: 6px, the tip lands at the
-         very top of the page area — pointing OUT of the page toward
-         the share icon in the URL bar above. -->
-    <div class="install-arrow install-arrow-tr" aria-hidden="true">
-      <svg viewBox="0 0 70 110">
-        <defs>
-          <marker id="install-arrowhead-tr" viewBox="0 0 10 10" refX="8" refY="5"
-                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
-          </marker>
-        </defs>
-        <path d="M15 110 L60 0"
-              stroke="currentColor" stroke-width="6" fill="none"
-              stroke-linecap="round" marker-end="url(#install-arrowhead-tr)"/>
-      </svg>
-    </div>
-    <!-- Bottom-right arrow for Safari. Tip at the bottom edge of the
-         viewBox; container at bottom: 6px so the tip lands at the
-         very bottom of the page area — pointing OUT toward the "•••"
-         menu in the URL bar below. -->
-    <div class="install-arrow install-arrow-br" aria-hidden="true">
-      <svg viewBox="0 0 70 110">
-        <defs>
-          <marker id="install-arrowhead-br" viewBox="0 0 10 10" refX="8" refY="5"
-                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-            <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
-          </marker>
-        </defs>
-        <path d="M15 0 L60 110"
-              stroke="currentColor" stroke-width="6" fill="none"
-              stroke-linecap="round" marker-end="url(#install-arrowhead-br)"/>
-      </svg>
-    </div>
-
     <div class="install-card">
       <img class="install-logo" src="applogo.svg" alt="GoFirst" />
       <h1 class="install-title">Install GoFirst</h1>
@@ -5128,19 +5054,22 @@
         <div class="install-content install-content-chrome">
           <div class="install-step">
             <div class="install-step-num">1</div>
-            <div class="install-step-body">Tap the <b>share icon</b> in the top-right corner of Chrome.</div>
+            <div class="install-step-body">Tap the <b>share icon</b> in the top-right corner.</div>
           </div>
           <div class="install-step">
             <div class="install-step-num">2</div>
-            <div class="install-step-body">Scroll down and choose <b>Add to Home Screen</b>.</div>
+            <div class="install-step-body">Tap <b>View More</b>.</div>
           </div>
           <div class="install-step">
             <div class="install-step-num">3</div>
+            <div class="install-step-body">Tap <b>Add to Home Screen</b>.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">4</div>
             <div class="install-step-body">Open GoFirst from your home screen — not from Chrome.</div>
           </div>
         </div>
-        <!-- Safari variant: ••• menu in the bottom-right contains
-             "Add to Home Screen" directly on modern iOS. -->
+        <!-- Safari variant: ••• menu at the bottom-right of the URL bar -->
         <div class="install-content install-content-safari">
           <div class="install-step">
             <div class="install-step-num">1</div>
@@ -5148,10 +5077,14 @@
           </div>
           <div class="install-step">
             <div class="install-step-num">2</div>
-            <div class="install-step-body">Choose <b>Add to Home Screen</b>.</div>
+            <div class="install-step-body">Tap <b>View More</b>.</div>
           </div>
           <div class="install-step">
             <div class="install-step-num">3</div>
+            <div class="install-step-body">Tap <b>Add to Home Screen</b>.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">4</div>
             <div class="install-step-body">Open GoFirst from your home screen.</div>
           </div>
         </div>
