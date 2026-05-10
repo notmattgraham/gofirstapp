@@ -3102,34 +3102,34 @@
   .install-prompt[data-variant="chrome"] .install-arrow-tr { display: block; }
   .install-prompt[data-variant="safari"] .install-arrow-br { display: block; }
 
-  /* Top-right arrow — tip lands ON Chrome's share icon, which sits in
-     the address bar at the very top of the viewport (just below the
-     status-bar safe area). The container starts at safe-top so the
-     SVG tip (drawn near its top-right corner) coincides with the icon. */
+  /* Top-right arrow — Chrome's share icon lives in the URL bar, which
+     is browser chrome ABOVE our page viewport. We can't reach into it,
+     so the arrow sits flush at the top edge of the page with its tip
+     pointing UP (out of the page) toward where the icon is. */
   .install-arrow-tr {
-    top: var(--safe-top);
-    right: 13px;
-    width: 100px; height: 100px;
+    top: 6px;
+    right: 14px;
+    width: 70px; height: 110px;
     animation: install-arrow-tr 1.4s ease-in-out infinite;
   }
   @keyframes install-arrow-tr {
-    0%, 100% { transform: translate(0, 0); }
-    50%      { transform: translate(6px, -6px); }
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
   }
 
-  /* Bottom-right arrow — tip lands ON Safari's "•••" menu, which sits
-     in the address bar at the bottom of the viewport (just above the
-     home-indicator safe area). Container's bottom-right corner is
-     placed at the menu icon; the SVG tip is drawn near that corner. */
+  /* Bottom-right arrow — Safari's "•••" menu lives in the URL bar at
+     the bottom of the screen, which is browser chrome BELOW our page
+     viewport. Same trick: arrow flush at the bottom edge of the page,
+     tip pointing DOWN (out of the page) toward where the menu sits. */
   .install-arrow-br {
-    bottom: calc(var(--safe-bottom) + 30px);
-    right: 13px;
-    width: 100px; height: 100px;
+    bottom: 6px;
+    right: 14px;
+    width: 70px; height: 110px;
     animation: install-arrow-br 1.4s ease-in-out infinite;
   }
   @keyframes install-arrow-br {
-    0%, 100% { transform: translate(0, 0); }
-    50%      { transform: translate(6px, 6px); }
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(6px); }
   }
 
   /* ── Commitment onboarding ───────────────────────────────────
@@ -5082,35 +5082,36 @@
        navigator.standalone) bypass this entirely. -->
   <div class="install-prompt" id="install-prompt" hidden aria-modal="true" role="dialog">
     <!-- Top-right arrow for Chrome / Firefox / Edge / etc. on iOS.
-         Curve runs from the bottom-left of the SVG up to (88, 22) —
-         deliberately near the top-right corner of the viewBox so the
-         tip lines up with the share-icon location once the container
-         is positioned at the share icon's coordinates. -->
+         The tip sits at the top edge of its viewBox, so when the
+         container is positioned at top: 6px, the tip lands at the
+         very top of the page area — pointing OUT of the page toward
+         the share icon in the URL bar above. -->
     <div class="install-arrow install-arrow-tr" aria-hidden="true">
-      <svg viewBox="0 0 100 100">
+      <svg viewBox="0 0 70 110">
         <defs>
           <marker id="install-arrowhead-tr" viewBox="0 0 10 10" refX="8" refY="5"
                   markerWidth="5" markerHeight="5" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
           </marker>
         </defs>
-        <path d="M15 92 Q15 55 88 22"
+        <path d="M15 105 Q15 55 60 6"
               stroke="currentColor" stroke-width="6" fill="none"
               stroke-linecap="round" marker-end="url(#install-arrowhead-tr)"/>
       </svg>
     </div>
-    <!-- Bottom-right arrow for Safari. Tip near the bottom-right of the
-         viewBox so it lands on the "•••" menu when the container is
-         positioned at the menu's coordinates. -->
+    <!-- Bottom-right arrow for Safari. Tip at the bottom edge of the
+         viewBox; container at bottom: 6px so the tip lands at the
+         very bottom of the page area — pointing OUT toward the "•••"
+         menu in the URL bar below. -->
     <div class="install-arrow install-arrow-br" aria-hidden="true">
-      <svg viewBox="0 0 100 100">
+      <svg viewBox="0 0 70 110">
         <defs>
           <marker id="install-arrowhead-br" viewBox="0 0 10 10" refX="8" refY="5"
                   markerWidth="5" markerHeight="5" orient="auto-start-reverse">
             <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
           </marker>
         </defs>
-        <path d="M15 8 Q15 45 88 78"
+        <path d="M15 5 Q15 55 60 104"
               stroke="currentColor" stroke-width="6" fill="none"
               stroke-linecap="round" marker-end="url(#install-arrowhead-br)"/>
       </svg>
