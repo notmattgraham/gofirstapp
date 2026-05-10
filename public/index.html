@@ -8429,7 +8429,16 @@ function openFeedbackSheet() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
       });
-      if (!r.ok) throw new Error('send_failed');
+      if (!r.ok) {
+        // Surface the server's error code so we can debug from the
+        // alert text alone — saves a round-trip through the network tab.
+        let detail = '';
+        try {
+          const data = await r.json();
+          detail = data && (data.detail || data.error) ? ` (${data.detail || data.error})` : '';
+        } catch {}
+        throw new Error(`send_failed_${r.status}${detail}`);
+      }
       close();
       // Lightweight confirmation toast — uses the existing confirm
       // sheet pattern but with a single dismiss action.
@@ -8454,7 +8463,7 @@ function openFeedbackSheet() {
     } catch (e) {
       sendBtn.disabled = false;
       sendBtn.textContent = 'Send';
-      alert('Couldn\'t send right now. Please try again in a moment.');
+      alert('Couldn\'t send right now: ' + (e && e.message || 'unknown error'));
     }
   }
   el.addEventListener('click', (e) => {
