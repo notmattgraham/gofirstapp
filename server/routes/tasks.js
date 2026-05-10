@@ -76,11 +76,55 @@ async function isTodayComplete(user) {
   return (await todayCompletionState(user)).complete;
 }
 
-// Decide if a task with the given scheduledDate may be created/edited/deleted.
-// Day-lock suspended until app is stable as a reliable to-do list.
-// To re-enable, restore the full lock logic here.
+// Decide if a task with the given scheduledDate may be created / edited /
+// deleted, given the day-commit lifecycle:
+//   past dates  → never mutable (history is history)
+//   today       → mutable only if NOT committed (planning-today mode)
+//   tomorrow    → mutable only if today is committed AND today is done
+//                 AND tomorrow is NOT yet committed
+//   further out → never (the system only ever lets you plan one day out)
+//
+// Completion-only updates (done / completedDates) bypass this — see
+// PATCH handler. Recurring tasks bypass too — they're habit templates,
+// not entries in any single day's committed list.
 async function canMutateForDate(user, scheduledDate) {
-  return { ok: true };
+  if (!scheduledDate) return { ok: true };
+  const today    = userToday(user);
+  const tomorrow = userTomorrow(user);
+
+  if (scheduledDate < today) {
+    return { ok: false, reason: 'past_date', message: 'Past days are locked.' };
+  }
+
+  if (scheduledDate === today) {
+    const commit = await prisma.dayCommit.findUnique({
+      where: { userId_date: { userId: user.id, date: today } },
+    });
+    if (commit) return { ok: false, reason: 'today_committed', message: 'Today is locked.' };
+    return { ok: true };
+  }
+
+  if (scheduledDate === tomorrow) {
+    const todayCommit = await prisma.dayCommit.findUnique({
+      where: { userId_date: { userId: user.id, date: today } },
+    });
+    if (!todayCommit) {
+      return { ok: false, reason: 'today_not_committed', message: 'Commit today first.' };
+    }
+    const todayState = await todayCompletionState(user);
+    if (todayState.total > 0 && !todayState.complete) {
+      return { ok: false, reason: 'today_incomplete', message: 'Finish today first.' };
+    }
+    const tomorrowCommit = await prisma.dayCommit.findUnique({
+      where: { userId_date: { userId: user.id, date: tomorrow } },
+    });
+    if (tomorrowCommit) {
+      return { ok: false, reason: 'tomorrow_committed', message: 'Tomorrow is locked.' };
+    }
+    return { ok: true };
+  }
+
+  return { ok: false, reason: 'too_far_ahead', message: "Can't plan more than one day ahead." };
 }
 function rejectLocked(res, guard) {
   return res.status(403).json({

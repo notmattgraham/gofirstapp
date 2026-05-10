@@ -1,7 +1,7 @@
 const express = require('express');
 const passport = require('../auth');
 const prisma = require('../db');
-const { userToday } = require('../time');
+const { userToday, dateInTz } = require('../time');
 
 const router = express.Router();
 
@@ -38,6 +38,16 @@ function shape(u) {
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
     lockTime: (typeof u.lockTime === 'string' && u.lockTime) || '00:00',
+    lockTimeChangedAt: u.lockTimeChangedAt ? (u.lockTimeChangedAt.toISOString?.() || u.lockTimeChangedAt) : null,
+    // Computed convenience for the SPA — the earliest moment the user
+    // can change their lockTime again. Null if no change has been
+    // recorded yet (i.e., never set, so no cooldown).
+    nextLockChangeAt: u.lockTimeChangedAt
+      ? (() => {
+          const last = u.lockTimeChangedAt instanceof Date ? u.lockTimeChangedAt : new Date(u.lockTimeChangedAt);
+          return new Date(last.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+        })()
+      : null,
     // Coalesce nullables defensively for users created before these
     // columns existed — Prisma returns the column as the default `true`
     // once the migration runs, but a stale shape returned mid-deploy
@@ -71,6 +81,31 @@ router.get('/me', async (req, res) => {
       });
     }
   }
+  // Backfill lockTimeChangedAt for users who onboarded before the
+  // 14-day-cooldown feature shipped. Their cooldown clock starts here
+  // — the alternative (instant change allowed) defeats the purpose.
+  if (user.onboardedAt && user.lockTimeChangedAt == null) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { lockTimeChangedAt: user.onboardedAt },
+    });
+  }
+  // Backfill DayCommit for users who onboarded TODAY before the
+  // commit-lifecycle feature shipped. Their onboarding-commit didn't
+  // create the row, so today reads as "uncommitted" and locks them in
+  // planning mode despite having a committed list. Idempotent via upsert.
+  if (user.onboardedAt) {
+    const tz = user.timezone || 'UTC';
+    const onboardedDate = dateInTz(user.onboardedAt, tz);
+    const today = userToday(user);
+    if (onboardedDate === today) {
+      await prisma.dayCommit.upsert({
+        where: { userId_date: { userId: user.id, date: today } },
+        update: {},
+        create: { userId: user.id, date: today, committedAt: user.onboardedAt },
+      }).catch(() => {});
+    }
+  }
   res.json({ user: shape(user) });
 });
 
@@ -95,9 +130,26 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
   if (typeof req.body.lockTime === 'string') {
     // HH:MM, 24-hour. Anything else is silently ignored.
     if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(req.body.lockTime)) {
-      // Normalize "9:00" → "09:00" for stable comparisons downstream.
       const [h, m] = req.body.lockTime.split(':').map(Number);
-      data.lockTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const next = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      // Only enforce the 14-day cooldown when the value would actually
+      // change — re-PATCHing the same value is a harmless no-op.
+      if (next !== req.user.lockTime) {
+        const last = req.user.lockTimeChangedAt;
+        const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+        if (last) {
+          const lastDate = last instanceof Date ? last : new Date(last);
+          const elapsed = Date.now() - lastDate.getTime();
+          if (elapsed < COOLDOWN_MS) {
+            return res.status(429).json({
+              error: 'lock_time_cooldown',
+              nextChangeAt: new Date(lastDate.getTime() + COOLDOWN_MS).toISOString(),
+            });
+          }
+        }
+        data.lockTime = next;
+        data.lockTimeChangedAt = new Date();
+      }
     }
   }
   if (typeof req.body.timezone === 'string') {
@@ -173,11 +225,16 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
   const now = new Date();
 
   // One transaction so a half-write never leaves the user partially
-  // onboarded with an empty task list.
+  // onboarded with an empty task list. We also commit today's list (via
+  // DayCommit) and stamp lockTimeChangedAt so the 14-day cooldown clock
+  // starts here — the onboarding choice is "change 1".
   const [updated] = await prisma.$transaction([
     prisma.user.update({
       where: { id: req.user.id },
-      data: { onboardedAt: now, tutorialSeen: true, lockTime },
+      data: {
+        onboardedAt: now, tutorialSeen: true,
+        lockTime, lockTimeChangedAt: now,
+      },
     }),
     ...habits.map((name) =>
       prisma.quitStreak.create({
@@ -194,6 +251,9 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
         },
       })
     ),
+    prisma.dayCommit.create({
+      data: { userId: req.user.id, date: today },
+    }),
   ]);
   res.json({ user: shape(updated), habits: habits.length, tasks: tasks.length });
 });
