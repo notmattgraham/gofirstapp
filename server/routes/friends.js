@@ -21,6 +21,9 @@ function shapeUser(u) {
     name: u.name,
     picture: u.picture,
     lastSeenAt: u.lastSeenAt,
+    // Free-form "where I live" string. Public — every authenticated user
+    // can see this on search results and friend rows.
+    location: u.location || null,
   };
 }
 
@@ -131,8 +134,8 @@ router.get('/', wrap(async (req, res) => {
       ],
     },
     include: {
-      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
-      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true, location: true } },
+      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true, location: true } },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -172,13 +175,19 @@ router.get('/search', wrap(async (req, res) => {
     where: {
       id: { notIn: [...excludeIds] },
       OR: [
-        { name:  { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
+        { name:     { contains: q, mode: 'insensitive' } },
+        { email:    { contains: q, mode: 'insensitive' } },
+        // Match the user's free-form "where I live" string too so the
+        // same search box doubles as a "find people in my area" filter
+        // — typing "austin" surfaces every user whose location contains
+        // it. Two-char minimum keeps single-letter typos from returning
+        // half the user base.
+        { location: { contains: q, mode: 'insensitive' } },
       ],
       // Skip placeholder accounts that never set a name.
       name: { not: null },
     },
-    select: { id: true, name: true, email: true, picture: true, lastSeenAt: true },
+    select: { id: true, name: true, email: true, picture: true, lastSeenAt: true, location: true },
     take: 12,
     orderBy: { name: 'asc' },
   });
@@ -303,8 +312,8 @@ router.get('/threads', wrap(async (req, res) => {
   const friendRows = await prisma.friendship.findMany({
     where: { status: 'accepted', OR: [{ fromUserId: me.id }, { toUserId: me.id }] },
     include: {
-      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
-      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true } },
+      fromUser: { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true, location: true } },
+      toUser:   { select: { id: true, name: true, email: true, picture: true, lastSeenAt: true, location: true } },
     },
   });
   if (friendRows.length === 0) return res.json({ threads: [] });

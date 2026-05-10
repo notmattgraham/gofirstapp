@@ -2786,6 +2786,33 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* Name + location stack — location renders as a smaller dim line
+     directly under the display name when the user has one set. */
+  .search-result-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .search-result-meta .search-result-name {
+    flex: 0 0 auto;
+  }
+  .search-result-location {
+    font-size: 12px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .search-result-location svg {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+  }
   .search-result-row .search-row-action {
     height: 30px;
     padding: 0 16px;
@@ -4813,6 +4840,13 @@
             </div>
             <button class="action-btn ghost setting-btn" id="edit-avatar-btn">Change</button>
           </div>
+          <div class="setting-row">
+            <div class="setting-copy">
+              <div class="setting-title">Location</div>
+              <div class="setting-sub" id="profile-location-sub">Where you live — others can find you by searching their area.</div>
+            </div>
+            <button class="action-btn ghost setting-btn" id="edit-location-btn">Edit</button>
+          </div>
         </div>
 
         <div class="section-title">Appearance</div>
@@ -5250,7 +5284,7 @@
             id="friend-search-input"
             class="friend-search-input"
             type="text"
-            placeholder="Search by name"
+            placeholder="Search by name or location"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="words"
@@ -8313,6 +8347,14 @@ function renderProfile() {
   nameEl.textContent = u.name || '(no name)';
   emailEl.textContent = u.email || '';
   if (nameSubEl) nameSubEl.textContent = u.name || u.email || '';
+  // Location subtitle: show the user's current location, or the
+  // default explainer copy when unset.
+  const locSubEl = document.getElementById('profile-location-sub');
+  if (locSubEl) {
+    locSubEl.textContent = u.location
+      ? u.location
+      : 'Where you live — others can find you by searching their area.';
+  }
   // Notify any setting-row IIFE that depends on Auth.user (e.g. the
   // lock-time picker) to re-read its value. Cheaper than each one
   // polling the auth state on its own.
@@ -8805,6 +8847,22 @@ document.getElementById('edit-name-btn').addEventListener('click', async () => {
   } catch (e) {
     console.warn(e);
     banner('Could not save name', true);
+  }
+});
+
+// Profile → Edit location. Free-form "where you live" string; other
+// users can match against it in friend search. Empty input clears it.
+document.getElementById('edit-location-btn').addEventListener('click', async () => {
+  const current = (Auth.user && Auth.user.location) || '';
+  const v = window.prompt('Where do you live? (e.g. "Austin, TX")', current);
+  if (v == null) return;
+  try {
+    await Auth.updateMe({ location: v.trim().slice(0, 80) });
+    renderProfile();
+    banner(v.trim() ? 'Location updated' : 'Location cleared');
+  } catch (e) {
+    console.warn(e);
+    banner('Could not save location', true);
   }
 });
 
@@ -10173,7 +10231,7 @@ const Coaching = (() => {
     }
     document.getElementById('friend-search-results').innerHTML = '';
     document.getElementById('friend-search-hint').hidden = false;
-    document.getElementById('friend-search-hint').textContent = 'Type at least 2 characters.';
+    document.getElementById('friend-search-hint').textContent = 'Search by name or by city / state to find people in your area.';
   }
   function closeFriendSearch() { closeOverlay('friend-search-overlay'); }
 
@@ -10185,7 +10243,7 @@ const Coaching = (() => {
     if (trimmed.length < 2) {
       list.innerHTML = '';
       hint.hidden = false;
-      hint.textContent = 'Type at least 2 characters.';
+      hint.textContent = 'Search by name or by city / state to find people in your area.';
       return;
     }
     clearTimeout(_friendSearchTimer);
@@ -10204,10 +10262,20 @@ const Coaching = (() => {
         list.innerHTML = users.map(u => {
           const sent = sentSet.has(u.id);
           // Privacy: never display email. The server search still matches
-          // against email server-side, but only the display name is shown.
+          // against email server-side, but only the display name + a
+          // small location pin (if they've set one) is shown.
+          const locationLine = u.location
+            ? `<span class="search-result-location">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                ${esc(u.location)}
+              </span>`
+            : '';
           return `<li class="search-result-row">
             <span class="search-result-avatar">${avatarHtml(u, u.name || 'User')}</span>
-            <span class="search-result-name">${esc(u.name || 'User')}</span>
+            <span class="search-result-meta">
+              <span class="search-result-name">${esc(u.name || 'User')}</span>
+              ${locationLine}
+            </span>
             <button class="search-row-action ${sent ? '' : 'primary'}" data-search-add data-user-id="${esc(u.id)}" ${sent ? 'disabled' : ''}>
               ${sent ? 'Requested' : 'Add'}
             </button>

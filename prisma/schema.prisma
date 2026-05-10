@@ -20,6 +20,13 @@ model User {
   // Drives midnight calculations and lock enforcement server-side.
   timezone    String?
 
+  // Free-form "where I live" string the user enters in Profile (e.g.
+  // "Austin, TX" or "Brooklyn, NY"). Not a current-location ping —
+  // it's their stated hometown. Used by the friend-search endpoint to
+  // help users find people in their area, and rendered alongside
+  // the name on search result rows. Up to 80 chars.
+  location    String?
+
   // Time-of-day at which "today" rolls over for this user — i.e. when
   // their list locks and a fresh day begins. Stored as "HH:MM" in their
   // local timezone. Default 00:00 (midnight) matches the original
