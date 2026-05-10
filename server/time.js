@@ -58,12 +58,37 @@ function isFirstDay(user) {
   return dateInTz(new Date(user.createdAt), tz) === userToday(user);
 }
 
+// ms until the user's NEXT lockTime (i.e., the moment "today" rolls over).
+// Used by the SPA to render the "You crushed today, next tasks in HH:MM:SS"
+// countdown without having to recompute lockTime math client-side.
+function msUntilNextLock(user) {
+  const tz = (user && user.timezone) || 'UTC';
+  const lockMin = lockMinutes(user); // 0..1439
+  // Compute "now" in user's TZ as minutes-since-midnight + the local date.
+  const now = new Date();
+  // Get the user-local hours/minutes/seconds via Intl
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(now);
+  const lookup = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const localMinutes = parseInt(lookup.hour, 10) * 60 + parseInt(lookup.minute, 10);
+  const localSeconds = parseInt(lookup.second, 10);
+  // Difference to lock in minutes (within 24h cycle).
+  let diffMin = lockMin - localMinutes;
+  if (diffMin <= 0 || (diffMin === 0 && localSeconds > 0)) diffMin += 1440;
+  return Math.max(0, diffMin * 60_000 - localSeconds * 1000);
+}
+
 module.exports = {
   dateInTz,
   userToday,
   userTomorrow,
   userDateOffset,
   lockMinutes,
+  msUntilNextLock,
   isOverrideActive,
   isFirstDay,
 };

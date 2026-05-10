@@ -406,6 +406,111 @@
   }
   .lock-banner[hidden] { display: none; }
 
+  /* ── Day-mode banner ───────────────────────────────────────────
+     Sits at the top of the Tasks tab and tells the user what they
+     should be doing right now. Different copy per mode is set in
+     JS — see DayState.applyToTodoView. */
+  .mode-banner {
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .mode-banner[hidden] { display: none; }
+  .mode-banner-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .mode-banner-sub {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    line-height: 1.45;
+  }
+
+  /* Commit button — bottom of the planning task list. Locks today
+     (or tomorrow, depending on mode) when tapped. */
+  .commit-row {
+    margin: 18px 0 24px;
+    display: flex;
+    justify-content: center;
+  }
+  .commit-row[hidden] { display: none; }
+  .commit-btn {
+    appearance: none;
+    border: 0;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 800;
+    height: 52px;
+    padding: 0 36px;
+    border-radius: 999px;
+    background: var(--text);
+    color: var(--bg);
+    cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    transition: box-shadow 0.2s ease, transform 0.08s ease;
+  }
+  .commit-btn:active { transform: scale(0.98); }
+  .commit-btn:disabled { opacity: 0.5; cursor: default; }
+
+  /* "You crushed today" full-screen waiting state. Replaces the task
+     list when mode === 'tomorrow-committed'. */
+  .crushed-card {
+    margin: 36px 0;
+    padding: 28px 22px;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+  .crushed-card[hidden] { display: none; }
+  .crushed-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .crushed-title {
+    font-size: clamp(22px, 6vw, 28px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.25;
+    margin: 0 0 14px;
+  }
+  .crushed-sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-bottom: 18px;
+  }
+  .crushed-countdown {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* "X tasks left" / green-glow states for the top New-Task button. */
+  .top-action-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .top-action-glow {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+    animation: top-action-glow 1.6s ease-in-out infinite;
+  }
+  @keyframes top-action-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    50%      { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0.18); }
+  }
+
   /* Inline icons inside text — keep them sized to the line. */
   .icon {
     flex-shrink: 0;
@@ -4250,6 +4355,24 @@
       <div class="view-slider" id="view-slider">
       <!-- To Do List view -->
       <section id="view-todo" class="view">
+        <!-- Mode banner. Driven by DayState.applyToTodoView() — copy
+             changes per mode (planning today / today incomplete /
+             planning tomorrow / tomorrow committed). -->
+        <div class="mode-banner" id="mode-banner" hidden>
+          <div class="mode-banner-title" id="mode-banner-title"></div>
+          <div class="mode-banner-sub" id="mode-banner-sub"></div>
+        </div>
+
+        <!-- "You crushed today" waiting state. Replaces the entire task
+             list when mode is tomorrow-committed; the countdown ticks
+             down to the user's next lockTime. -->
+        <div class="crushed-card" id="crushed-card" hidden>
+          <div class="crushed-eyebrow">Day complete</div>
+          <h2 class="crushed-title">You crushed today.</h2>
+          <p class="crushed-sub">You can begin your next tasks in:</p>
+          <div class="crushed-countdown" id="crushed-countdown">—</div>
+        </div>
+
         <div class="date-nav" id="date-nav">
           <button class="date-nav-arrow" id="date-prev" aria-label="Previous day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <button class="date-nav-label" id="date-label-btn" aria-label="Open calendar">
@@ -4330,6 +4453,12 @@
           </summary>
           <ul class="list completed-list" id="completed-list"></ul>
         </details>
+
+        <!-- Commit button — only visible in planning modes. Locks the
+             current planning day's list when tapped. -->
+        <div class="commit-row" id="commit-row" hidden>
+          <button type="button" class="commit-btn" id="commit-btn">Commit</button>
+        </div>
       </section>
 
       <!-- Streaks view (retired — habits/streaks now live on the Tasks view) -->
@@ -4575,15 +4704,13 @@
           </div>
         </div>
 
-        <div class="section-title">Overrides</div>
-        <div class="card">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <div class="setting-title" id="override-title">3 overrides left this month</div>
-              <div class="setting-sub" id="override-sub">Use one to unlock today's list when you missed planning the night before.</div>
-            </div>
-            <button class="action-btn primary setting-btn" id="use-override">Use</button>
-          </div>
+        <!-- Overrides hidden — replaced by the day-commit lifecycle.
+             Markup kept (hidden) so the renderOverrides() handler doesn't
+             throw on missing nodes. -->
+        <div hidden>
+          <div class="setting-title" id="override-title"></div>
+          <div class="setting-sub" id="override-sub"></div>
+          <button id="use-override"></button>
         </div>
 
         <div class="section-title">Notes</div>
@@ -5450,6 +5577,11 @@ const Store = (() => {
       overrideActive: !!(t && t.overrideActive),
     };
     emit();
+    // Task data just refreshed — pull the day-state machine alongside
+    // so the mode banner / Commit button / countdown reflect the new
+    // counts (e.g. user just completed today's last task, mode flips
+    // to planning-tomorrow).
+    if (window.DayState) DayState.refresh();
     // Persist a snapshot so the next boot can render instantly from cache
     // while fresh data loads in the background.
     try {
@@ -6005,11 +6137,28 @@ const StreakForm = {
 /* ---- Top-action label ---- */
 let currentTab = 'todo';
 function setTopAction() {
-  if (currentTab === 'todo') {
-    els.topAction.hidden = false;
-    els.topAction.textContent = els.dockWrap.classList.contains('closed') ? '+ New task' : 'Close';
-  } else {
+  if (currentTab !== 'todo') {
     els.topAction.hidden = true;
+    return;
+  }
+  els.topAction.hidden = false;
+  els.topAction.classList.remove('top-action-disabled', 'top-action-glow');
+  // Mode-aware label / disabled / glow. Falls back to the original
+  // "+ New task" / "Close" toggle when DayState hasn't loaded yet.
+  const mode = (window.DayState && DayState.current && DayState.current.mode) || null;
+  const dockOpen = !els.dockWrap.classList.contains('closed');
+  if (dockOpen) { els.topAction.textContent = 'Close'; return; }
+  if (mode === 'today-incomplete') {
+    const left = (DayState.current && DayState.current.todayRemaining) || 0;
+    els.topAction.textContent = `${left} task${left === 1 ? '' : 's'} left`;
+    els.topAction.classList.add('top-action-disabled');
+  } else if (mode === 'tomorrow-committed') {
+    els.topAction.hidden = true;
+  } else if (mode === 'planning-tomorrow') {
+    els.topAction.textContent = '+ New task';
+    els.topAction.classList.add('top-action-glow');
+  } else {
+    els.topAction.textContent = '+ New task';
   }
 }
 
@@ -8014,10 +8163,34 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
     h = h % 12; if (h === 0) h = 12;
     return `${h}:${mm} ${period}`;
   }
+  // Format an ISO timestamp as a short countdown ("4 days") or
+  // calendar date ("May 23") depending on how far out it is.
+  function fmtAvailable(nextISO) {
+    if (!nextISO) return null;
+    const next = new Date(nextISO);
+    const ms = next.getTime() - Date.now();
+    if (ms <= 0) return null;
+    const days = Math.ceil(ms / 86_400_000);
+    if (days <= 1) {
+      const hrs = Math.ceil(ms / 3_600_000);
+      return `${hrs} hour${hrs === 1 ? '' : 's'}`;
+    }
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
   function refresh() {
     const t = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
     input.value = t;
-    if (sub) sub.textContent = `Currently ${fmt(t)} — change anytime.`;
+    const nextISO = Auth && Auth.user && Auth.user.nextLockChangeAt;
+    const available = fmtAvailable(nextISO);
+    if (available) {
+      // Within the 14-day cooldown window — block the input and show
+      // when it can change again.
+      input.disabled = true;
+      if (sub) sub.textContent = `Locked at ${fmt(t)}. Available to change in ${available}.`;
+    } else {
+      input.disabled = false;
+      if (sub) sub.textContent = `Currently ${fmt(t)}. You can only change this once every 14 days.`;
+    }
   }
   // Initial render — wait until Auth resolves. boot() calls renderProfile
   // after auth, so a microtask delay is enough; otherwise refresh manually.
@@ -8027,7 +8200,22 @@ document.getElementById('profile-show-tour').addEventListener('click', () => {
     const v = input.value;
     if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(v)) return;
     try {
-      const data = await api('PATCH', '/api/auth/me', { lockTime: v });
+      const r = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lockTime: v }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 429 && data && data.error === 'lock_time_cooldown') {
+        const available = fmtAvailable(data.nextChangeAt);
+        alert(`You can only change this once every 14 days. Available again in ${available || 'a bit'}.`);
+        // Sync the auth shape so the UI reflects the locked state.
+        if (Auth && Auth.user) Auth.user.nextLockChangeAt = data.nextChangeAt;
+        refresh();
+        return;
+      }
+      if (!r.ok) throw new Error(data && data.error || `status_${r.status}`);
       if (data && data.user) Auth.user = data.user;
       refresh();
     } catch (e) { console.warn('[lock-time] save failed', e); }
@@ -10538,6 +10726,11 @@ async function boot() {
   // start out unchecked even when notifyMessages/Friends/System are true.
   if (window.PushNotifications) PushNotifications.refreshState();
 
+  // Pull the day-state machine immediately so the Tasks tab shows the
+  // right mode (planning / today-incomplete / etc.) on first paint.
+  // Subsequent refreshes are triggered by Store.load on task changes.
+  if (window.DayState) DayState.refresh();
+
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
   try {
@@ -10640,6 +10833,169 @@ document.querySelectorAll('details').forEach(smoothDetails);
    doesn't reappear next session. The tour does not switch tabs —
    it's plain prose by design (Option A from the design discussion).
    ============================================================ */
+
+/* ============================================================
+   DayState — the Tasks tab's state machine.
+   Pulls /api/days/state on boot and after every task mutation, then
+   drives:
+     - mode-banner copy (planning/today-incomplete/planning-tomorrow/...)
+     - the New Task button (label / disabled / glow)
+     - the Commit button at the bottom of the planning list
+     - the "You crushed today" countdown card
+     - which date the task list is rendering (today vs tomorrow)
+   ============================================================ */
+window.DayState = (() => {
+  let current = null;          // last response from /api/days/state
+  let countdownTimer = null;   // setInterval handle for crushed-card
+
+  async function refresh() {
+    try {
+      const r = await fetch('/api/days/state', { credentials: 'same-origin' });
+      if (!r.ok) return null;
+      current = await r.json();
+      apply();
+      return current;
+    } catch (e) {
+      console.warn('[day-state] fetch failed', e);
+      return null;
+    }
+  }
+
+  // Force-render whatever's currently in `current` to the DOM.
+  function apply() {
+    if (!current) return;
+    const banner       = document.getElementById('mode-banner');
+    const bannerTitle  = document.getElementById('mode-banner-title');
+    const bannerSub    = document.getElementById('mode-banner-sub');
+    const crushed      = document.getElementById('crushed-card');
+    const commitRow    = document.getElementById('commit-row');
+    const commitBtn    = document.getElementById('commit-btn');
+    const dateNav      = document.getElementById('date-nav');
+    const tasksList    = document.getElementById('tasks-list');
+    const tasksEmpty   = document.getElementById('tasks-empty');
+    const completedSec = document.getElementById('completed-section');
+
+    // Mode-specific copy + visibility.
+    let title = '', sub = '', commitLabel = '';
+    let showCrushed = false, showCommit = false, showList = true;
+    switch (current.mode) {
+      case 'planning-today':
+        title = 'Plan today.';
+        sub   = 'Add the things you\'re committing to today, then tap Commit.';
+        commitLabel = 'Commit today';
+        showCommit = (current.todayCount > 0);
+        break;
+      case 'today-incomplete':
+        title = `${current.todayRemaining} task${current.todayRemaining === 1 ? '' : 's'} left.`;
+        sub   = 'Finish today\'s list before you can plan tomorrow.';
+        showCommit = false;
+        break;
+      case 'planning-tomorrow':
+        title = 'You crushed today.';
+        sub   = 'Plan tomorrow and commit.';
+        commitLabel = 'Commit tomorrow';
+        showCommit = (current.tomorrowCount > 0);
+        break;
+      case 'tomorrow-committed':
+        showCrushed = true;
+        showList = false;
+        showCommit = false;
+        break;
+    }
+
+    if (banner)      banner.hidden = !title && !sub;
+    if (bannerTitle) bannerTitle.textContent = title;
+    if (bannerSub)   bannerSub.textContent   = sub;
+    if (crushed)     crushed.hidden = !showCrushed;
+    if (commitBtn && commitLabel)  commitBtn.textContent = commitLabel;
+    if (commitRow)   commitRow.hidden = !showCommit;
+
+    // Hide the date navigator + task list in committed-waiting mode —
+    // there's nothing for the user to do until lockTime hits.
+    if (dateNav)      dateNav.hidden    = !showList;
+    if (tasksList)    tasksList.hidden  = !showList;
+    if (completedSec) completedSec.style.display = showList ? '' : 'none';
+    if (tasksEmpty && !showList) tasksEmpty.hidden = true;
+
+    // Make sure the Tasks tab is rendering the RIGHT day. In planning-
+    // tomorrow mode we shift to tomorrow; everywhere else, today. The
+    // SPA tracks the visible date in `selectedDateISO`; setting it +
+    // re-rendering moves the list.
+    try {
+      const target = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
+      if (typeof selectedDateISO !== 'undefined' && selectedDateISO !== target) {
+        selectedDateISO = target;
+        if (typeof Store !== 'undefined' && typeof render === 'function') render(Store.get());
+      }
+    } catch {}
+
+    // Top-action button reflects the mode too — re-render via the
+    // existing helper.
+    if (typeof setTopAction === 'function') setTopAction();
+
+    // Countdown ticking — only in committed-waiting mode.
+    stopCountdown();
+    if (showCrushed && current.msUntilNextLock > 0) startCountdown(current.msUntilNextLock);
+  }
+
+  function startCountdown(initialMs) {
+    const el = document.getElementById('crushed-countdown');
+    if (!el) return;
+    const target = Date.now() + initialMs;
+    const tick = () => {
+      const ms = Math.max(0, target - Date.now());
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      if (ms <= 0) { stopCountdown(); refresh(); /* lockTime hit, re-pull state */ }
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+  function stopCountdown() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  }
+
+  async function commit(date) {
+    if (!date) return;
+    const r = await fetch(`/api/days/${encodeURIComponent(date)}/commit`, {
+      method: 'POST', credentials: 'same-origin',
+    });
+    if (!r.ok) throw new Error('commit_failed');
+    await refresh();
+  }
+
+  // Wire the Commit button — picks the right date based on current mode.
+  function wire() {
+    const btn = document.getElementById('commit-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      if (!current) return;
+      const date = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
+      btn.disabled = true;
+      try {
+        await commit(date);
+        // Refresh the task list so the now-locked state renders.
+        if (typeof Store !== 'undefined' && Store.load) Store.load();
+      } catch (e) {
+        alert('Could not commit. ' + (e.message || e));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+  wire();
+
+  return {
+    get current() { return current; },
+    refresh,
+    apply,
+    commit,
+  };
+})();
+
 window.Tour = (() => {
   const STEPS = [
     {
@@ -10651,7 +11007,7 @@ window.Tour = (() => {
       eyebrow: 'Tasks',
       title: 'Plan it, then do it.',
       body: `<p>Tap <b>+</b> to add a task — one-shot for today, or recurring (daily, weekly, monthly) for habits. Tap a row to mark it done.</p>
-             <p>Today's list <b>locks at midnight</b>. That's the whole point — you commit ahead of time. If life happens, you have <b>3 mulligans a month</b>.</p>`,
+             <p>You plan today, hit <b>Commit</b>, and the list locks until your day ends. Finish them all to unlock tomorrow's planning.</p>`,
     },
     {
       eyebrow: 'Analytics',
@@ -10934,6 +11290,10 @@ window.Onboarding = (() => {
         list locks and tomorrow begins. Most people pick midnight — go
         later if you stay up past it, or much later (8 AM) if you work
         overnight.
+      </p>
+      <p class="onb-body" style="font-size:13px;color:var(--text-faint);">
+        You can only change this <b>once every 14 days</b> — pick
+        carefully.
       </p>
       <div class="onb-lock-presets">
         ${buttons}
