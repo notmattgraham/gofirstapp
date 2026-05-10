@@ -4698,7 +4698,7 @@
           <div class="setting-row">
             <div class="setting-copy">
               <div class="setting-title">Tasks lock at</div>
-              <div class="setting-sub" id="lock-time-sub">Each day's list locks at this time and the streaks count up.</div>
+              <div class="setting-sub" id="lock-time-sub">You have until this time each day to finish the tasks you committed to.</div>
             </div>
             <input type="time" id="profile-lock-time" class="field-input setting-select" style="height:32px;font-size:13px;padding:0 8px;width:auto;" />
           </div>
@@ -5581,7 +5581,12 @@ const Store = (() => {
     // so the mode banner / Commit button / countdown reflect the new
     // counts (e.g. user just completed today's last task, mode flips
     // to planning-tomorrow).
-    if (window.DayState) DayState.refresh();
+    //
+    // Deferred by 250ms so the check-mark / list-row animations from
+    // the just-completed mutation get to finish before any DayState-
+    // driven re-render interrupts them. Without this the user sees
+    // the check animation skip mid-frame.
+    if (window.DayState) setTimeout(() => DayState.refresh(), 250);
     // Persist a snapshot so the next boot can render instantly from cache
     // while fresh data loads in the background.
     try {
@@ -10959,13 +10964,16 @@ window.DayState = (() => {
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
   }
 
+  // Bare commit — POSTs to the server and resolves. Caller decides
+  // when to refresh DayState / Store; the wired Commit button defers
+  // those updates until the ceremony has fully appeared so the
+  // underlying re-render doesn't fight the animation for paint frames.
   async function commit(date) {
     if (!date) return;
     const r = await fetch(`/api/days/${encodeURIComponent(date)}/commit`, {
       method: 'POST', credentials: 'same-origin',
     });
     if (!r.ok) throw new Error('commit_failed');
-    await refresh();
   }
 
   // Replays the onboarding's commit ceremony (green check pop +
@@ -11015,14 +11023,22 @@ window.DayState = (() => {
           ? `${count} ${noun} ready for tomorrow.`
           : `${count} ${noun} for today. Now execute.`;
         playCeremony(sub);
-        if (typeof Store !== 'undefined' && Store.load) Store.load();
-        // Hold the ceremony for ~2.4s, then hide and snap to the top
-        // of the Tasks tab so the user sees the mode banner first.
+        // Smoothness: defer the DayState refresh until the ceremony
+        // has fully animated in (~1.5s). Otherwise the underlying
+        // mode-banner / commit-button DOM updates compete with the
+        // ceremony for paint frames and the animation stutters.
+        // No Store.load here — the task data didn't change, only the
+        // DayCommit row did, and that's covered by refresh() below.
+        setTimeout(() => { refresh(); }, 1500);
+        // Hide ceremony at 2.4s + snap to the top of the Tasks tab.
+        // Instant scroll (not smooth) — smooth scrolling animates
+        // alongside the ceremony fade and tends to stutter on long
+        // task lists.
         setTimeout(() => {
           hideCeremony();
           const view = document.getElementById('view-todo');
-          if (view && view.scrollTo) view.scrollTo({ top: 0, behavior: 'smooth' });
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          if (view && view.scrollTo) view.scrollTo({ top: 0, behavior: 'auto' });
+          window.scrollTo({ top: 0, behavior: 'auto' });
         }, 2400);
       } catch (e) {
         alert('Could not commit. ' + (e.message || e));
@@ -11331,10 +11347,11 @@ window.Onboarding = (() => {
       <div class="onb-eyebrow">Step 1 of 4</div>
       <h1 class="onb-h1">When does your day end?</h1>
       <p class="onb-body">
-        Pick the time you usually <b>go to sleep</b>. That's when today's
-        list locks and tomorrow begins. Most people pick midnight — go
-        later if you stay up past it, or much later (8 AM) if you work
-        overnight.
+        Pick the time you usually <b>go to sleep</b>. That's the
+        <b>deadline</b> to finish the tasks you committed to — and
+        the moment tomorrow's planning unlocks. Most people pick
+        midnight — go later if you stay up past it, or much later
+        (8 AM) if you work overnight.
       </p>
       <p class="onb-body" style="font-size:13px;color:var(--text-faint);">
         You can only change this <b>once every 14 days</b> — pick
@@ -11445,9 +11462,9 @@ window.Onboarding = (() => {
         ${tasksHtml}
       </div>
       <div class="onb-fineprint">
-        The list locks at <b>${escHtml(formatLockLabel(STATE.lockTime))}</b>.
-        The streaks start now. You can edit the list before then, but
-        once it locks, it's history.
+        Once you commit, this list <b>locks immediately</b>. You have
+        until <b>${escHtml(formatLockLabel(STATE.lockTime))}</b> to
+        finish them. The streaks start now.
       </div>
       ${errorHtml}
       <div class="onb-actions">
