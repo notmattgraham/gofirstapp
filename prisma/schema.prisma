@@ -198,6 +198,13 @@ model Message {
   // Does not affect the recipient's view, and does not hide messages once
   // the admin actually opens the thread.
   hiddenFromAdminAt DateTime?
+  // Mirror of the above for the SENDER's inbox listing. Set when the
+  // message originates from the Share Feedback portal — the user's pinned
+  // admin row stays empty until the admin actually replies (which creates
+  // a row from admin → user with this field null, surfacing the thread).
+  // Once they open the thread, the original feedback messages render
+  // alongside the reply — this only gates the listing, not the history.
+  hiddenFromSenderAt DateTime?
   createdAt  DateTime  @default(now())
 
   @@index([fromUserId])

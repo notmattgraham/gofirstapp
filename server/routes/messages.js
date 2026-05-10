@@ -129,7 +129,13 @@ router.get('/admin-pin', wrap(async (req, res) => {
     prisma.message.findFirst({
       where: {
         OR: [
-          { fromUserId: me.id, toUserId: admin.id },
+          // Outbound from me → admin only counts if it wasn't sent
+          // through the Share Feedback portal (which stamps
+          // hiddenFromSenderAt). That keeps the pinned-admin row
+          // empty until the admin actually replies.
+          { fromUserId: me.id, toUserId: admin.id, hiddenFromSenderAt: null },
+          // Any inbound from admin → me always surfaces the thread
+          // (admin replies + broadcasts).
           { fromUserId: admin.id, toUserId: me.id },
         ],
       },
