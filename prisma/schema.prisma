@@ -102,6 +102,13 @@ model User {
   // the recipient actually replies.
   welcomeDmSentAt     DateTime?
 
+  // Last time the inactivity-reengagement push fired for this user.
+  // The scheduler (server/inactivity.js) sends a "your goals are
+  // waiting" push when lastSeenAt > 24h ago AND this is either null
+  // or older than ~22h — i.e. at most one reengagement push per day
+  // while they're dormant.
+  lastReengagementPushAt DateTime?
+
   tasks          Task[]
   quitStreaks    QuitStreak[]
   sentMessages   Message[] @relation("SentMessages")
