@@ -1,12 +1,18 @@
 // Welcome-DM scheduler. Runs every minute and, for every user whose
-// `lastSeenAt - createdAt` has crossed 15 minutes AND whose
-// `welcomeDmSentAt` is still null, sends an auto-DM from the admin
-// account thanking them for downloading.
+// account was created 15+ minutes ago AND whose `welcomeDmSentAt`
+// is still null, sends an auto-DM from the admin thanking them for
+// downloading. One-shot per user — the `welcomeDmSentAt` column
+// makes the trigger idempotent forever after.
+//
+// We deliberately do NOT gate on `lastSeenAt` — the DM goes out 15
+// minutes after `createdAt` regardless of how active the user has
+// been in between. If they happen to be offline they pick the
+// message up next time they open the app; if they're online they
+// see it land via WS + push.
 //
 // The DM is stamped with `hiddenFromAdminAt = now` so it does NOT
 // appear in the admin's inbox listing — the thread only surfaces if
-// the recipient writes back. After delivery we set the user's
-// `welcomeDmSentAt` so we never double-send.
+// the recipient writes back.
 //
 // On first boot we mark every EXISTING user as already-welcomed (via
 // raw SQL — the column exists in DB after `db push`, regardless of
@@ -19,7 +25,8 @@ const pushModule = require('./routes/push');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
 const WELCOME_BODY = 'Thank you for downloading the GOFIRST app. If there\'s anything I can do to improve your experience with the app, please let me know. - Matt';
-const ACTIVE_THRESHOLD_MS = 15 * 60 * 1000;
+// Wait this long after createdAt before sending the welcome DM.
+const SIGNUP_AGE_THRESHOLD_MS = 15 * 60 * 1000;
 const TICK_MS = 60 * 1000;
 
 async function findAdmin() {
@@ -53,22 +60,20 @@ async function tick() {
   const admin = await findAdmin();
   if (!admin) return; // No admin user yet — try again next tick.
 
-  // Fetch every candidate (welcomeDmSentAt null, lastSeenAt present),
-  // then filter in JS for `lastSeenAt - createdAt >= 15 min`. The
-  // SQL-side `lastSeenAt > createdAt + INTERVAL '15 minutes'` would
-  // be more efficient but Prisma's typed where doesn't compose
-  // column-to-column comparisons cleanly; fetch + filter is fine at
-  // the scale we're at (single-digit signups per day).
-  let candidates;
+  // Anyone created 15+ minutes ago who hasn't been welcomed yet.
+  // The welcomeDmSentAt column makes this idempotent — once stamped,
+  // a user never matches this query again.
+  const cutoff = new Date(Date.now() - SIGNUP_AGE_THRESHOLD_MS);
+  let eligible;
   try {
-    candidates = await prisma.user.findMany({
+    eligible = await prisma.user.findMany({
       where: {
         welcomeDmSentAt: null,
+        createdAt: { lte: cutoff },
         id: { not: admin.id },
-        lastSeenAt: { not: null },
       },
       select: {
-        id: true, name: true, createdAt: true, lastSeenAt: true,
+        id: true, name: true,
         notifyMessages: true, notifySystem: true,
       },
     });
@@ -76,12 +81,6 @@ async function tick() {
     console.warn('[welcome] candidate query failed:', e.message);
     return;
   }
-
-  const eligible = candidates.filter((u) => {
-    if (!u.lastSeenAt) return false;
-    const elapsed = u.lastSeenAt.getTime() - u.createdAt.getTime();
-    return elapsed >= ACTIVE_THRESHOLD_MS;
-  });
 
   for (const user of eligible) {
     try {
@@ -137,7 +136,7 @@ function start() {
   // server is fully booted before we hit it.
   setTimeout(() => tick().catch((e) => console.warn('[welcome] tick error', e.message)), 45_000);
   timer = setInterval(() => tick().catch((e) => console.warn('[welcome] tick error', e.message)), TICK_MS);
-  console.log(`[welcome] scheduler started (every ${TICK_MS / 60_000} min, active threshold ${ACTIVE_THRESHOLD_MS / 60_000} min)`);
+  console.log(`[welcome] scheduler started (every ${TICK_MS / 60_000} min, signup-age threshold ${SIGNUP_AGE_THRESHOLD_MS / 60_000} min)`);
 }
 
 module.exports = { start, tick };
