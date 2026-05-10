@@ -3004,6 +3004,130 @@
     opacity: 0.5;
   }
 
+  /* ── iOS install prompt ──────────────────────────────────────
+     Hard-block iOS users who aren't running the installed PWA. Two
+     variants — the share-button location differs per browser:
+       Safari  → bottom toolbar  (arrow points down)
+       Chrome  → upper-right address bar (arrow points up-right)
+       Other iOS browsers (Firefox / Edge / DuckDuckGo / Opera) get
+       the Chrome variant since their share affordance is also up
+       in the chrome bar, not the bottom.
+     `data-variant` on the root toggles which content + arrow show. */
+  .install-prompt {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--safe-top) + 28px) 26px calc(var(--safe-bottom) + 100px);
+  }
+  .install-prompt[hidden] { display: none; }
+  .install-card {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+  }
+  .install-logo { height: 56px; width: auto; }
+  .install-title {
+    font-size: clamp(28px, 7vw, 36px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin: 0;
+  }
+  .install-body {
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+  }
+  .install-body b { color: var(--text); font-weight: 700; }
+  .install-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+  .install-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    text-align: left;
+  }
+  .install-step-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 800;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .install-step-body {
+    flex: 1;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .install-step-body b { font-weight: 700; }
+
+  /* Variant gating — show only the matching content + arrow. */
+  .install-prompt .install-content { display: none; }
+  .install-prompt[data-variant="chrome"] .install-content-chrome { display: contents; }
+  .install-prompt[data-variant="safari"] .install-content-safari { display: contents; }
+
+  .install-arrow { display: none; position: fixed; pointer-events: none; }
+  .install-arrow svg {
+    stroke: var(--text);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+  }
+  .install-prompt[data-variant="chrome"] .install-arrow-tr { display: block; }
+  .install-prompt[data-variant="safari"] .install-arrow-b  { display: block; }
+
+  /* Top-right arrow points at Chrome's address-bar share icon. */
+  .install-arrow-tr {
+    top: calc(var(--safe-top) + 8px);
+    right: 14px;
+    width: 90px; height: 90px;
+    animation: install-arrow-tr 1.4s ease-in-out infinite;
+  }
+  @keyframes install-arrow-tr {
+    0%, 100% { transform: translate(0, 0); }
+    50%      { transform: translate(8px, -8px); }
+  }
+
+  /* Bottom arrow points at Safari's bottom-toolbar share icon. */
+  .install-arrow-b {
+    bottom: calc(var(--safe-bottom) + 60px);
+    right: 50%;
+    transform: translateX(50%);
+    width: 80px; height: 80px;
+    animation: install-arrow-b 1.4s ease-in-out infinite;
+  }
+  @keyframes install-arrow-b {
+    0%, 100% { transform: translateX(50%) translateY(0); }
+    50%      { transform: translateX(50%) translateY(10px); }
+  }
+
   /* ── Commitment onboarding ───────────────────────────────────
      Full-viewport takeover for first-login users. Replaces the
      explanatory tabs tour (which still exists, replayable from
@@ -4947,6 +5071,71 @@
     </div>
   </div>
 
+  <!-- iOS install prompt. Hard-blocks any iOS user who hasn't added
+       the app to their home screen yet. JS sets data-variant to either
+       "chrome" or "safari" so the right share-button arrow + steps
+       show. Installed PWA users (display-mode: standalone OR legacy
+       navigator.standalone) bypass this entirely. -->
+  <div class="install-prompt" id="install-prompt" hidden aria-modal="true" role="dialog">
+    <!-- Top-right arrow for Chrome / Firefox / Edge / etc. on iOS — their
+         share button lives in the upper-right of the address bar. -->
+    <div class="install-arrow install-arrow-tr" aria-hidden="true">
+      <svg viewBox="0 0 100 100">
+        <path d="M30 75 Q55 75 75 30"/>
+        <path d="M75 30 L60 28 M75 30 L73 45"/>
+      </svg>
+    </div>
+    <!-- Bottom arrow for Safari on iPhone — share button lives in the
+         middle of the bottom toolbar. -->
+    <div class="install-arrow install-arrow-b" aria-hidden="true">
+      <svg viewBox="0 0 100 100">
+        <path d="M50 15 L50 85"/>
+        <path d="M50 85 L25 60 M50 85 L75 60"/>
+      </svg>
+    </div>
+
+    <div class="install-card">
+      <img class="install-logo" src="applogo.svg" alt="GoFirst" />
+      <h1 class="install-title">Install GoFirst</h1>
+      <p class="install-body">
+        Add the app to your home screen for push notifications and a
+        smoother experience.
+      </p>
+      <div class="install-steps">
+        <!-- Chrome variant: share button at top-right -->
+        <div class="install-content install-content-chrome">
+          <div class="install-step">
+            <div class="install-step-num">1</div>
+            <div class="install-step-body">Tap the <b>share icon</b> in the top-right corner of Chrome.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">2</div>
+            <div class="install-step-body">Scroll down and choose <b>Add to Home Screen</b>.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">3</div>
+            <div class="install-step-body">Open GoFirst from your home screen — not from Chrome.</div>
+          </div>
+        </div>
+        <!-- Safari variant: share button at bottom -->
+        <div class="install-content install-content-safari">
+          <div class="install-step">
+            <div class="install-step-num">1</div>
+            <div class="install-step-body">Tap the <b>share icon</b> in the bottom toolbar.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">2</div>
+            <div class="install-step-body">Scroll down and choose <b>Add to Home Screen</b>.</div>
+          </div>
+          <div class="install-step">
+            <div class="install-step-num">3</div>
+            <div class="install-step-body">Open GoFirst from your home screen.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Commitment-onboarding takeover. Fires once for accounts with no
        prior tasks/streaks. The 4-step flow is rendered into
        #onb-content by the Onboarding module — DOM swaps per step rather
@@ -5002,6 +5191,46 @@
 
 <script>
 'use strict';
+
+/* ============================================================
+   iOS install gate — runs first, before any other JS work.
+   On iOS, web push + a real PWA experience only happen once the user
+   has added the app to their home screen. So when we detect we're
+   running in an iOS browser tab (NOT a standalone PWA), we hard-block
+   with browser-specific install instructions:
+     iOS Chrome / Firefox / Edge / etc → top-right share-icon arrow
+     iOS Safari                        → bottom-toolbar share-icon arrow
+   Once the user adds it to their home screen and reopens, display-mode
+   is "standalone" (or navigator.standalone === true on legacy iOS) and
+   this gate is skipped entirely.
+   ============================================================ */
+(function iosInstallGate() {
+  const ua = navigator.userAgent || '';
+  const isIos = /iPhone|iPad|iPod/.test(ua) || (
+    // iPadOS reports as Mac in modern Safari but exposes touch.
+    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+  );
+  if (!isIos) return;
+
+  const isStandalone =
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    navigator.standalone === true;
+  if (isStandalone) return;
+
+  // Distinguish Safari from the alt-browser-on-iOS family. iOS Safari
+  // adds no special UA marker, so absence of the alt-browser tokens
+  // IS Safari. We bucket every alt browser into the "chrome" variant
+  // because they all surface their share affordance in the upper bar,
+  // not the bottom toolbar.
+  const isAlt = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|Yandex|UCBrowser/.test(ua);
+  const variant = isAlt ? 'chrome' : 'safari';
+
+  const root = document.getElementById('install-prompt');
+  if (!root) return;
+  root.dataset.variant = variant;
+  root.hidden = false;
+  document.body.style.overflow = 'hidden';
+})();
 
 /* ============================================================
    API layer — thin fetch wrapper. Everything goes through JSON
