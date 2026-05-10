@@ -275,6 +275,11 @@ server.listen(port, () => {
   try { require('./welcome').start(); }
   catch (e) { console.warn('[welcome] failed to start', e.message); }
 
+  // Inactivity-reengagement scheduler — daily push to anyone whose
+  // lastSeenAt is more than 24h old, throttled to 1/day per user.
+  try { require('./inactivity').start(); }
+  catch (e) { console.warn('[inactivity] failed to start', e.message); }
+
   // Server-side keepalive: ping ourselves every 5 minutes so Railway never
   // idles the dyno even when no clients are connected.
   const selfUrl = process.env.RAILWAY_PUBLIC_DOMAIN
