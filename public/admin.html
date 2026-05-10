@@ -450,6 +450,66 @@
   .four-oh-four p { margin-top: 6px; font-size: 14px; }
   .four-oh-four a { color: var(--text-dim); text-decoration: underline; }
 
+  /* --- User detail modal ------------------------------------ */
+  /* Click any avatar in the user table to open this — full
+     tasks / streaks / category breakdown / per-user analytics
+     for the row, reusing the same renderClient layout. */
+  .user-detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px;
+    overflow-y: auto;
+  }
+  .user-detail-overlay[hidden] { display: none; }
+  .user-detail-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: min(720px, 100%);
+    max-width: 720px;
+    overflow: hidden;
+    position: relative;
+  }
+  .user-detail-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .user-detail-close:hover { color: var(--text); }
+  .user-detail-loading {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  /* The avatars in the table are now clickable — show that affordance. */
+  .user-cell .avatar { cursor: pointer; transition: opacity 0.15s; }
+  .user-cell .avatar:hover { opacity: 0.8; }
+  .streak-list { list-style: none; padding: 0; margin: 8px 0 0; }
+  .streak-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+  .streak-list li:last-child { border-bottom: none; }
+  .streak-list .meta { color: var(--text-dim); font-size: 12px; }
+
   /* --- Responsive ------------------------------------------- */
   @media (max-width: 720px) {
     .wrap { padding: 18px 14px 60px; }
@@ -533,6 +593,17 @@
           <tr><td colspan="9" class="center">Loading users…</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- User-detail modal. Populated lazily on avatar click via
+       /api/admin/users/:id; renders the same client-card layout
+       that coaching clients get on this page, plus a full streaks
+       list and a longer task history. -->
+  <div id="user-detail-overlay" class="user-detail-overlay" hidden role="dialog" aria-modal="true">
+    <div class="user-detail-card" id="user-detail-card">
+      <button class="user-detail-close" id="user-detail-close" aria-label="Close">×</button>
+      <div class="user-detail-loading" id="user-detail-body">Loading…</div>
     </div>
   </div>
 
@@ -715,7 +786,7 @@
       <tr data-id="${escapeHtml(u.id)}">
         <td>
           <div class="user-cell">
-            ${avatarHtml(u)}
+            <span data-user-detail="${escapeHtml(u.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(u.name || u.email || 'user')} details">${avatarHtml(u)}</span>
             <div>
               <div class="name">${escapeHtml(u.name || '—')} ${roleBadge}</div>
               <div class="email">${escapeHtml(u.email || '')}</div>
@@ -1065,6 +1136,136 @@
       alert('Could not update coaching status. ' + err.message);
     }
   });
+
+  // --- User detail modal ----------------------------------------------
+  // Click any avatar in the user table → fetch /api/admin/users/:id and
+  // render a card with their tasks, streaks, and analytics. Same layout
+  // as the coaching-client cards but adds a streaks list and skips the
+  // "Unmark" button (since the user might not be a coaching client).
+  $('users-body').addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-user-detail]');
+    if (!trigger) return;
+    openUserDetail(trigger.dataset.userDetail);
+  });
+  $('users-body').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const trigger = e.target.closest('[data-user-detail]');
+    if (!trigger) return;
+    e.preventDefault();
+    openUserDetail(trigger.dataset.userDetail);
+  });
+
+  $('user-detail-close').addEventListener('click', closeUserDetail);
+  $('user-detail-overlay').addEventListener('click', (e) => {
+    // Click outside the card (on the backdrop) closes the modal.
+    if (e.target === $('user-detail-overlay')) closeUserDetail();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('user-detail-overlay').hidden) closeUserDetail();
+  });
+
+  function closeUserDetail() {
+    $('user-detail-overlay').hidden = true;
+    $('user-detail-body').innerHTML = '<div class="user-detail-loading">Loading…</div>';
+  }
+
+  async function openUserDetail(userId) {
+    const overlay = $('user-detail-overlay');
+    const body    = $('user-detail-body');
+    overlay.hidden = false;
+    body.innerHTML = '<div class="user-detail-loading">Loading…</div>';
+    try {
+      const data = await fetchJson(`/api/admin/users/${encodeURIComponent(userId)}`);
+      body.innerHTML = renderUserDetail(data);
+    } catch (err) {
+      console.error('[admin] user-detail failed', err);
+      body.innerHTML = `<div class="user-detail-loading">Couldn't load user details.<br/><small>${escapeHtml(err.message || 'unknown')}</small></div>`;
+    }
+  }
+
+  function renderUserDetail(d) {
+    const u = d.user;
+    const s = d.summary || {};
+    const cats = s.byCategory || {};
+    const catKeys = Object.keys(cats).sort();
+    const maxScheduled = Math.max(1, ...catKeys.map(k => cats[k].scheduled || 0));
+
+    const catRows = catKeys.length
+      ? catKeys.map(k => {
+          const v = cats[k];
+          const pct = v.scheduled > 0 ? (v.completed / v.scheduled) : null;
+          const w = v.scheduled / maxScheduled * 100;
+          return `
+            <div class="cat-row">
+              <div class="label">${escapeHtml(k)}</div>
+              <div class="bar"><div style="width:${w.toFixed(1)}%"></div></div>
+              <div class="pct">${v.completed}/${v.scheduled} · ${fmt.pct(pct)}</div>
+            </div>`;
+        }).join('')
+      : '<div class="center" style="padding:8px 0">No categorized tasks yet.</div>';
+
+    // Up to 25 most-recently-updated tasks. Beyond that the modal gets
+    // unwieldy and the analytics rollup above tells the broader story.
+    const tasks = (d.tasks || []).slice(0, 25);
+    const taskHtml = tasks.length
+      ? tasks.map(t => {
+          const recurLabel = t.recurrence
+            ? (t.recurrence.type || 'recurring')
+            : (t.done ? 'done' : 'open');
+          const meta = t.recurrence
+            ? `${(t.completedDates || []).length} done`
+            : (t.scheduledDate || fmt.date(t.createdAt));
+          return `
+            <li>
+              <span class="recur">${escapeHtml(recurLabel)}</span>
+              <span class="text">${escapeHtml(t.text)}</span>
+              <span class="meta">${escapeHtml(meta)}</span>
+            </li>`;
+        }).join('')
+      : '<li><span class="text" style="color:var(--text-dim)">No tasks yet.</span></li>';
+
+    const streaks = d.streaks || [];
+    const streakHtml = streaks.length
+      ? streaks.map(st => {
+          // Days since startAt (which is "YYYY-MM-DDTHH:MM" local string).
+          const start = new Date(st.startAt);
+          const days = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
+          return `
+            <li>
+              <span>${escapeHtml(st.name)}</span>
+              <span class="meta">${days} day${days === 1 ? '' : 's'} · since ${fmt.date(st.startAt)}</span>
+            </li>`;
+        }).join('')
+      : '<li><span class="meta" style="color:var(--text-dim)">No quit streaks.</span></li>';
+
+    const role = u.coachingClient ? 'Client' : '';
+    const tzLabel = u.timezone || 'no tz';
+    return `
+      <div class="client-head">
+        ${avatarHtml(u)}
+        <div class="meta">
+          <div class="name">${escapeHtml(u.name || u.email)} ${role ? `<span class="badge role-client">${role}</span>` : ''}</div>
+          <div class="email">${escapeHtml(u.email)} · joined ${fmt.date(u.createdAt)} · ${escapeHtml(tzLabel)}</div>
+        </div>
+      </div>
+      <div class="client-body">
+        <div class="client-stats">
+          <div class="stat"><div class="label">Tasks</div><div class="num">${fmt.int(s.totalTasks)}</div></div>
+          <div class="stat"><div class="label">Recurring</div><div class="num">${fmt.int(s.recurringCount)}</div></div>
+          <div class="stat"><div class="label">One-shots</div><div class="num">${fmt.int(s.oneShotCount)}</div></div>
+          <div class="stat"><div class="label">Exec rate</div><div class="num">${fmt.pct(s.executionRate)}</div></div>
+          <div class="stat"><div class="label">Streaks</div><div class="num">${fmt.int(streaks.length)}</div></div>
+          <div class="stat"><div class="label">Overrides</div><div class="num">${fmt.int(u.overridesUsed)}</div></div>
+        </div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:6px 0">By category</div>
+        <div class="cat-grid">${catRows}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">Recent tasks</div>
+        <ul class="task-list">${taskHtml}</ul>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 0">Quit streaks</div>
+        <ul class="streak-list">${streakHtml}</ul>
+      </div>
+    `;
+  }
 
   loadAll();
 })();
