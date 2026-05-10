@@ -9,7 +9,17 @@ datasource db {
 
 model User {
   id          String       @id @default(cuid())
-  googleId    String       @unique
+  // googleId stays @unique but is now nullable. Users who first sign
+  // up via Sign in with Apple don't have a Google id, and existing
+  // Google users don't have an Apple one. The email field is the
+  // join key between the two providers — same email logs in regardless
+  // of which provider authenticates them.
+  googleId    String?      @unique
+  // Apple Sign in subject (sub claim on the id_token). Unique per
+  // (app, user) — Apple gives a stable identifier scoped to your
+  // Services ID. Required by App Store guideline 4.8 once we ship
+  // the iOS native app.
+  appleId     String?      @unique
   email       String       @unique
   name        String?
   picture     String?
