@@ -3102,35 +3102,34 @@
   .install-prompt[data-variant="chrome"] .install-arrow-tr { display: block; }
   .install-prompt[data-variant="safari"] .install-arrow-br { display: block; }
 
-  /* Top-right arrow — Chrome's share icon lives in the URL bar, which
-     is browser chrome ABOVE our page viewport. We can't reach into it,
-     so the arrow sits flush at the top edge of the page with its tip
-     pointing UP (out of the page) toward where the icon is. */
+  /* Top-right arrow — flush against the top edge of the page, tip
+     touching the page boundary so it's as close to Chrome's share
+     icon as we can physically get (the icon itself is in browser
+     chrome above the page, beyond what we can render onto). */
   .install-arrow-tr {
-    top: 6px;
+    top: 0;
     right: 14px;
     width: 70px; height: 110px;
     animation: install-arrow-tr 1.4s ease-in-out infinite;
   }
   @keyframes install-arrow-tr {
     0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-6px); }
+    50%      { transform: translateY(-5px); }
   }
 
-  /* Bottom-right arrow — Safari's "•••" menu lives in the URL bar at
-     the bottom of the screen, which is browser chrome BELOW our page
-     viewport. Same trick: arrow flush at the bottom edge of the page,
-     tip pointing DOWN (out of the page) toward where the menu sits. */
+  /* Bottom-right arrow — same trick, mirrored for Safari's bottom URL
+     bar with the "•••" menu. */
   .install-arrow-br {
-    bottom: 6px;
+    bottom: 0;
     right: 14px;
     width: 70px; height: 110px;
     animation: install-arrow-br 1.4s ease-in-out infinite;
   }
   @keyframes install-arrow-br {
     0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(6px); }
+    50%      { transform: translateY(5px); }
   }
+  .install-arrow svg { overflow: visible; }
 
   /* ── Commitment onboarding ───────────────────────────────────
      Full-viewport takeover for first-login users. Replaces the
@@ -5094,7 +5093,7 @@
             <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
           </marker>
         </defs>
-        <path d="M15 105 L60 6"
+        <path d="M15 110 L60 0"
               stroke="currentColor" stroke-width="6" fill="none"
               stroke-linecap="round" marker-end="url(#install-arrowhead-tr)"/>
       </svg>
@@ -5111,7 +5110,7 @@
             <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
           </marker>
         </defs>
-        <path d="M15 5 L60 104"
+        <path d="M15 0 L60 110"
               stroke="currentColor" stroke-width="6" fill="none"
               stroke-linecap="round" marker-end="url(#install-arrowhead-br)"/>
       </svg>
