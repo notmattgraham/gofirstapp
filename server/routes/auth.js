@@ -28,6 +28,9 @@ function shape(u) {
     name: u.name,
     picture: u.picture,
     timezone: u.timezone,
+    // Free-form "where I live" string (e.g. "Austin, TX"). Public — every
+    // other user can see this on friend-search results. Null if unset.
+    location: u.location || null,
     overridesUsed: u.overridesUsed,
     overrideActiveDate: u.overrideActiveDate,
     // Coaching fields — frontend uses these to switch tab layout + show chat.
@@ -167,6 +170,13 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
   if (typeof req.body.timezone === 'string') {
     // Trust IANA-shaped strings only ("Region/City" or fixed names like "UTC").
     if (/^[A-Za-z_+\-/0-9]{3,60}$/.test(req.body.timezone)) data.timezone = req.body.timezone;
+  }
+  if (typeof req.body.location === 'string') {
+    // Free-form "where I live". Trim, cap at 80 chars, treat empty as null
+    // (so users can clear their location). No further validation — it's
+    // a display string that other users see on search results.
+    const trimmed = req.body.location.trim().slice(0, 80);
+    data.location = trimmed || null;
   }
   if (Object.keys(data).length === 0) return res.json({ user: shape(req.user) });
   const user = await prisma.user.update({ where: { id: req.user.id }, data });
