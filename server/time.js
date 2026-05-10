@@ -1,15 +1,31 @@
 // Date helpers that respect each user's local timezone AND their custom
-// day-end lock time. "Today" is the YYYY-MM-DD label of the user's
-// current logical day — which, when lockTime != "00:00", may differ
-// from the wall-clock calendar date.
+// day-end deadline. "Today" is the YYYY-MM-DD label of the user's
+// current logical day.
 //
-// Mental model: a user's day runs from `lockTime` to `lockTime` 24h
-// later. So if lockTime = "06:00":
-//   - 5:00 AM May 9 → still in "May 8"'s logical day (haven't crossed lock)
-//   - 6:00 AM May 9 → freshly into "May 9"'s logical day
-// Implementation: shift `now` backwards by lockTime minutes, then take
-// the calendar date in the user's TZ. The shifted clock crosses
-// midnight at exactly the user's lock moment.
+// Mental model: lockTime is the DEADLINE for finishing today's tasks.
+// A day named "X" runs from the previous deadline to deadline X. The
+// day's name is the calendar date of ITS deadline — i.e., whichever
+// calendar day the period mostly occupies:
+//
+//   lockTime "23:00" (evening deadline):
+//     "May 10" runs 23:00 May 9 → 22:59:59.999 May 10
+//     At 9 AM May 10 → today = May 10 (deadline tonight at 23:00 May 10)
+//     At 23:01 May 10 → today = May 11 (rolled; May 10's incomplete
+//                        tasks now count as missed)
+//
+//   lockTime "03:00" (early-morning deadline; "up late"):
+//     "May 10" runs 03:00 May 10 → 02:59:59.999 May 11
+//     At 1 AM May 10 → today = May 9 (still finishing yesterday's day,
+//                       which extends until 3 AM May 10)
+//     At 4 AM May 10 → today = May 10
+//
+//   lockTime "00:00" (midnight; standard calendar day):
+//     "May 10" runs 00:00 May 10 → 23:59:59.999 May 10
+//
+// Implementation: pick start-date or end-date naming based on which
+// calendar day the 24h period mostly occupies. Cutoff is noon — any
+// lockTime past noon is treated as "this evening" (end-date naming);
+// noon-or-earlier is "tomorrow morning extension" (start-date).
 
 function dateInTz(date, tz) {
   // 'en-CA' formats as YYYY-MM-DD by default.
@@ -26,17 +42,30 @@ function lockMinutes(user) {
   return h * 60 + mm;
 }
 
+// Returns the ms-offset to apply to "now" before reading the calendar
+// date in the user's TZ. The sign of the offset chooses start-date vs
+// end-date naming:
+//   lockMin <= 720 (noon or earlier) → shift backwards by lockMin (the
+//      day mostly sits on the start calendar date, so subtract the
+//      morning extension to land on it)
+//   lockMin >  720 (evening)         → shift forward by (1440 - lockMin),
+//      then back 1ms (to avoid the midnight-boundary date flip), so we
+//      land on the calendar date the deadline falls on
+function refOffsetMs(user) {
+  const lockMin = lockMinutes(user);
+  if (lockMin > 720) return (1440 - lockMin) * 60_000 - 1;
+  return -(lockMin * 60_000);
+}
+
 function userToday(user) {
   const tz = (user && user.timezone) || 'UTC';
-  const shift = lockMinutes(user) * 60_000;
-  const ref = new Date(Date.now() - shift);
+  const ref = new Date(Date.now() + refOffsetMs(user));
   return dateInTz(ref, tz);
 }
 
 function userDateOffset(user, days) {
   const tz = (user && user.timezone) || 'UTC';
-  const shift = lockMinutes(user) * 60_000;
-  const ref = new Date(Date.now() - shift + days * 86_400_000);
+  const ref = new Date(Date.now() + refOffsetMs(user) + days * 86_400_000);
   return dateInTz(ref, tz);
 }
 

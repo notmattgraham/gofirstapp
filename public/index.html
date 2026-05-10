@@ -234,6 +234,7 @@
     margin: 0 -4px 12px;
     width: calc(100% + 8px);
   }
+  .date-nav[hidden] { display: none; }
   .date-nav-arrow {
     background: none;
     border: none;
@@ -4437,7 +4438,7 @@
           <div class="crushed-countdown" id="crushed-countdown">—</div>
         </div>
 
-        <div class="date-nav" id="date-nav">
+        <div class="date-nav" id="date-nav" hidden>
           <button class="date-nav-arrow" id="date-prev" aria-label="Previous day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <button class="date-nav-label" id="date-label-btn" aria-label="Open calendar">
             <span class="date-nav-day-text" id="date-nav-day">Today</span>
@@ -5502,17 +5503,23 @@ function lockMinutes() {
   return h * 60 + mm;
 }
 
-// "Today" respects the user's lockTime. Shifting `now` backwards by
-// lockTime minutes makes the calendar date roll over at exactly the
-// user's chosen lock instant, instead of at clock midnight. Mirrors
-// userToday() in server/time.js.
+// "Today" respects the user's lockTime — see server/time.js for the
+// full rationale. lockTime is a DEADLINE; the day's name is the
+// calendar date of its deadline.
+//   lockMin > 720 (evening): today = end-date. Shift forward by
+//      (1440 - lockMin) min, then back 1ms to dodge the midnight flip.
+//   lockMin <= 720 (morning/midnight): today = start-date. Shift back
+//      by lockMin minutes.
+function _refOffsetMs() {
+  const lockMin = lockMinutes();
+  if (lockMin > 720) return (1440 - lockMin) * 60_000 - 1;
+  return -(lockMin * 60_000);
+}
 function todayISO() {
-  const shift = lockMinutes() * 60_000;
-  return toISO(new Date(Date.now() - shift));
+  return toISO(new Date(Date.now() + _refOffsetMs()));
 }
 function todayDow() {
-  const shift = lockMinutes() * 60_000;
-  return new Date(Date.now() - shift).getDay();
+  return new Date(Date.now() + _refOffsetMs()).getDay();
 }
 function addDaysISO(iso, n) {
   const d = new Date(iso + 'T00:00:00');
