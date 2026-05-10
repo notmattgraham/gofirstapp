@@ -202,5 +202,41 @@ router.post('/:date/commit', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Minimal mode resolver, used by server/nudges.js to figure out which
+// deadline-nudge (if any) a user should receive. Returns the same
+// `mode` strings as GET /api/days/state so the two stay in sync.
+async function computeMode(user) {
+  const today    = userToday(user);
+  const tomorrow = userTomorrow(user);
+  const tasks = await prisma.task.findMany({
+    where: { userId: user.id },
+    select: {
+      id: true, recurrence: true, scheduledDate: true, done: true,
+      completedDates: true, createdAt: true, startedAt: true,
+    },
+  });
+  const todayCounts    = countForDate(tasks, today);
+  const tomorrowCounts = countForDate(tasks, tomorrow);
+  const commits = await prisma.dayCommit.findMany({
+    where: { userId: user.id, date: { in: [today, tomorrow] } },
+    select: { date: true },
+  });
+  const commitSet = new Set(commits.map(c => c.date));
+  const todayCommitted = commitSet.has(today);
+  const tomorrowCommitted = commitSet.has(tomorrow);
+  const todayDone = todayCounts.total > 0 && todayCounts.done >= todayCounts.total;
+  let mode;
+  if (!todayCommitted)                                        mode = 'planning-today';
+  else if (!todayDone)                                        mode = 'today-incomplete';
+  else if (todayDone && tomorrowCommitted)                    mode = 'tomorrow-committed';
+  else /* todayDone && !tomorrowCommitted */                  mode = 'planning-tomorrow';
+  return {
+    mode, today, tomorrow,
+    todayCounts, tomorrowCounts,
+    todayCommitted, tomorrowCommitted, todayDone,
+  };
+}
+
 module.exports = router;
 module.exports.autoCommitPastDates = autoCommitPastDates;
+module.exports.computeMode = computeMode;

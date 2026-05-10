@@ -450,6 +450,25 @@
     color: var(--text-dim);
     margin-top: 1px;
   }
+  .quit-streak-reset {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    margin-left: 12px;
+    flex-shrink: 0;
+  }
+  .quit-streak-reset:hover {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
 
   /* ── Day-mode banner ───────────────────────────────────────────
      Sits at the top of the Tasks tab and tells the user what they
@@ -6260,11 +6279,15 @@ function setTab(name) {
 }
 
 /* ---- Task-check animation ----
-   Tasks currently mid-exit-animation. Renders keep them in the
-   active list with the .checking-out class so they animate out
-   in place; once the timer fires we drop them from the set and
-   the next render moves them to the Completed dropdown. */
+   Two parallel sets track the per-task animation state so re-renders
+   triggered by background syncs (Store.load, DayState.refresh) during
+   the animation window don't destroy the in-progress animation:
+     _poppingTasks  — the check-button is mid-pop (0–220 ms)
+     _exitingTasks  — the row is mid-slide-out (220–720 ms)
+   The renderer (see renderTasksView) reads both and applies the right
+   classes so a fresh DOM rebuild keeps the animation alive. */
 const _exitingTasks = new Set();
+const _poppingTasks = new Set();
 
 function handleTaskToggle(id, rowEl) {
   const task = Store.get().tasks.find(t => t.id === id);
@@ -6278,28 +6301,31 @@ function handleTaskToggle(id, rowEl) {
     return;
   }
 
-  // Going undone → done. Animate the EXISTING DOM in place: pop the check
-  // button, then slide the row out, and only commit state at the very end.
-  // If we updated state up front, Store.toggleTaskToday's synchronous emit
-  // would re-render the list and destroy the button mid-pop — which is
-  // why the previous version showed a "wiggle then disappear" instead of
-  // a satisfying pop.
+  // Going undone → done. Animate the existing DOM in place. State is
+  // committed only at the very end so the synchronous render emit
+  // doesn't destroy the button mid-pop.
   if (!rowEl) {
     Store.toggleTaskToday(id);
     return;
   }
 
-  // Mark as exiting so any unrelated re-render that lands during the
-  // animation window keeps this row in the active list with .checking-out.
+  _poppingTasks.add(id);
   _exitingTasks.add(id);
 
   const btn = rowEl.querySelector('.check');
   if (btn) btn.classList.add('checking', 'done');
-  // Slide-out kicks in after the pop has had room to crest.
-  setTimeout(() => rowEl.classList.add('checking-out'), 220);
+  // After the pop crests, drop popping (slide-out's class then drives
+  // the row's animation; the row already carries .checking-out via the
+  // renderer's _exitingTasks check).
+  setTimeout(() => {
+    _poppingTasks.delete(id);
+    rowEl.classList.add('checking-out');
+  }, 220);
 
-  // After both animations finish, commit state. The next render moves the
-  // task into the Completed dropdown via the normal pending/done split.
+  // After both animations finish, commit state. The next render moves
+  // the task into the Completed dropdown via the normal pending/done
+  // split. Tracking sets are cleared just before to keep the renderer
+  // from clinging to the obsolete state.
   setTimeout(() => {
     _exitingTasks.delete(id);
     Store.toggleTaskToday(id);
@@ -6776,6 +6802,9 @@ function renderTasksView(state) {
   const renderRow = (t) => {
     const done = isTaskDoneOn(t, dayISO);
     const exiting = _exitingTasks.has(t.id);
+    // Mid-pop tasks need the .checking class on the button so the
+    // pop animation survives a re-render that lands during 0–220ms.
+    const popping = _poppingTasks.has(t.id);
     const schedule = scheduleLabel(t.recurrence, t.startedAt);
     const badges = [];
     if (schedule) badges.push(`<span class="badge">${repeatIcon} ${esc(schedule)}</span>`);
@@ -6806,7 +6835,7 @@ function renderTasksView(state) {
       : '';
     const row = `
       <li class="row ${done ? 'done' : ''} ${exiting ? 'checking-out' : ''}" data-task-id="${t.id}">
-        ${dragHandle}<button class="check ${done ? 'done' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
+        ${dragHandle}<button class="check ${done ? 'done' : ''}${popping ? ' checking' : ''}" data-action="task-toggle" aria-label="Mark done"></button>
         <div class="row-body">
           <div class="row-text">${esc(t.text)}</div>
           ${sub}
@@ -7371,9 +7400,37 @@ function renderQuitStreaks(state) {
           <div class="num">${s.days}</div>
           <div class="label">${s.days === 1 ? 'day' : 'days'}</div>
         </div>
+        <button type="button" class="quit-streak-reset"
+                data-quit-reset="${esc(s.id)}"
+                data-quit-name="${esc(s.name || 'this streak')}">
+          Reset
+        </button>
       </li>
     `).join('');
 }
+
+// Reset-streak click handler. Confirms, then PATCHes startAt to now
+// so the day count rolls back to 0. Optimistically updates Store so
+// the change reflects immediately, then refreshes from the server.
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-quit-reset]');
+  if (!btn) return;
+  const id = btn.dataset.quitReset;
+  const name = btn.dataset.quitName || 'this streak';
+  if (!confirm(`Reset ${name}? The day count goes back to 0.`)) return;
+  btn.disabled = true;
+  try {
+    await api('PATCH', `/api/streaks/${encodeURIComponent(id)}`, {
+      startAt: new Date().toISOString(),
+    });
+    if (typeof Store !== 'undefined' && Store.load) await Store.load();
+  } catch (err) {
+    console.warn('[quit-reset] failed', err);
+    alert('Could not reset streak. Try again.');
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 function renderAnalyticsView(state) {
   // Off-tab? Skip entirely. We don't want to update the snapshot or fire
@@ -11684,12 +11741,13 @@ window.Onboarding = (() => {
     }
   }
 
-  // Reveal the celebration overlay on top of the onboarding takeover
-  // and populate the sub-line with the commitment counts. Animations
-  // live in CSS — this just unhides and writes the count.
+  // Reveal the celebration overlay on top of the onboarding takeover.
+  // Rebuilds the inner HTML so the CSS keyframes always start from
+  // frame 0 — without that, if the element was used before (e.g. from
+  // a Tasks-tab commit), the browser doesn't replay the animation and
+  // the user sees the icon already at scale(1) with no pop.
   function playCeremony() {
     const cel = $('onb-celebration');
-    const sub = $('onb-celebration-sub');
     if (!cel) return;
     const habits = nonEmpty(STATE.habits).length;
     const tasks  = nonEmpty(STATE.tasks).length;
@@ -11697,7 +11755,14 @@ window.Onboarding = (() => {
       ? null
       : `${habits} habit${habits === 1 ? '' : 's'} walked away from`;
     const tPart = `${tasks} action${tasks === 1 ? '' : 's'} for today`;
-    if (sub) sub.textContent = hPart ? `${hPart} · ${tPart}.` : `${tPart}.`;
+    const subText = hPart ? `${hPart} · ${tPart}.` : `${tPart}.`;
+    cel.innerHTML = `
+      <div class="onb-celebration-icon">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1 class="onb-celebration-title">Committed.</h1>
+      <p class="onb-celebration-sub">${subText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    `;
     cel.hidden = false;
     cel.setAttribute('aria-hidden', 'false');
   }
