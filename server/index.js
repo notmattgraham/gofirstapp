@@ -262,6 +262,11 @@ server.on('upgrade', async (request, socket, head) => {
 
 server.listen(port, () => {
   console.log(`GoFirst listening on :${port}  (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
+  // Start the deadline-nudge scheduler — fires the 2h / 1h push
+  // notifications when a user's day-end is approaching and they
+  // still have unfinished work or a uncommitted tomorrow.
+  try { require('./nudges').start(); }
+  catch (e) { console.warn('[nudges] failed to start', e.message); }
 
   // Server-side keepalive: ping ourselves every 5 minutes so Railway never
   // idles the dyno even when no clients are connected.

@@ -95,6 +95,24 @@ model User {
   receivedFriendships Friendship[] @relation("ReceivedFriendships")
   pushSubscriptions   PushSubscription[]
   dayCommits          DayCommit[]
+  nudgeLogs           NudgeLog[]
+}
+
+// Per-(user, kind, date) record of a deadline-nudge push having fired,
+// so the scheduled job (server/nudges.js) doesn't double-send when its
+// 5-minute tick falls inside the same firing window twice.
+//   kind: '2h' | '1h' — distance from lockTime when this nudge fires
+//   date: YYYY-MM-DD of the day the nudge is for (in user's TZ)
+model NudgeLog {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind    String
+  date    String
+  sentAt  DateTime @default(now())
+
+  @@unique([userId, kind, date])
+  @@index([userId])
 }
 
 // One row per (user, date) the user has explicitly committed. The
