@@ -2687,6 +2687,90 @@
   }
   .chat-promo-cta:active { background: var(--accent-hover); }
 
+  /* Coach-upsell bottom sheet — same coach.jpg + green-dot tile as the
+     Social-tab promo, but presented as a modal that auto-opens when
+     the user has had three consecutive sub-50% execution days. */
+  .coach-upsell-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .coach-upsell-overlay[hidden] { display: none; }
+  .coach-upsell-sheet {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-elev);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 24px 20px calc(var(--safe-bottom) + 24px);
+    text-align: center;
+  }
+  .coach-upsell-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    position: relative;
+    margin: 0 auto 14px;
+    background: var(--accent-dim);
+  }
+  .coach-upsell-icon img {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    /* Same crop tuning as the social-tab promo so the face sits centered. */
+    object-position: 50% 25%;
+    display: block;
+  }
+  .coach-upsell-online-dot {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 3px solid var(--bg-elev);
+  }
+  .coach-upsell-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .coach-upsell-body {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin: 0 auto 20px;
+    line-height: 1.45;
+    max-width: 380px;
+  }
+  .coach-upsell-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .coach-upsell-btn {
+    width: 100%;
+    min-height: var(--tap);
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .coach-upsell-btn.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: transparent;
+  }
+  .coach-upsell-btn:active { opacity: 0.85; }
+
   /* Friend-search overlay body — input + scrolling result list.
      Header title is centered iOS-style; the back button stays on the
      left without nudging the title. */
@@ -7342,6 +7426,125 @@ function executionStreak(state) {
   return streak;
 }
 
+/* ─── Coach upsell prompt ───────────────────────────────────────────
+   When the user's per-day execution rate is below 50% for three
+   consecutive completed days (i.e. yesterday + two before — today is
+   excluded so a mid-day rate doesn't trigger it), pop a modal asking
+   if they'd like a coach. Skipped for users who already have a coach,
+   the coach themselves, and the admin. Cooldown via localStorage so
+   the same user doesn't see the prompt repeatedly.
+   ─────────────────────────────────────────────────────────────────── */
+const CoachUpsell = (() => {
+  const STORAGE_KEY = 'gofirst:coach-upsell:lastShown';
+  // Don't re-prompt the same user within this window even if their
+  // streak keeps going. Resets on a fresh login or storage clear.
+  const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+  const STREAK_DAYS = 3;
+  const THRESHOLD_PCT = 50;
+
+  let _open = false;
+  let _checkScheduled = false;
+
+  function lastShown() {
+    try {
+      const v = localStorage.getItem(STORAGE_KEY);
+      return v ? parseInt(v, 10) : 0;
+    } catch { return 0; }
+  }
+  function markShown() {
+    try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch {}
+  }
+
+  // Returns true iff each of the last STREAK_DAYS completed days
+  // (yesterday and the two before) has a rate that's BOTH measurable
+  // (scheduled > 0, i.e. not null) AND below THRESHOLD_PCT. If any of
+  // the three days has null rate (no scheduled tasks) we don't count it
+  // either way — we just exit without prompting, since the user might
+  // not have been using the app yet.
+  function streakBelowThreshold(state) {
+    const today = todayISO();
+    for (let i = 1; i <= STREAK_DAYS; i++) {
+      const iso = addDaysISO(today, -i);
+      const rate = dayExecutionRate(state, iso);
+      if (rate === null) return false;
+      if (rate >= THRESHOLD_PCT) return false;
+    }
+    return true;
+  }
+
+  function eligible(user) {
+    if (!user) return false;
+    if (user.coachingClient) return false; // already has a coach
+    if (user.isCoach) return false;
+    if (user.isAdmin) return false;
+    return true;
+  }
+
+  function show() {
+    if (_open) return;
+    _open = true;
+    markShown();
+    const el = document.createElement('div');
+    el.className = 'coach-upsell-overlay';
+    el.innerHTML = `
+      <div class="coach-upsell-sheet" role="dialog" aria-modal="true">
+        <div class="coach-upsell-icon">
+          <img src="/coach.jpg" alt="" referrerpolicy="no-referrer" />
+          <span class="coach-upsell-online-dot" aria-label="Online"></span>
+        </div>
+        <div class="coach-upsell-title">Could a coach help?</div>
+        <div class="coach-upsell-body">
+          Your execution rate has been below 50% for three days. A
+          1:1 coach can keep you on track, in-app, with daily
+          check-ins and accountability.
+        </div>
+        <div class="coach-upsell-actions">
+          <button class="coach-upsell-btn primary" data-action="get">Get a coach</button>
+          <button class="coach-upsell-btn" data-action="dismiss">Maybe later</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    function close() {
+      _open = false;
+      if (el.parentNode) document.body.removeChild(el);
+    }
+    el.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-action]');
+      const action = btn ? btn.dataset.action : (e.target === el ? 'dismiss' : null);
+      if (action === null) return;
+      if (action === 'get') {
+        window.location.href = 'https://buy.stripe.com/8x200jaqBagadCn3WS77O05';
+        return;
+      }
+      close();
+    });
+  }
+
+  // Public: schedule a check. Debounced so back-to-back Store updates
+  // don't spam the eligibility math. Runs on a 1.5s tail so the first
+  // post-load render finishes painting before any modal pops.
+  function maybeShow() {
+    if (_open) return;
+    if (_checkScheduled) return;
+    _checkScheduled = true;
+    setTimeout(() => {
+      _checkScheduled = false;
+      try {
+        const user = (typeof Auth !== 'undefined') ? Auth.user : null;
+        if (!eligible(user)) return;
+        if (Date.now() - lastShown() < COOLDOWN_MS) return;
+        const state = (typeof Store !== 'undefined') ? Store.get() : null;
+        if (!state || !Array.isArray(state.tasks)) return;
+        if (!streakBelowThreshold(state)) return;
+        show();
+      } catch (e) { console.warn('[coach-upsell] check failed', e); }
+    }, 1500);
+  }
+
+  return { maybeShow };
+})();
+window.CoachUpsell = CoachUpsell;
+
 /* Top 5 recurring tasks by current consecutive-day streak (skip:* dates
    excluded so an "I'm sick today, skip it" doesn't extend a streak). */
 function computeStreakRanking(state) {
@@ -8267,6 +8470,11 @@ setInterval(() => {
 
 // Wire store → view
 Store.subscribe(render);
+
+// After every Store update, re-evaluate whether the coach-upsell
+// prompt should pop. The module itself debounces + checks cooldown,
+// so spamming this is safe.
+Store.subscribe(() => { if (window.CoachUpsell) CoachUpsell.maybeShow(); });
 
 // --- Swipe between tabs on the main content area ---
 // Horizontal swipe left/right switches to the neighbouring tab. We only fire
@@ -11296,8 +11504,11 @@ window.DayState = (() => {
         showCommit = (current.todayCount > 0);
         break;
       case 'today-incomplete':
-        title = `${current.todayRemaining} task${current.todayRemaining === 1 ? '' : 's'} left for ${fmtBannerDate(current.today)}.`;
-        sub   = 'Finish today\'s list before you can plan tomorrow.';
+        // No banner — the "X tasks left" pill in the header already
+        // tells the user how much is left, so this would just be
+        // duplicate noise at the top of the list.
+        title = '';
+        sub   = '';
         showCommit = false;
         break;
       case 'planning-tomorrow':
