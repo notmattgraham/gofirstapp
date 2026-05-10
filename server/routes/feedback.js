@@ -17,11 +17,16 @@ const MAX_FEEDBACK_LENGTH = 4000;
 const router = express.Router();
 router.use(requireAuth);
 
-router.post('/', express.json({ limit: '64kb' }), async (req, res) => {
+router.post('/', async (req, res) => {
+  try {
   const me = req.user;
   const raw = (req.body && typeof req.body.body === 'string') ? req.body.body : '';
   const content = raw.trim().slice(0, MAX_FEEDBACK_LENGTH);
-  if (!content) return res.status(400).json({ error: 'empty_body' });
+  if (!content) {
+    console.warn('[feedback] empty body, raw:', JSON.stringify(req.body));
+    return res.status(400).json({ error: 'empty_body' });
+  }
+  console.log(`[feedback] from=${me.id} content_len=${content.length}`);
 
   // Find the admin user. DB flag wins; ADMIN_EMAIL env var bootstraps
   // before anyone is flagged in /dev. Same priority order as messages.js.
@@ -87,6 +92,13 @@ router.post('/', express.json({ limit: '64kb' }), async (req, res) => {
   })();
 
   res.json({ ok: true });
+  } catch (err) {
+    // Belt-and-suspenders: anything unexpected (admin lookup throw, push
+    // module exception sneaking past its IIFE try, etc.) lands here so
+    // the SPA gets a useful error instead of a hung connection.
+    console.error('[feedback] unhandled', err);
+    if (!res.headersSent) res.status(500).json({ error: 'feedback_failed', detail: String(err && err.message || err) });
+  }
 });
 
 module.exports = router;
