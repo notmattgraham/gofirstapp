@@ -10907,12 +10907,13 @@ window.DayState = (() => {
     if (bannerTitle) bannerTitle.textContent = title;
     if (bannerSub)   bannerSub.textContent   = sub;
     if (crushed)     crushed.hidden = !showCrushed;
-    if (commitBtn && commitLabel)  commitBtn.textContent = commitLabel;
+    if (commitBtn)   commitBtn.textContent = 'Commit';
     if (commitRow)   commitRow.hidden = !showCommit;
 
-    // Hide the date navigator + task list in committed-waiting mode —
-    // there's nothing for the user to do until lockTime hits.
-    if (dateNav)      dateNav.hidden    = !showList;
+    // Date navigator is permanently hidden — the whole point of the
+    // commit lifecycle is "focus on what's in front of you, no
+    // wandering around past or future days."
+    if (dateNav)      dateNav.hidden    = true;
     if (tasksList)    tasksList.hidden  = !showList;
     if (completedSec) completedSec.style.display = showList ? '' : 'none';
     if (tasksEmpty && !showList) tasksEmpty.hidden = true;
@@ -10967,18 +10968,62 @@ window.DayState = (() => {
     await refresh();
   }
 
-  // Wire the Commit button — picks the right date based on current mode.
+  // Replays the onboarding's commit ceremony (green check pop +
+  // "Committed." text + sub line) on top of the Tasks tab. We rewrite
+  // the ceremony container's innerHTML so the CSS animations run from
+  // the start each time — animations are tied to element creation,
+  // and just toggling hidden doesn't replay them.
+  function playCeremony(subText) {
+    const cel = document.getElementById('onb-celebration');
+    if (!cel) return;
+    cel.innerHTML = `
+      <div class="onb-celebration-icon">
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1 class="onb-celebration-title">Committed.</h1>
+      <p class="onb-celebration-sub">${subText || ''}</p>
+    `;
+    cel.hidden = false;
+    cel.setAttribute('aria-hidden', 'false');
+  }
+  function hideCeremony() {
+    const cel = document.getElementById('onb-celebration');
+    if (!cel) return;
+    cel.hidden = true;
+    cel.setAttribute('aria-hidden', 'true');
+  }
+
+  // Wire the Commit button — picks the right date based on current
+  // mode, plays the ceremony, then refreshes + scrolls to the top of
+  // the page so the user lands at the top (mode banner) rather than
+  // looking at where the now-gone Commit button was.
   function wire() {
     const btn = document.getElementById('commit-btn');
     if (!btn) return;
     btn.addEventListener('click', async () => {
       if (!current) return;
       const date = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
+      const isTomorrow = (current.mode === 'planning-tomorrow');
+      const count = isTomorrow ? current.tomorrowCount : current.todayCount;
       btn.disabled = true;
       try {
         await commit(date);
-        // Refresh the task list so the now-locked state renders.
+        // Sub-line: shows what the user just locked in. Brief by
+        // design — the ceremony is the moment, not the data.
+        const noun = count === 1 ? 'task' : 'tasks';
+        const sub  = isTomorrow
+          ? `${count} ${noun} ready for tomorrow.`
+          : `${count} ${noun} for today. Now execute.`;
+        playCeremony(sub);
         if (typeof Store !== 'undefined' && Store.load) Store.load();
+        // Hold the ceremony for ~2.4s, then hide and snap to the top
+        // of the Tasks tab so the user sees the mode banner first.
+        setTimeout(() => {
+          hideCeremony();
+          const view = document.getElementById('view-todo');
+          if (view && view.scrollTo) view.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 2400);
       } catch (e) {
         alert('Could not commit. ' + (e.message || e));
       } finally {
