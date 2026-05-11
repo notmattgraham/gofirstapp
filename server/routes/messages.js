@@ -397,14 +397,8 @@ router.get('/:clientId', wrap(async (req, res) => {
 // `attachment` is an optional base64 image data URL.
 // Clients always send to the coach (toUserId is ignored).
 // The coach must supply toUserId (the client's ID).
-// 25 MB of base64 = ~18 MB of binary. Big enough for a short phone
-// video (~15-30s at typical bitrates), small enough that a row read
-// from Postgres doesn't blow up the message handler. Images take
-// far less than this in practice (chat downscales them to 1280px).
-const MAX_ATTACHMENT_LENGTH = 25 * 1024 * 1024;
-// Allow image OR short video. Quicktime / mov is here for iOS — the
-// system video picker hands back .mov files from the camera roll.
-const ATTACHMENT_RE = /^data:(image\/(png|jpe?g|webp|gif)|video\/(mp4|webm|quicktime));base64,[A-Za-z0-9+/=]+$/;
+const MAX_ATTACHMENT_LENGTH = 4 * 1024 * 1024; // 4MB of base64 (~3MB binary)
+const ATTACHMENT_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
 router.post('/', wrap(async (req, res) => {
   const me = req.user;

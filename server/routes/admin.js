@@ -323,13 +323,8 @@ router.delete('/users/:id', wrap(async (req, res) => {
 // replies (creating a row with hiddenFromAdminAt = null).
 const MAX_BROADCAST_RECIPIENTS = 5000;
 const BROADCAST_MAX_LENGTH = 4000;
-// 10 MB base64 (~7.5 MB binary). Lower than the per-message cap
-// because a broadcast fan-outs into N rows — the same attachment
-// is duplicated for every recipient. We'd want true blob storage
-// (Volumes / S3) before raising this further. Good enough for short
-// promo clips at the current user count.
-const BROADCAST_MAX_ATTACHMENT = 10 * 1024 * 1024;
-const BROADCAST_ATTACHMENT_RE = /^data:(image\/(png|jpe?g|webp|gif)|video\/(mp4|webm|quicktime));base64,[A-Za-z0-9+/=]+$/;
+const BROADCAST_MAX_ATTACHMENT = 4 * 1024 * 1024; // 4MB base64
+const BROADCAST_ATTACHMENT_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 
 router.post('/broadcast', wrap(async (req, res) => {
   if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });

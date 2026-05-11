@@ -27,12 +27,7 @@ const app = express();
 // Railway sits behind a proxy. Needed so `secure` cookies + `req.secure` work.
 app.set('trust proxy', 1);
 
-// Body size cap. Bumped from 5mb → 30mb so DM video attachments
-// (capped at ~25mb base64 = ~18mb of binary video) fit through the
-// JSON parser. Most requests are tiny — this only matters for the
-// attachment path. Per-route validators still enforce stricter
-// per-payload caps; this is just the outer ceiling.
-app.use(express.json({ limit: '30mb' }));
+app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // Session store in Postgres. `createTableIfMissing` bootstraps the session

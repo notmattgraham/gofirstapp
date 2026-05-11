@@ -341,51 +341,6 @@
   .broadcast .meta.ok { color: var(--success); }
   .broadcast .meta.err { color: var(--danger); }
 
-  /* Attach button + media preview in the broadcast composer. */
-  .broadcast .left { display: inline-flex; align-items: center; gap: 10px; }
-  .broadcast .attach-btn {
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .broadcast .attach-btn:hover { background: var(--surface); }
-  .broadcast .attach-preview[hidden] { display: none; }
-  .broadcast .attach-preview {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px 4px 4px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-2);
-    font-size: 12px;
-    color: var(--text-dim);
-  }
-  .broadcast .attach-preview img,
-  .broadcast .attach-preview video {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: #000;
-  }
-  .broadcast .attach-preview button {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-  }
-  .broadcast .attach-preview button:hover { color: var(--danger); }
-
   .filter-row {
     display: flex;
     gap: 10px;
@@ -596,18 +551,9 @@
     <div class="card broadcast" id="broadcast-card" hidden>
       <textarea id="broadcast-content" placeholder="Write a message to send to every user…" maxlength="4000"></textarea>
       <div class="row">
-        <div class="left">
-          <button class="attach-btn" id="broadcast-attach-btn" type="button">+ Photo / video</button>
-          <span class="attach-preview" id="broadcast-attach-preview" hidden>
-            <img id="broadcast-attach-thumb-img" alt="" hidden />
-            <video id="broadcast-attach-thumb-vid" muted playsinline hidden></video>
-            <span id="broadcast-attach-label">attached</span>
-            <button type="button" id="broadcast-attach-clear" aria-label="Remove attachment">×</button>
-          </span>
-        </div>
+        <div class="meta" id="broadcast-meta">Delivered as a DM from your account. Replies show up in your inbox.</div>
         <button class="btn primary" id="broadcast-send">Send to all</button>
       </div>
-      <div class="meta" id="broadcast-meta">Delivered as a DM from your account. Replies show up in your inbox.</div>
     </div>
 
     <div class="section-title" id="push-broadcast-title" hidden>Push notification</div>
@@ -960,92 +906,9 @@
     const send = $('broadcast-send');
     const ta = $('broadcast-content');
     const meta = $('broadcast-meta');
-    const attachBtn   = $('broadcast-attach-btn');
-    const attachPrev  = $('broadcast-attach-preview');
-    const attachThumb = $('broadcast-attach-thumb-img');
-    const attachVidEl = $('broadcast-attach-thumb-vid');
-    const attachLabel = $('broadcast-attach-label');
-    const attachClear = $('broadcast-attach-clear');
-    // Server cap: 10 MB base64. Mirror it client-side so we can show a
-    // friendly error instead of letting the request bounce off the
-    // body parser.
-    const BROADCAST_MAX_ATTACH = 10 * 1024 * 1024;
-    let attachmentDataUrl = null;
-
-    function showPreview(dataUrl) {
-      attachmentDataUrl = dataUrl || null;
-      if (!dataUrl) {
-        attachPrev.hidden = true;
-        attachThumb.hidden = true;
-        attachVidEl.hidden = true;
-        attachThumb.src = '';
-        attachVidEl.src = '';
-        return;
-      }
-      const isVideo = /^data:video\//.test(dataUrl);
-      attachPrev.hidden = false;
-      if (isVideo) {
-        attachVidEl.src = dataUrl;
-        attachVidEl.hidden = false;
-        attachThumb.hidden = true;
-        attachLabel.textContent = 'video attached';
-      } else {
-        attachThumb.src = dataUrl;
-        attachThumb.hidden = false;
-        attachVidEl.hidden = true;
-        attachLabel.textContent = 'photo attached';
-      }
-    }
-
-    attachBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*,video/*';
-      input.addEventListener('change', async () => {
-        const file = input.files && input.files[0];
-        if (!file) return;
-        const isVideo = (file.type || '').startsWith('video/');
-        const approxBase64 = Math.ceil(file.size * 4 / 3);
-        if (approxBase64 > BROADCAST_MAX_ATTACH) {
-          const cap = Math.floor((BROADCAST_MAX_ATTACH * 3 / 4) / (1024 * 1024));
-          meta.className = 'meta err';
-          meta.textContent = `${isVideo ? 'Video' : 'File'} too large — max ${cap} MB for broadcasts.`;
-          return;
-        }
-        try {
-          if (isVideo) {
-            // No scaling — broadcast just takes what you give it. The
-            // size check above already enforces the cap.
-            const dataUrl = await new Promise((res, rej) => {
-              const r = new FileReader();
-              r.onerror = () => rej(new Error('read failed'));
-              r.onload = () => res(r.result);
-              r.readAsDataURL(file);
-            });
-            showPreview(dataUrl);
-          } else {
-            // Same scaling pattern as the chat photo path: downscale
-            // to 1280px max edge as JPEG @85%, which trims most photos
-            // into the size cap painlessly.
-            const dataUrl = await scaleImageFileToDataURL(file, 1280);
-            showPreview(dataUrl);
-          }
-          meta.className = 'meta';
-          meta.textContent = 'Delivered as a DM from your account. Replies show up in your inbox.';
-        } catch (e) {
-          console.warn('[broadcast attach]', e);
-          meta.className = 'meta err';
-          meta.textContent = 'Could not read file.';
-        }
-      });
-      input.click();
-    });
-
-    attachClear.addEventListener('click', () => showPreview(null));
-
     send.addEventListener('click', async () => {
       const content = (ta.value || '').trim();
-      if (!content && !attachmentDataUrl) { ta.focus(); return; }
+      if (!content) { ta.focus(); return; }
       const recipientCount = allUsers.length; // approx — server is source of truth
       const ok = confirm(
         `Send this message to every user${recipientCount ? ` (~${recipientCount})` : ''}?\n\n` +
@@ -1059,20 +922,17 @@
       meta.className = 'meta';
       meta.textContent = 'Sending…';
       try {
-        const payload = { content };
-        if (attachmentDataUrl) payload.attachment = attachmentDataUrl;
         const r = await fetch('/api/admin/broadcast', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ content }),
         });
         const data = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(data.error || `status ${r.status}`);
         meta.className = 'meta ok';
         meta.textContent = `Sent to ${data.sent} user${data.sent === 1 ? '' : 's'}.`;
         ta.value = '';
-        showPreview(null);
       } catch (err) {
         meta.className = 'meta err';
         meta.textContent = 'Failed: ' + (err.message || err);
@@ -1080,34 +940,6 @@
         send.disabled = false;
         ta.disabled = false;
       }
-    });
-  }
-
-  // Helper: scale an image file via canvas to a data URL with a max
-  // edge of `maxEdge` px. JPEG @85% — same trick the chat photo path
-  // uses. Reused here so the broadcast composer doesn't have to ship
-  // raw 12MP camera images.
-  function scaleImageFileToDataURL(file, maxEdge) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('read failed'));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error('decode failed'));
-        img.onload = () => {
-          const longest = Math.max(img.width, img.height);
-          const scale = longest > maxEdge ? maxEdge / longest : 1;
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
     });
   }
 
