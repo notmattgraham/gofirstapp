@@ -6232,18 +6232,25 @@ const Store = (() => {
     // the check animation skip mid-frame.
     if (window.DayState) setTimeout(() => DayState.refresh(), 250);
     // Persist a snapshot so the next boot can render instantly from cache
-    // while fresh data loads in the background.
+    // while fresh data loads in the background. SKIPPED when we're
+    // currently scoped to another account (Premium collaborator viewing
+    // someone else's tasks) — caching that under the same key would
+    // poison the next session and flash the wrong account's tasks at
+    // boot before the auth round-trip completes.
     try {
-      localStorage.setItem('gofirst:ui-cache', JSON.stringify({
-        tasks: state.tasks,
-        streaks: state.streaks,
-        overrides: state.overrides,
-        today: state.today,
-        tomorrow: state.tomorrow,
-        todayComplete: state.todayComplete,
-        overrideActive: state.overrideActive,
-        ts: Date.now(),
-      }));
+      const isScoped = !!(window.Collab && Collab.viewingAsId && Collab.viewingAsId());
+      if (!isScoped) {
+        localStorage.setItem('gofirst:ui-cache', JSON.stringify({
+          tasks: state.tasks,
+          streaks: state.streaks,
+          overrides: state.overrides,
+          today: state.today,
+          tomorrow: state.tomorrow,
+          todayComplete: state.todayComplete,
+          overrideActive: state.overrideActive,
+          ts: Date.now(),
+        }));
+      }
     } catch {}
   }
 
@@ -6984,6 +6991,11 @@ function renderStatStrip(state) {
 
 // Currently-selected date ISO string (YYYY-MM-DD). Empty until first render.
 let selectedDateISO = '';
+// Exposed so the Collab module can clear the selection when the
+// viewer switches accounts — otherwise the previous viewer's "today"
+// stays pinned and the next render filters the new account's tasks
+// against the wrong date (looks like an empty / unchanged list).
+window.__resetSelectedDate = function _resetSelectedDate() { selectedDateISO = ''; };
 
 // Calendar view state
 let calViewYear = 0, calViewMonth = 0;
@@ -8987,17 +8999,56 @@ window.Collab = (function setupCollab() {
     return _state.accessibleAccounts.find(a => a.id === viewingAs) || null;
   }
 
-  function setViewingAs(id) {
+  async function setViewingAs(id) {
     if (id === viewingAs) return;
+    const previous = viewingAs;
     viewingAs = id || null;
-    // Force a fresh data load + re-render under the new scope.
-    if (window.Store && typeof Store.load === 'function') {
-      Store.load().catch(() => {});
-    }
-    if (window.DayState && typeof DayState.refresh === 'function') {
-      DayState.refresh();
-    }
+    console.log('[collab] viewingAs →', viewingAs);
     renderSwitcher();
+    // Reset the persistent date selection BEFORE the data refetch so
+    // the next render keys off the new account's "today" rather than
+    // the previous viewer's date. Without this the switch looks like
+    // a no-op when the two viewers are in different time zones / have
+    // tasks scheduled on different dates.
+    try {
+      if (typeof window.__resetSelectedDate === 'function') {
+        window.__resetSelectedDate();
+      }
+    } catch {}
+    // Optional UX toast — the visual change happens in two waves
+    // (Store.load → DayState.refresh) and on a slow connection that
+    // can feel like nothing happened.
+    if (typeof banner === 'function') {
+      const acct = viewingAsAccount();
+      banner(acct ? `Viewing ${acct.name || acct.email}'s tasks…` : 'Switching back to your tasks…', false, 1500);
+    }
+    // Await both. If either throws, surface the error rather than
+    // swallowing it — the user was getting "nothing happens" UX from
+    // a silent failure with no log trail.
+    let storeOk = true, dayOk = true;
+    try {
+      if (window.Store && typeof Store.load === 'function') {
+        await Store.load();
+      }
+    } catch (e) {
+      storeOk = false;
+      console.error('[collab] Store.load after switch failed:', e);
+    }
+    try {
+      if (window.DayState && typeof DayState.refresh === 'function') {
+        await DayState.refresh();
+      }
+    } catch (e) {
+      dayOk = false;
+      console.error('[collab] DayState.refresh after switch failed:', e);
+    }
+    if (!storeOk || !dayOk) {
+      // Roll back so the UI doesn't claim we're viewing an account we
+      // can't actually load.
+      viewingAs = previous;
+      renderSwitcher();
+      if (typeof banner === 'function') banner('Could not load that account. Reverted.', true);
+    }
   }
 
   async function refresh() {
