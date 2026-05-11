@@ -2,6 +2,12 @@ const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 
+// Free-tier cap on quit streaks ("walking away from"). Premium is
+// unlimited. Mirrored client-side in window.Premium.FREE_QUIT_STREAK_CAP
+// so the SPA can disable the Add button + show the upgrade prompt
+// before the user even tries.
+const FREE_QUIT_STREAK_CAP = 3;
+
 const router = express.Router();
 router.use(requireAuth);
 
@@ -27,6 +33,19 @@ router.post('/', async (req, res) => {
   const { name, startAt } = req.body || {};
   const trimmed = typeof name === 'string' ? name.trim() : '';
   if (!trimmed) return res.status(400).json({ error: 'name required' });
+  // Cap free users at FREE_QUIT_STREAK_CAP. The SPA suppresses the Add
+  // button at the cap (with an upgrade nudge), but defense-in-depth
+  // here so a direct API call can't bypass it.
+  if (!req.user.isPremium) {
+    const count = await prisma.quitStreak.count({ where: { userId: req.user.id } });
+    if (count >= FREE_QUIT_STREAK_CAP) {
+      return res.status(402).json({
+        error: 'free_tier_cap',
+        cap: FREE_QUIT_STREAK_CAP,
+        message: 'Free accounts can track 3 quit streaks. Upgrade to Premium for unlimited.',
+      });
+    }
+  }
   const row = await prisma.quitStreak.create({
     data: {
       userId: req.user.id,

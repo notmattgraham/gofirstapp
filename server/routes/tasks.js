@@ -47,6 +47,13 @@ function sanitizeCategory(v) {
   return typeof v === 'string' && VALID_CATEGORIES.has(v) ? v : null;
 }
 
+// Free-tier cap on tracked habits (recurring tasks with trackStreak=true).
+// Premium = unlimited. Mirrored client-side in window.Premium.FREE_TRACKED_HABIT_CAP.
+const FREE_TRACKED_HABIT_CAP = 3;
+async function trackedHabitCount(userId) {
+  return prisma.task.count({ where: { userId, trackStreak: true } });
+}
+
 function shape(t) {
   return {
     id: t.id,
@@ -214,6 +221,21 @@ router.post('/', async (req, res) => {
   }
 
   const isDaily = recurrence && recurrence.type === 'daily';
+  const wantsTrackStreak = !!(isDaily && trackStreak);
+  // Cap free users at FREE_TRACKED_HABIT_CAP tracked daily habits.
+  // Note: cap applies to req.acting (the OWNER of the task), not the
+  // signed-in actor — a collaborator working on a Premium owner's
+  // list inherits the owner's unlimited cap.
+  if (wantsTrackStreak && !req.acting.isPremium) {
+    const count = await trackedHabitCount(req.acting.id);
+    if (count >= FREE_TRACKED_HABIT_CAP) {
+      return res.status(402).json({
+        error: 'free_tier_cap',
+        cap: FREE_TRACKED_HABIT_CAP,
+        message: `Free accounts can track ${FREE_TRACKED_HABIT_CAP} habits. Upgrade to Premium for unlimited.`,
+      });
+    }
+  }
   const task = await prisma.task.create({
     data: {
       userId: req.acting.id,
@@ -221,7 +243,7 @@ router.post('/', async (req, res) => {
       startedAt: startedAt || new Date().toISOString(),
       scheduledDate: isRecurring ? null : date,
       recurrence: recurrence || null,
-      trackStreak: !!(isDaily && trackStreak),
+      trackStreak: wantsTrackStreak,
       category: sanitizeCategory(category),
       scheduledTime: sanitizeTime(scheduledTime),
       notes: sanitizeNotes(notes),
@@ -261,6 +283,25 @@ router.patch('/:id', async (req, res) => {
     const date = existing.scheduledDate || userToday(req.acting);
     const guard = await canMutateForDate(req.acting, date);
     if (!guard.ok) return rejectLocked(res, guard);
+  }
+
+  // Free-tier cap on tracked habits, applied when this PATCH would
+  // FLIP the field from false→true. Skip when it's already on (no
+  // delta) or when the owner is Premium.
+  if (
+    Object.prototype.hasOwnProperty.call(data, 'trackStreak')
+    && data.trackStreak === true
+    && existing.trackStreak !== true
+    && !req.acting.isPremium
+  ) {
+    const count = await trackedHabitCount(req.acting.id);
+    if (count >= FREE_TRACKED_HABIT_CAP) {
+      return res.status(402).json({
+        error: 'free_tier_cap',
+        cap: FREE_TRACKED_HABIT_CAP,
+        message: `Free accounts can track ${FREE_TRACKED_HABIT_CAP} habits. Upgrade to Premium for unlimited.`,
+      });
+    }
   }
 
   const effectiveRecurrence = data.recurrence !== undefined ? data.recurrence : existing.recurrence;
