@@ -169,13 +169,21 @@ wss.on('connection', (ws, userId, info) => {
 
     if (msg.type === 'typing') {
       // Resolve recipient based on the sender's role:
-      //   coach   → typing to msg.to (a coaching client they're chatting with)
-      //   client  → typing to the coach
+      //   coach          → typing to msg.to (a coaching client they're chatting with)
+      //   coaching-client → typing to the coach (no msg.to needed; legacy path)
+      //   regular user   → typing to msg.to (a friend / pinned-admin / pinned-coach
+      //                     thread peer). Authorization is "trust-the-WS"
+      //                     because the WS itself is session-authenticated;
+      //                     worst case is a stray typing dot, not data leak.
+      //                     Previously this branch fell through and friend
+      //                     DMs got no typing indicator at all.
       let to = null;
       if (ws._isCoach) {
         to = typeof msg.to === 'string' ? msg.to : null;
-      } else if (ws._isClient) {
+      } else if (ws._isClient && !msg.to) {
         to = ws._coachId;
+      } else if (typeof msg.to === 'string') {
+        to = msg.to;
       }
       if (!to || to === userId) return;
 
