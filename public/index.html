@@ -804,6 +804,14 @@
   .week-bar-card {
     padding: 12px 8px;
   }
+  /* For free users the View Month toggle that normally sits below
+     the week-bar is hidden, leaving a chunk of empty padding inside
+     the card. Trim the bottom padding so the card hugs the day
+     circles — without this, the gap above the next label reads as
+     larger than every other section break even though the margin is
+     identical (the card itself just looks bottom-heavy with empty
+     space). */
+  html.is-premium-gated .week-bar-card { padding-bottom: 4px; }
   .week-bar {
     display: flex;
     justify-content: space-between;
