@@ -1408,6 +1408,36 @@
     }
   }
 
+  // Uncommit-today button delegated off the detail modal body. Confirms
+  // first, POSTs to /api/admin/users/:id/uncommit, and re-renders the
+  // modal on success so any state refresh (overrides etc) reflects.
+  $('user-detail-body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-uncommit]');
+    if (!btn) return;
+    const id   = btn.dataset.id;
+    const name = btn.dataset.name || 'this user';
+    if (!confirm(`Roll ${name}'s today back to planning mode? Their tasks stay; the lock lifts so they can edit + recommit.`)) return;
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.textContent = 'Uncommitting…';
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/uncommit`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `status_${r.status}`);
+      btn.textContent = data.deleted > 0
+        ? `Uncommitted ${data.date}`
+        : `Nothing to uncommit (${data.date})`;
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      alert('Uncommit failed. ' + (err.message || err));
+    }
+  });
+
   function renderUserDetail(d) {
     const u = d.user;
     const s = d.summary || {};
@@ -1482,7 +1512,16 @@
           <div class="stat"><div class="label">Streaks</div><div class="num">${fmt.int(streaks.length)}</div></div>
           <div class="stat"><div class="label">Overrides</div><div class="num">${fmt.int(u.overridesUsed)}</div></div>
         </div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:6px 0">By category</div>
+        ${amAdmin ? `
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">Day controls</div>
+          <button class="btn ghost" data-uncommit data-id="${escapeHtml(u.id)}" data-name="${escapeHtml(u.name || u.email)}">
+            Uncommit today
+          </button>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:6px;line-height:1.4">
+            Rolls today back to planning mode. Their tasks stay; just the lock lifts so they can edit + recommit.
+          </div>
+        ` : ''}
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">By category</div>
         <div class="cat-grid">${catRows}</div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">Recent tasks</div>
         <ul class="task-list">${taskHtml}</ul>

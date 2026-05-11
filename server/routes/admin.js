@@ -6,7 +6,7 @@
 const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
-const { dateInTz } = require('../time');
+const { dateInTz, userToday } = require('../time');
 const pushModule = require('./push');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
@@ -230,6 +230,25 @@ router.patch('/users/:id/premium', wrap(async (req, res) => {
     if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
     throw e;
   }
+}));
+
+// POST /api/admin/users/:id/uncommit — rollback a committed day for a user.
+// Body: { date? } where date defaults to the user's own current "today"
+// per their timezone + lockTime. Deletes the DayCommit row so the day
+// flips back to planning-today mode — the user's existing tasks stay
+// attached (no task data is touched), the lock just lifts so they can
+// add / remove / edit and re-commit. Admin-only; coach can't trigger this.
+router.post('/users/:id/uncommit', wrap(async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
+  const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!target) return res.status(404).json({ error: 'not_found' });
+  const date = (req.body && typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date))
+    ? req.body.date
+    : userToday(target);
+  const result = await prisma.dayCommit.deleteMany({
+    where: { userId: target.id, date },
+  });
+  res.json({ ok: true, date, deleted: result.count });
 }));
 
 // PATCH /api/admin/users/:id/coaching — toggle coachingClient for a user.
