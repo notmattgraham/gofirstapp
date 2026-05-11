@@ -6205,6 +6205,14 @@ const Store = (() => {
   const emit = () => listeners.forEach(fn => fn(state));
 
   async function load() {
+    // Snapshot what we're scoping to BEFORE the fetches go out. If
+    // the user (or another caller) changes scope mid-flight — e.g.
+    // boot()'s initial unscoped load is still in flight when the user
+    // clicks the viewer-switcher and a NEW scoped load starts — the
+    // older one would otherwise resolve later and overwrite the
+    // newer state with stale wife's-tasks data. We drop the result
+    // when the snapshot doesn't match what's current at write time.
+    const startedAs = (window.Collab && Collab.viewingAsId) ? Collab.viewingAsId() : null;
     const [t, s, m, o] = await Promise.all([
       api('GET', '/api/tasks'),
       api('GET', '/api/streaks'),
@@ -6218,6 +6226,11 @@ const Store = (() => {
       }),
       api('GET', '/api/overrides').catch(() => ({ overrides: state.overrides })),
     ]);
+    const endedAs = (window.Collab && Collab.viewingAsId) ? Collab.viewingAsId() : null;
+    if (startedAs !== endedAs) {
+      console.warn('[store] load discarded — viewingAs changed mid-flight', { startedAs, endedAs });
+      return;
+    }
     state = {
       ...state,
       tasks: (t && t.tasks) || [],

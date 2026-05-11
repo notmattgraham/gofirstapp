@@ -7,10 +7,12 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v6 to evict stale collaborator-switch + DM-scroll code
-// from clients that may still be on v5. The activate handler below
-// deletes anything not matching this name on first new-SW activation.
-const CACHE = 'gofirst-v6';
+// Bumped to v7 — the previous collab-switch fix had a race-condition
+// hole where the boot's initial Store.load could still be in flight
+// when the user clicked the viewer-switcher; the boot result then
+// overwrote the switched account's tasks. v7 contains the start/end
+// scope-snapshot guard inside Store.load that drops stale results.
+const CACHE = 'gofirst-v7';
 const ASSETS = [
   './',
   './index.html',
