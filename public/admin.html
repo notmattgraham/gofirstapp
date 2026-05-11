@@ -207,32 +207,34 @@
   .badge.role-coach { background: var(--warn); color: #1a1d25; border-color: transparent; }
   .badge.role-client { background: var(--accent-dim); color: var(--text); border-color: transparent; }
   .badge.role-admin { background: var(--danger); color: #fff; border-color: transparent; }
-  /* Premium is stackable — its badge shows alongside the role badge. */
-  .badge.role-premium {
-    background: linear-gradient(135deg, #facc15, #eab308);
-    color: #1a1d25;
-    border-color: transparent;
-  }
-  /* Premium toggle pill — sits next to the role picker. Filled when on,
-     outline when off. Clickable; PATCH /api/admin/users/:id/premium. */
+  /* Premium toggle — small clickable badge that sits inline with
+     the user's name (next to the role badge). Stackable attribute,
+     so it lives with identity rather than the mutually-exclusive
+     role picker. Filled gold when on, outlined gray when off. */
   .premium-toggle {
     appearance: none;
+    display: inline-block;
     border: 1px solid var(--border);
-    background: var(--surface-2);
+    background: transparent;
     color: var(--text-dim);
     font: inherit;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    padding: 5px 12px;
+    padding: 1px 8px;
     border-radius: 999px;
     cursor: pointer;
     margin-left: 6px;
+    vertical-align: middle;
+    line-height: 1.5;
+    transition: background 0.12s, color 0.12s;
   }
+  .premium-toggle:hover { background: var(--surface-2); color: var(--text); }
   .premium-toggle.on {
     background: linear-gradient(135deg, #facc15, #eab308);
     color: #1a1d25;
     border-color: transparent;
   }
+  .premium-toggle.on:hover { opacity: 0.9; }
   .premium-toggle:disabled { opacity: 0.5; cursor: default; }
 
   /* Role picker — four-segment toggle (User / Client / Coach / Admin) */
@@ -856,7 +858,9 @@
           : role === 'client'
             ? '<span class="badge role-client">Client</span>'
             : '';
-      const premiumBadge = u.isPremium ? '<span class="badge role-premium">Premium</span>' : '';
+      const premiumPill = `<button class="premium-toggle ${u.isPremium ? 'on' : ''}"
+                  data-premium-toggle data-id="${escapeHtml(u.id)}"
+                  title="${u.isPremium ? 'Remove Premium' : 'Grant Premium'}">${u.isPremium ? '★ Premium' : '☆ Premium'}</button>`;
       // Only the actual admin can promote/demote the admin role; coach
       // viewers see the segment but it's disabled. The X delete button is
       // also admin-only (coach can't remove users).
@@ -870,7 +874,7 @@
           <div class="user-cell">
             <span data-user-detail="${escapeHtml(u.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(u.name || u.email || 'user')} details">${avatarHtml(u)}</span>
             <div>
-              <div class="name">${escapeHtml(u.name || '—')} ${roleBadge} ${premiumBadge}</div>
+              <div class="name">${escapeHtml(u.name || '—')} ${roleBadge} ${premiumPill}</div>
               <div class="email">${escapeHtml(u.email || '')}</div>
             </div>
           </div>
@@ -895,11 +899,6 @@
             <button data-role="coach"  class="${role === 'coach'  ? 'active' : ''}">Coach</button>
             <button data-role="admin"  class="${role === 'admin'  ? 'active' : ''}" ${adminBtnAttrs}>Admin</button>
           </div>
-          <button class="premium-toggle ${u.isPremium ? 'on' : ''}"
-                  data-premium-toggle data-id="${escapeHtml(u.id)}"
-                  title="${u.isPremium ? 'Remove Premium' : 'Grant Premium'}">
-            ${u.isPremium ? '★ Premium' : '☆ Premium'}
-          </button>
         </td>
         ${deleteCell}
       </tr>`;
