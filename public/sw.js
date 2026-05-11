@@ -7,9 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v13 — Premium card vertical spacing fix (38px top margin
-// so the card-to-card rhythm matches sections that have a title).
-const CACHE = 'gofirst-v13';
+// Bumped to v14 — Analytics tab vertical rhythm: section-title top
+// margin matches the Premium card's 38px gap so every section break
+// has the same pure-whitespace gap.
+const CACHE = 'gofirst-v14';
 const ASSETS = [
   './',
   './index.html',
