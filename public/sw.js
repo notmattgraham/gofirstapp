@@ -7,10 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v8 — collab-debug strip + extra diagnostics on
-// the collaborator-switch flow. Temporary; reverts to plain
-// once the bug is identified.
-const CACHE = 'gofirst-v8';
+// Bumped to v9 — server-side perf work for the collab-switch slowness
+// (gzip, dedup'd queries). Client-side bump matters so the diagnostic
+// strip is fresh too.
+const CACHE = 'gofirst-v9';
 const ASSETS = [
   './',
   './index.html',

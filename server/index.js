@@ -27,6 +27,16 @@ const app = express();
 // Railway sits behind a proxy. Needed so `secure` cookies + `req.secure` work.
 app.set('trust proxy', 1);
 
+// gzip every response that benefits from it. The big win is /api/tasks
+// for users with hundreds of tasks each carrying long completedDates
+// arrays — a 600 KB JSON payload typically compresses to 30-50 KB,
+// which on a 4G connection is the difference between a snappy switch
+// and "it took several minutes." Filter ensures we don't double-
+// compress already-compressed responses (images, videos sent as
+// attachments would be base64 inside JSON anyway, so they get
+// compressed too).
+app.use(require('compression')());
+
 // Body size cap. Bumped from 5mb → 30mb so DM video attachments
 // (capped at ~25mb base64 = ~18mb of binary video) fit through the
 // JSON parser. Most requests are tiny — this only matters for the
