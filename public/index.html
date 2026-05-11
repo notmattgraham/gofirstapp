@@ -2816,10 +2816,13 @@
   html.is-premium-gated .hide-when-free { display: none !important; }
 
   /* Premium upsell card — sized to match the visual weight of a
-     standard content card. margin-top matches the section-title's
-     16px top margin so the gap above this card reads as the same
-     pure-whitespace amount that sits above every other label on
-     the page. */
+     standard content card. margin-top of 16px so the gap above this
+     card matches the gap above every other section label on the
+     page WHEN it follows another card directly (analytics tab
+     pattern). When it follows a section-title (profile collaborator
+     pattern), kill the margin so the section-title's own 8px bottom
+     margin is the only gap — matching every other title→card pair
+     on that surface. */
   .premium-locked-card {
     display: flex;
     flex-direction: column;
@@ -2831,6 +2834,7 @@
     background: linear-gradient(160deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.04));
     border: 1px solid rgba(250, 204, 21, 0.25);
   }
+  .section-title + .premium-locked-card { margin-top: 0; }
   .premium-locked-card-eyebrow {
     display: inline-flex;
     align-items: center;
