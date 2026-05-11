@@ -3314,6 +3314,39 @@
   .msg-bubble:not(.image-only) .msg-image {
     margin-bottom: 6px;
   }
+  /* Video attachment in a bubble — mirrors the image styling but uses
+     a <video> with controls. preload=metadata in the markup keeps
+     the inbox load cheap; the user has to tap play to actually buffer. */
+  .msg-image, .msg-video {
+    max-width: 100%;
+    display: block;
+    border-radius: 14px;
+  }
+  .msg-video {
+    width: 100%;
+    height: auto;
+    max-height: 360px;
+    background: #000;
+    outline: none;
+  }
+  .msg-bubble.image-only .msg-video {
+    border-radius: 18px;
+  }
+  .msg-group.mine   .msg-bubble.image-only .msg-video { border-bottom-right-radius: 4px; }
+  .msg-group.theirs .msg-bubble.image-only .msg-video { border-bottom-left-radius: 4px; }
+  .msg-bubble:not(.image-only) .msg-video {
+    margin-bottom: 6px;
+  }
+  /* Linkified URL inside a bubble — uses the bubble's foreground colour
+     by default, underlined so it reads as a link without breaking the
+     iMessage-style look. */
+  .msg-bubble a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+  }
+  .msg-bubble a:hover { opacity: 0.8; }
 
   /* ── Back button (used in overlays) ─────────────────────────── */
   .back-btn {
@@ -5350,7 +5383,7 @@
         <span></span><span></span><span></span>
       </div>
       <div class="chat-input-wrap">
-        <button class="chat-attach" id="coach-chat-attach" aria-label="Send a photo">
+        <button class="chat-attach" id="coach-chat-attach" aria-label="Send a photo or video">
           <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
         <textarea class="chat-input" id="coach-chat-input" placeholder="Reply to client..." maxlength="4000" rows="1"></textarea>
@@ -5402,7 +5435,7 @@
         <span></span><span></span><span></span>
       </div>
       <div class="chat-input-wrap">
-        <button class="chat-attach" id="dm-attach" aria-label="Send a photo">
+        <button class="chat-attach" id="dm-attach" aria-label="Send a photo or video">
           <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
         <textarea class="chat-input" id="dm-input" placeholder="Message..." maxlength="4000" rows="1"></textarea>
@@ -11003,44 +11036,113 @@ const Coaching = (() => {
   }
 
   /* ── Helpers ─────────────────────────────────────────────── */
+  // Match http(s):// URLs OR www.-prefixed URLs. Tolerant on the tail
+  // (any non-whitespace, non-angle-bracket char) so trailing punctuation
+  // like a period or comma usually gets caught — but a single trailing
+  // ".)],;:" is stripped so it ends up outside the anchor.
+  const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+  function linkifyEscaped(text) {
+    // Walk the raw text, escape each chunk individually, wrap URL
+    // chunks in an <a>. Safer than escaping first + re-finding URLs
+    // in the escaped string (entity boundaries can split a match).
+    let out = '';
+    let lastIndex = 0;
+    URL_RE.lastIndex = 0;
+    let m;
+    while ((m = URL_RE.exec(text)) !== null) {
+      let url = m[0];
+      // Strip a single trailing piece of common punctuation so a URL
+      // ending a sentence doesn't drag the period into the anchor.
+      const trail = url.match(/[.,)\];:!?]+$/);
+      let trailingPunct = '';
+      if (trail) {
+        trailingPunct = trail[0];
+        url = url.slice(0, -trailingPunct.length);
+      }
+      out += esc(text.slice(lastIndex, m.index));
+      const href = url.startsWith('www.') ? `https://${url}` : url;
+      out += `<a href="${esc(href)}" target="_blank" rel="noopener nofollow">${esc(url)}</a>`;
+      out += esc(trailingPunct);
+      lastIndex = m.index + m[0].length;
+    }
+    out += esc(text.slice(lastIndex));
+    return out;
+  }
+
   function buildBubble(m, myId, isNew) {
     const mine = m.fromUserId === myId;
     const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const enterCls = isNew ? ' enter' : '';
-    const hasImg  = !!m.attachment;
-    const hasText = !!(m.content || '').trim();
-    const bubbleCls = (hasImg && !hasText) ? 'msg-bubble image-only' : 'msg-bubble';
-    const imgHtml = hasImg
-      ? `<img class="msg-image" src="${esc(m.attachment)}" alt="" loading="lazy" />`
-      : '';
-    const textHtml = hasText ? esc(m.content) : '';
+    const hasAttach = !!m.attachment;
+    const isVideo   = hasAttach && /^data:video\//.test(m.attachment);
+    const hasText   = !!(m.content || '').trim();
+    const bubbleCls = (hasAttach && !hasText) ? 'msg-bubble image-only' : 'msg-bubble';
+    const mediaHtml = !hasAttach
+      ? ''
+      : isVideo
+        ? `<video class="msg-video" controls playsinline preload="metadata" src="${esc(m.attachment)}"></video>`
+        : `<img class="msg-image" src="${esc(m.attachment)}" alt="" loading="lazy" />`;
+    const textHtml = hasText ? linkifyEscaped(m.content) : '';
     return `<div class="msg-group ${mine ? 'mine' : 'theirs'}${enterCls}">
-      <div class="${bubbleCls}">${imgHtml}${textHtml}</div>
+      <div class="${bubbleCls}">${mediaHtml}${textHtml}</div>
       <div class="msg-time">${esc(time)}</div>
     </div>`;
   }
 
-  /* Pick a photo from the device, downscale to a chat-friendly size, and
-     send it through the existing message POST. The endpoint accepts an
-     optional `attachment` data URL alongside (or in place of) text. */
-  function pickAndSendChatPhoto(send) {
+  // 25 MB after base64 expansion. Server's per-message attachment cap.
+  const CHAT_VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+  // Broadcast tightens this further (10 MB) because the same blob is
+  // duplicated per recipient. Passed in by the broadcast composer.
+  function pickAndSendChatMedia(send, opts) {
+    const accept = (opts && opts.accept)   || 'image/*,video/*';
+    const maxVid = (opts && opts.maxBytes) || CHAT_VIDEO_MAX_BYTES;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = accept;
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0];
       if (!file) return;
+      const isVideo = (file.type || '').startsWith('video/');
       try {
-        banner('Sending photo…', false, 8000);
-        const dataUrl = await fileToScaledDataURL(file, 1280);
-        await send(dataUrl);
+        if (isVideo) {
+          // Reading the file as-is — no client-side compression. The
+          // server caps the base64 length; we mirror it here so we
+          // can show a friendly message before uploading.
+          const approxBase64 = Math.ceil(file.size * 4 / 3);
+          if (approxBase64 > maxVid) {
+            const cap = Math.floor((maxVid * 3 / 4) / (1024 * 1024));
+            banner(`Video too large — max ${cap} MB. Try a shorter clip.`, true, 5000);
+            return;
+          }
+          banner('Sending video…', false, 12000);
+          const dataUrl = await fileToDataURL(file);
+          await send(dataUrl);
+        } else {
+          banner('Sending photo…', false, 8000);
+          const dataUrl = await fileToScaledDataURL(file, 1280);
+          await send(dataUrl);
+        }
         banner('Sent', false, 1500);
       } catch (e) {
-        console.warn('[chat photo]', e);
-        banner('Photo upload failed', true);
+        console.warn('[chat media]', e);
+        banner(`${isVideo ? 'Video' : 'Photo'} upload failed`, true);
       }
     });
     input.click();
+  }
+  // Legacy alias — kept so existing call sites keep compiling. Behaves
+  // identically; opts default to accept both image and video.
+  function pickAndSendChatPhoto(send) {
+    return pickAndSendChatMedia(send);
+  }
+
+  function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.onload  = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
   }
 
   function fileToScaledDataURL(file, maxEdge) {
