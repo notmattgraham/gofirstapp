@@ -536,6 +536,63 @@
     border: 1px solid var(--border);
     margin-bottom: 12px;
   }
+
+  /* Viewer-switcher pill at the top of the Tasks tab. Only shows when
+     the user is a collaborator on at least one other account. */
+  .viewer-switcher {
+    position: relative;
+    margin: 0 0 12px;
+  }
+  .viewer-switcher[hidden] { display: none; }
+  .viewer-switcher-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .viewer-switcher-trigger:active { background: var(--surface-2); }
+  .viewer-switcher-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    min-width: 220px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .viewer-switcher.open .viewer-switcher-menu { display: flex; }
+  .viewer-switcher-menu button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .viewer-switcher-menu button:hover { background: var(--surface); }
+  .viewer-switcher-menu button.active {
+    background: var(--accent-dim);
+    color: var(--text);
+    font-weight: 600;
+  }
   .mode-banner[hidden] { display: none; }
   .mode-banner-title {
     font-size: 15px;
@@ -4679,6 +4736,19 @@
       <div class="view-slider" id="view-slider">
       <!-- To Do List view -->
       <section id="view-todo" class="view">
+        <!-- Viewer switcher — only rendered when the signed-in user is
+             a collaborator on at least one Premium account. Default
+             value is "Your tasks"; selecting another row swaps every
+             Tasks-tab fetch + mutation to operate on that owner's
+             account via ?as=. Hidden otherwise. -->
+        <div class="viewer-switcher" id="viewer-switcher" hidden>
+          <button type="button" class="viewer-switcher-trigger">
+            <span class="viewer-switcher-label">Your tasks</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="viewer-switcher-menu" role="menu"></div>
+        </div>
+
         <!-- Mode banner. Driven by DayState.applyToTodoView() — copy
              changes per mode (planning today / today incomplete /
              planning tomorrow / tomorrow committed). -->
@@ -5072,6 +5142,42 @@
           <div class="empty" id="missed-empty">
             <div class="empty-title">Nothing missed</div>
             <div>Anything you don't check off by midnight lands here.</div>
+          </div>
+        </div>
+
+        <!-- Premium → Collaborator manager. Visible only for Premium users.
+             Lets the Premium user grant ONE other account (executive
+             assistant / spouse pattern) add/edit/delete access to their
+             task list. Server-side: routes/collaborators.js. -->
+        <div id="premium-collab-section" hidden>
+          <div class="section-title">Collaborator</div>
+          <div class="card">
+            <div class="setting-row" id="collab-current-row" hidden>
+              <div class="setting-copy">
+                <div class="setting-title" id="collab-current-name">—</div>
+                <div class="setting-sub" id="collab-current-sub">—</div>
+              </div>
+              <button class="action-btn ghost setting-btn" id="collab-remove-btn">Remove</button>
+            </div>
+            <div class="setting-row" id="collab-empty-row">
+              <div class="setting-copy">
+                <div class="setting-title">No collaborator yet</div>
+                <div class="setting-sub">Invite someone (by email) who can manage your task list — add, edit, delete, mark complete. They keep their own account too.</div>
+              </div>
+              <button class="action-btn ghost setting-btn" id="collab-add-btn">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accessible accounts → for users who are someone ELSE's collaborator.
+             Lists each Premium account that's granted them access; entry
+             point to the viewer-switcher. Visible only when the list is
+             non-empty (i.e. the user is at least one Premium owner's
+             collaborator). -->
+        <div id="accessible-accounts-section" hidden>
+          <div class="section-title">You manage</div>
+          <div class="card" id="accessible-accounts-card">
+            <!-- rows injected by renderAccessibleAccounts() -->
           </div>
         </div>
 
@@ -5703,8 +5809,20 @@ function removePendingTask(tmpId) {
   setPendingTasks(getPendingTasks().filter(p => p.tmpId !== tmpId));
 }
 
+// Auto-scope task and day-state requests through the Collab viewer so
+// that whenever the user has switched to view another account's tasks,
+// every fetch (including mutations) carries ?as=<ownerId>. No call
+// site in the SPA needs to know about scoping — this is the single
+// chokepoint.
+function _maybeScopePath(path) {
+  if (!window.Collab || !Collab.viewingAsId()) return path;
+  if (/^\/api\/(tasks|days)(\/|\?|$)/.test(path)) return Collab.scopedUrl(path);
+  return path;
+}
+
 async function api(method, path, body) {
-  const res = await fetch(path, {
+  const finalPath = _maybeScopePath(path);
+  const res = await fetch(finalPath, {
     method,
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
     credentials: 'same-origin',
@@ -5937,7 +6055,7 @@ const Store = (() => {
       new Promise(resolve => {
         const ctrl = new AbortController();
         const timer = setTimeout(() => { ctrl.abort(); resolve({ missed: [] }); }, 4000);
-        fetch('/api/tasks/missed', { credentials: 'same-origin', signal: ctrl.signal })
+        fetch(_maybeScopePath('/api/tasks/missed'), { credentials: 'same-origin', signal: ctrl.signal })
           .then(r => r.json()).then(d => { clearTimeout(timer); resolve(d); })
           .catch(() => { clearTimeout(timer); resolve({ missed: [] }); });
       }),
@@ -8685,7 +8803,214 @@ function renderProfile() {
   // lock-time picker) to re-read its value. Cheaper than each one
   // polling the auth state on its own.
   document.dispatchEvent(new CustomEvent('auth:userloaded'));
+  // Refresh collaboration UI — needs Auth.user.isPremium AND fresh
+  // server-side state (a Premium grant could've been added/revoked).
+  if (window.Collab) Collab.refresh().catch(() => {});
 }
+
+/* ============================================================
+   Collaboration module — Premium feature.
+   Two faces:
+     1. Premium owner: Profile section to manage their ONE collaborator
+        (add by email, remove). Calls /api/collaborators.
+     2. Collaborator: a list of accounts they have access to, plus
+        a viewer-switcher dropdown that swaps Tasks + Analytics tabs
+        to render the OWNER's data via ?as=<ownerId> on every fetch.
+   `Collab.viewingAs` is the global "currently acting as" user id
+   (null = self). All task / day-state network calls funnel through
+   `Collab.scopedUrl(path)` which appends ?as=… when set.
+   ============================================================ */
+window.Collab = (function setupCollab() {
+  let _state = { isPremium: false, mine: null, accessibleAccounts: [] };
+  let viewingAs = null; // null → acting as self; else owner user id
+
+  // Append ?as=<id> to a path when we're acting on someone else's
+  // data. Idempotent if the path already has a query string.
+  function scopedUrl(path) {
+    if (!viewingAs) return path;
+    const sep = path.includes('?') ? '&' : '?';
+    return `${path}${sep}as=${encodeURIComponent(viewingAs)}`;
+  }
+
+  function viewingAsId() { return viewingAs; }
+
+  function viewingAsAccount() {
+    if (!viewingAs) return null;
+    return _state.accessibleAccounts.find(a => a.id === viewingAs) || null;
+  }
+
+  function setViewingAs(id) {
+    if (id === viewingAs) return;
+    viewingAs = id || null;
+    // Force a fresh data load + re-render under the new scope.
+    if (window.Store && typeof Store.load === 'function') {
+      Store.load().catch(() => {});
+    }
+    if (window.DayState && typeof DayState.refresh === 'function') {
+      DayState.refresh();
+    }
+    renderSwitcher();
+  }
+
+  async function refresh() {
+    try {
+      _state = await api('GET', '/api/collaborators');
+    } catch (e) {
+      console.warn('[collab] fetch failed', e);
+      _state = { isPremium: false, mine: null, accessibleAccounts: [] };
+    }
+    renderProfileSections();
+    renderSwitcher();
+    // If we were viewing an account that's no longer accessible, snap back to self.
+    if (viewingAs && !_state.accessibleAccounts.some(a => a.id === viewingAs)) {
+      setViewingAs(null);
+    }
+  }
+
+  function renderProfileSections() {
+    // Premium owner section
+    const ownerSec   = document.getElementById('premium-collab-section');
+    const currentRow = document.getElementById('collab-current-row');
+    const emptyRow   = document.getElementById('collab-empty-row');
+    const nameEl     = document.getElementById('collab-current-name');
+    const subEl      = document.getElementById('collab-current-sub');
+    if (ownerSec) {
+      ownerSec.hidden = !_state.isPremium;
+      if (_state.isPremium) {
+        if (_state.mine) {
+          currentRow.hidden = false;
+          emptyRow.hidden = true;
+          if (nameEl) nameEl.textContent = _state.mine.name || _state.mine.email;
+          if (subEl)  subEl.textContent  = _state.mine.email + ' — full task-list access.';
+        } else {
+          currentRow.hidden = true;
+          emptyRow.hidden = false;
+        }
+      }
+    }
+
+    // Accessible accounts (collaborator face)
+    const accSec  = document.getElementById('accessible-accounts-section');
+    const accCard = document.getElementById('accessible-accounts-card');
+    if (accSec && accCard) {
+      const list = _state.accessibleAccounts || [];
+      accSec.hidden = list.length === 0;
+      accCard.innerHTML = list.map((a) => `
+        <div class="setting-row">
+          <div class="setting-copy">
+            <div class="setting-title">${esc(a.name || a.email)}</div>
+            <div class="setting-sub">${esc(a.email)} — you can add, edit, complete, and remove their tasks.</div>
+          </div>
+          <button class="action-btn ghost setting-btn" data-collab-leave="${esc(a.id)}">Leave</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Renders the viewer-switcher pill at the top of the Tasks tab. Only
+  // shows when the user has at least one accessible account. Default
+  // option is "Your tasks"; each accessible account is one extra row.
+  function renderSwitcher() {
+    const sw = document.getElementById('viewer-switcher');
+    if (!sw) return;
+    const list = _state.accessibleAccounts || [];
+    if (!list.length) { sw.hidden = true; return; }
+    sw.hidden = false;
+    const current = viewingAsAccount();
+    const label = current ? `${current.name || current.email}'s tasks` : 'Your tasks';
+    sw.querySelector('.viewer-switcher-label').textContent = label;
+    const menu = sw.querySelector('.viewer-switcher-menu');
+    menu.innerHTML = `
+      <button type="button" data-viewer-set="" class="${!viewingAs ? 'active' : ''}">Your tasks</button>
+      ${list.map(a => `
+        <button type="button" data-viewer-set="${esc(a.id)}" class="${viewingAs === a.id ? 'active' : ''}">${esc(a.name || a.email)}'s tasks</button>
+      `).join('')}
+    `;
+  }
+
+  // Wire the Profile add/remove buttons + accessible-account leave
+  // buttons + viewer-switcher dropdown. Idempotent — safe to call once
+  // at boot.
+  function wireUI() {
+    const addBtn = document.getElementById('collab-add-btn');
+    if (addBtn) addBtn.addEventListener('click', async () => {
+      const email = window.prompt('Collaborator email (must already have a GoFirst account):', '');
+      if (!email) return;
+      try {
+        await api('POST', '/api/collaborators', { email: email.trim() });
+        await refresh();
+        banner('Collaborator added');
+      } catch (e) {
+        const msg = (e && e.message) || 'failed';
+        banner(
+          msg.includes('user_not_found') ? 'No GoFirst account with that email.'
+          : msg.includes('already')       ? 'Already have a collaborator — remove the current one first.'
+          : msg.includes('premium_only')  ? 'Premium only.'
+          : 'Could not add collaborator.',
+          true
+        );
+      }
+    });
+
+    const removeBtn = document.getElementById('collab-remove-btn');
+    if (removeBtn) removeBtn.addEventListener('click', async () => {
+      if (!confirm('Remove your collaborator? They\'ll lose access to your task list immediately.')) return;
+      try {
+        await api('DELETE', '/api/collaborators/mine');
+        await refresh();
+        banner('Collaborator removed');
+      } catch { banner('Could not remove collaborator', true); }
+    });
+
+    const accCard = document.getElementById('accessible-accounts-card');
+    if (accCard) accCard.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-collab-leave]');
+      if (!btn) return;
+      const ownerId = btn.dataset.collabLeave;
+      if (!confirm('Leave this collaboration? You\'ll lose access to their task list.')) return;
+      try {
+        await api('DELETE', `/api/collaborators/access/${encodeURIComponent(ownerId)}`);
+        if (viewingAs === ownerId) setViewingAs(null);
+        await refresh();
+        banner('Left collaboration');
+      } catch { banner('Could not leave collaboration', true); }
+    });
+
+    const sw = document.getElementById('viewer-switcher');
+    if (sw) {
+      const trigger = sw.querySelector('.viewer-switcher-trigger');
+      const menu    = sw.querySelector('.viewer-switcher-menu');
+      trigger.addEventListener('click', () => {
+        sw.classList.toggle('open');
+      });
+      menu.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-viewer-set]');
+        if (!btn) return;
+        sw.classList.remove('open');
+        setViewingAs(btn.dataset.viewerSet || null);
+      });
+      // Close the menu on outside click.
+      document.addEventListener('click', (e) => {
+        if (!sw.contains(e.target)) sw.classList.remove('open');
+      });
+    }
+  }
+
+  // Wire UI when DOM is parsed — markup IDs above will exist by then.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireUI);
+  } else {
+    wireUI();
+  }
+
+  return {
+    refresh,
+    scopedUrl,
+    viewingAsId,
+    viewingAsAccount,
+    setViewingAs,
+  };
+})();
 
 function renderOverrides(state) {
   const ov = state.overrides || { used: 0, remaining: 3, active: false };
@@ -11739,7 +12064,7 @@ window.DayState = (() => {
 
   async function refresh() {
     try {
-      const r = await fetch('/api/days/state', { credentials: 'same-origin' });
+      const r = await fetch(_maybeScopePath('/api/days/state'), { credentials: 'same-origin' });
       if (!r.ok) return null;
       current = await r.json();
       apply();
@@ -11869,7 +12194,7 @@ window.DayState = (() => {
   // underlying re-render doesn't fight the animation for paint frames.
   async function commit(date) {
     if (!date) return;
-    const r = await fetch(`/api/days/${encodeURIComponent(date)}/commit`, {
+    const r = await fetch(_maybeScopePath(`/api/days/${encodeURIComponent(date)}/commit`), {
       method: 'POST', credentials: 'same-origin',
     });
     if (!r.ok) throw new Error('commit_failed');

@@ -19,10 +19,16 @@ const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { userToday, userTomorrow, msUntilNextLock, dateInTz } = require('../time');
+const { attachActor } = require('../collab');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const router = express.Router();
 router.use(requireAuth);
+// req.acting is the OWNER of the data when an authorized collaborator
+// passes ?as=<premiumOwnerId>; otherwise it's req.user. Day-commit
+// state always reads off the OWNER's tz/lockTime, never the
+// collaborator's.
+router.use(attachActor);
 
 // Returns the calendar date a one-shot Task lives on. Recurring tasks
 // have no scheduledDate — they're not "for a specific day" in the same
@@ -108,7 +114,7 @@ async function autoCommitPastDates(userId, today) {
 // the SPA to render the right view + countdown without recomputing
 // lockTime/TZ math client-side.
 router.get('/state', wrap(async (req, res) => {
-  const me = req.user;
+  const me = req.acting;
   const today = userToday(me);
   const tomorrow = userTomorrow(me);
 
@@ -184,7 +190,7 @@ router.get('/state', wrap(async (req, res) => {
 // tomorrow; can't commit past dates (already implicitly committed) or
 // dates further out (the system only ever lets you plan one day ahead).
 router.post('/:date/commit', wrap(async (req, res) => {
-  const me = req.user;
+  const me = req.acting;
   const date = req.params.date;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: 'invalid_date' });

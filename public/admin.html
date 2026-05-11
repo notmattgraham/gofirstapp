@@ -207,6 +207,33 @@
   .badge.role-coach { background: var(--warn); color: #1a1d25; border-color: transparent; }
   .badge.role-client { background: var(--accent-dim); color: var(--text); border-color: transparent; }
   .badge.role-admin { background: var(--danger); color: #fff; border-color: transparent; }
+  /* Premium is stackable — its badge shows alongside the role badge. */
+  .badge.role-premium {
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #1a1d25;
+    border-color: transparent;
+  }
+  /* Premium toggle pill — sits next to the role picker. Filled when on,
+     outline when off. Clickable; PATCH /api/admin/users/:id/premium. */
+  .premium-toggle {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    margin-left: 6px;
+  }
+  .premium-toggle.on {
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #1a1d25;
+    border-color: transparent;
+  }
+  .premium-toggle:disabled { opacity: 0.5; cursor: default; }
 
   /* Role picker — four-segment toggle (User / Client / Coach / Admin) */
   .role-picker {
@@ -829,6 +856,7 @@
           : role === 'client'
             ? '<span class="badge role-client">Client</span>'
             : '';
+      const premiumBadge = u.isPremium ? '<span class="badge role-premium">Premium</span>' : '';
       // Only the actual admin can promote/demote the admin role; coach
       // viewers see the segment but it's disabled. The X delete button is
       // also admin-only (coach can't remove users).
@@ -842,7 +870,7 @@
           <div class="user-cell">
             <span data-user-detail="${escapeHtml(u.id)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(u.name || u.email || 'user')} details">${avatarHtml(u)}</span>
             <div>
-              <div class="name">${escapeHtml(u.name || '—')} ${roleBadge}</div>
+              <div class="name">${escapeHtml(u.name || '—')} ${roleBadge} ${premiumBadge}</div>
               <div class="email">${escapeHtml(u.email || '')}</div>
             </div>
           </div>
@@ -867,6 +895,11 @@
             <button data-role="coach"  class="${role === 'coach'  ? 'active' : ''}">Coach</button>
             <button data-role="admin"  class="${role === 'admin'  ? 'active' : ''}" ${adminBtnAttrs}>Admin</button>
           </div>
+          <button class="premium-toggle ${u.isPremium ? 'on' : ''}"
+                  data-premium-toggle data-id="${escapeHtml(u.id)}"
+                  title="${u.isPremium ? 'Remove Premium' : 'Grant Premium'}">
+            ${u.isPremium ? '★ Premium' : '☆ Premium'}
+          </button>
         </td>
         ${deleteCell}
       </tr>`;
@@ -914,6 +947,31 @@
     } catch (err) {
       [...picker.querySelectorAll('button')].forEach(b => b.disabled = false);
       alert('Could not update role. ' + err.message);
+    }
+  });
+
+  // Premium toggle — stackable attribute, orthogonal to role.
+  $('users-body').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-premium-toggle]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const u = allUsers.find(x => x.id === id);
+    if (!u) return;
+    const next = !u.isPremium;
+    btn.disabled = true;
+    try {
+      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/premium`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPremium: next }),
+      });
+      if (!r.ok) throw new Error('bad status ' + r.status);
+      u.isPremium = next;
+      applyUserFilter();
+    } catch (err) {
+      btn.disabled = false;
+      alert('Could not update Premium. ' + err.message);
     }
   });
 
