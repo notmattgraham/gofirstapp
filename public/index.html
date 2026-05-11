@@ -2803,16 +2803,18 @@
         offering one CTA. Used in place of stacked blurry overlays. */
   html.is-premium-gated .hide-when-free { display: none !important; }
 
+  /* Premium upsell card — sized to match the visual weight of a
+     standard content card. Compact padding + minimal gap so it
+     doesn't dominate the page above the tab bar. */
   .premium-locked-card {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    padding: 22px 20px;
-    border-radius: 14px;
+    gap: 10px;
+    padding: 16px 16px 14px;
+    border-radius: var(--radius);
     background: linear-gradient(160deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.04));
     border: 1px solid rgba(250, 204, 21, 0.25);
-    margin-bottom: 12px;
   }
   .premium-locked-card-eyebrow {
     display: inline-flex;
@@ -2826,29 +2828,15 @@
   }
   .premium-locked-card-eyebrow svg { width: 12px; height: 12px; fill: currentColor; }
   .premium-locked-card-title {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--text);
     line-height: 1.3;
   }
   .premium-locked-card-body {
-    font-size: 13.5px;
+    font-size: 13px;
     color: var(--text-dim);
-    line-height: 1.5;
-  }
-  .premium-locked-card-body ul {
-    list-style: none;
-    padding: 0;
-    margin: 6px 0 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .premium-locked-card-body li::before {
-    content: "✓";
-    color: #facc15;
-    font-weight: 700;
-    margin-right: 8px;
+    line-height: 1.45;
   }
   .premium-locked-card-cta {
     appearance: none;
@@ -2858,10 +2846,11 @@
     font: inherit;
     font-size: 14px;
     font-weight: 700;
-    padding: 12px 18px;
+    padding: 10px 16px;
     border-radius: 10px;
     cursor: pointer;
     width: 100%;
+    margin-top: 2px;
   }
   .premium-locked-card-cta:active { transform: translateY(1px); opacity: 0.95; }
   /* Hide the gated cards entirely for Premium users — they see the
@@ -5086,15 +5075,7 @@
             Premium Analytics
           </div>
           <div class="premium-locked-card-title">See the full picture of your execution.</div>
-          <div class="premium-locked-card-body">
-            <ul>
-              <li>Execution streak (consecutive 100% days)</li>
-              <li>Per-category breakdown</li>
-              <li>Best-executed and needs-work tasks</li>
-              <li>Longest habit streaks</li>
-              <li>Custom date ranges + monthly calendar</li>
-            </ul>
-          </div>
+          <div class="premium-locked-card-body">Execution streak, per-category breakdown, best &amp; worst tasks, longest streaks, monthly calendar.</div>
           <button type="button" class="premium-locked-card-cta" data-premium-upgrade>Upgrade to Premium</button>
         </div>
         <div class="premium-only">
