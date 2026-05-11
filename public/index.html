@@ -3569,11 +3569,10 @@
   .install-prompt[data-variant="safari"]  .install-content-safari  { display: contents; }
   .install-prompt[data-variant="android"] .install-content-android { display: contents; }
 
-  /* Android install button — primary CTA replacing the step-by-step
-     instructions when the browser exposes beforeinstallprompt. The
-     fallback instructions sit underneath and are revealed only if
-     the prompt isn't available (or the user dismissed the native
-     dialog). */
+  /* Android install button — primary CTA when beforeinstallprompt has
+     been captured. Fallback steps sit underneath and are ALWAYS visible
+     too, so the user has a manual path even when the button works (or
+     especially when it doesn't). */
   .install-android-action[hidden],
   .install-android-fallback[hidden] { display: none; }
   .install-btn {
@@ -3592,14 +3591,24 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
   }
   .install-btn:active { transform: translateY(1px); opacity: 0.95; }
-  .install-android-fallback-eyebrow {
+  .install-android-or {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-dim);
     font-weight: 600;
     text-align: center;
-    margin-top: 6px;
+    margin-top: 12px;
+    margin-bottom: -4px;
+  }
+  .install-android-fallback-header {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
   }
 
 
@@ -5688,25 +5697,34 @@
             <div class="install-step-body">Open GoFirst from your home screen — not from Chrome.</div>
           </div>
         </div>
-        <!-- Android variant: real Install button via beforeinstallprompt,
-             with fallback step-by-step instructions if that event hasn't
-             fired (or the user dismissed the native dialog). -->
+        <!-- Android variant. Two faces:
+             1. Real "Install GoFirst" button (when beforeinstallprompt
+                has been captured). Tapping it triggers the native
+                Android install dialog directly.
+             2. Manual fallback steps. Always-visible header + ordered
+                steps so even when Chrome's heuristic decides not to
+                fire beforeinstallprompt (which is more common than
+                you'd expect), the user has an obvious path.
+             Both can show simultaneously — fallback as a "if the
+             button doesn't work" hint underneath the button. -->
         <div class="install-content install-content-android">
           <div class="install-android-action" id="install-android-action" hidden>
             <button type="button" class="install-btn" id="install-btn">Install GoFirst</button>
+            <div class="install-android-or">— or follow the steps below —</div>
           </div>
           <div class="install-android-fallback" id="install-android-fallback">
+            <div class="install-android-fallback-header">Install in 3 steps</div>
             <div class="install-step">
               <div class="install-step-num">1</div>
-              <div class="install-step-body">Tap the <b>⋮</b> menu in the top-right corner of your browser.</div>
+              <div class="install-step-body">Tap the <b>⋮</b> menu in the top-right corner of Chrome.</div>
             </div>
             <div class="install-step">
               <div class="install-step-num">2</div>
-              <div class="install-step-body">Tap <b>Install app</b> or <b>Add to Home screen</b>.</div>
+              <div class="install-step-body">Tap <b>Install app</b> (or <b>Add to Home screen</b>).</div>
             </div>
             <div class="install-step">
               <div class="install-step-num">3</div>
-              <div class="install-step-body">Open GoFirst from your home screen — not from your browser.</div>
+              <div class="install-step-body">Open <b>GoFirst</b> from your home screen — not from Chrome.</div>
             </div>
           </div>
         </div>
@@ -5817,12 +5835,13 @@ let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   _deferredInstallPrompt = e;
-  // If the install gate is already showing the Android variant, swap
-  // from fallback instructions to the real button now.
-  const action   = document.getElementById('install-android-action');
-  const fallback = document.getElementById('install-android-fallback');
-  if (action)   action.hidden = false;
-  if (fallback) fallback.hidden = true;
+  // Reveal the Install button on the gate. Leave the manual steps
+  // visible too — they're useful even with a working button (some
+  // users don't trust generic "install" buttons; some browsers
+  // surface the real UI elsewhere; the steps make the path
+  // unambiguous either way).
+  const action = document.getElementById('install-android-action');
+  if (action) action.hidden = false;
 });
 window.addEventListener('appinstalled', () => {
   _deferredInstallPrompt = null;
@@ -5889,13 +5908,14 @@ window.addEventListener('appinstalled', () => {
 
   // Android: wire the Install button to the captured beforeinstallprompt
   // event. If the event was already captured before this code ran (via
-  // the document-start listener above), un-hide the action row now;
-  // otherwise it'll un-hide itself when the event fires later. Either
-  // way the fallback instructions are visible until the button works.
+  // the document-start listener above), un-hide the action row now —
+  // otherwise it'll un-hide itself when the event fires later. The
+  // manual fallback steps stay visible either way; they're a safety
+  // net for the (common) case where Chrome's heuristic decides not to
+  // fire beforeinstallprompt at all.
   if (variant === 'android') {
-    const action   = document.getElementById('install-android-action');
-    const fallback = document.getElementById('install-android-fallback');
-    if (action && _deferredInstallPrompt) { action.hidden = false; if (fallback) fallback.hidden = true; }
+    const action = document.getElementById('install-android-action');
+    if (action && _deferredInstallPrompt) action.hidden = false;
 
     const btn = document.getElementById('install-btn');
     if (btn) btn.addEventListener('click', async () => {
@@ -5908,15 +5928,13 @@ window.addEventListener('appinstalled', () => {
         if (outcome === 'accepted') {
           // appinstalled handler above will hide the gate.
         } else {
-          // User dismissed — fall back to manual instructions so they
-          // can still try via the browser menu.
-          if (action)   action.hidden = true;
-          if (fallback) fallback.hidden = false;
+          // User dismissed — hide the now-dead button. Fallback steps
+          // are already visible, so they can install via the menu.
+          if (action) action.hidden = true;
         }
       } catch (err) {
         console.warn('[install] prompt failed', err);
-        if (action)   action.hidden = true;
-        if (fallback) fallback.hidden = false;
+        if (action) action.hidden = true;
       }
     });
   }
