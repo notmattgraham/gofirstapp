@@ -7,9 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v15 — section-title top margin reset to 16px to match
-// the header→first-section gap; Premium card matches at 16px.
-const CACHE = 'gofirst-v15';
+// Bumped to v16 — week-bar-card bottom padding trimmed for free
+// users so the empty space below the day circles doesn't make the
+// gap above EXECUTION RATE look bigger than other section breaks.
+const CACHE = 'gofirst-v16';
 const ASSETS = [
   './',
   './index.html',
