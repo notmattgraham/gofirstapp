@@ -7,12 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v7 — the previous collab-switch fix had a race-condition
-// hole where the boot's initial Store.load could still be in flight
-// when the user clicked the viewer-switcher; the boot result then
-// overwrote the switched account's tasks. v7 contains the start/end
-// scope-snapshot guard inside Store.load that drops stale results.
-const CACHE = 'gofirst-v7';
+// Bumped to v8 — collab-debug strip + extra diagnostics on
+// the collaborator-switch flow. Temporary; reverts to plain
+// once the bug is identified.
+const CACHE = 'gofirst-v8';
 const ASSETS = [
   './',
   './index.html',

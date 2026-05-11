@@ -7377,6 +7377,39 @@ function renderTasksView(state) {
   const tasksTitle = document.getElementById('tasks-title');
   if (tasksTitle) tasksTitle.hidden = true;
 
+  // ─── TEMPORARY DIAGNOSTIC ───────────────────────────────────
+  // Renders a small grey strip at the top of the Tasks tab when
+  // a viewing scope is active. Shows enough state to triage the
+  // "switched view but still seeing my own tasks" report from a
+  // single screenshot. Remove once the bug is locked down.
+  try {
+    const viewingId = (window.Collab && Collab.viewingAsId && Collab.viewingAsId()) || null;
+    const acct      = (window.Collab && Collab.viewingAsAccount && Collab.viewingAsAccount()) || null;
+    const dbg = document.getElementById('collab-debug-strip');
+    if (viewingId) {
+      const sample = (state.tasks || []).slice(0, 3).map(t => (t.text || '').slice(0, 24)).join(' / ') || '(none)';
+      const html = `
+        <div style="font-size:11px;line-height:1.4;padding:8px 10px;background:#3b2410;color:#facc15;border-radius:8px;margin-bottom:10px;font-family:ui-monospace,monospace;">
+          <div><b>viewing as:</b> ${esc((acct && (acct.name || acct.email)) || viewingId)}</div>
+          <div><b>state.tasks:</b> ${state.tasks.length} · <b>today:</b> ${esc(state.today || '?')} · <b>selectedDate:</b> ${esc(selectedDateISO || '(empty)')}</div>
+          <div style="opacity:0.85;margin-top:2px;"><b>first 3:</b> ${esc(sample)}</div>
+        </div>
+      `;
+      if (dbg) dbg.innerHTML = html;
+      else {
+        const box = document.createElement('div');
+        box.id = 'collab-debug-strip';
+        box.innerHTML = html;
+        const list = document.getElementById('tasks-list');
+        if (list && list.parentNode) list.parentNode.insertBefore(box, list);
+      }
+    } else {
+      const dbg2 = document.getElementById('collab-debug-strip');
+      if (dbg2) dbg2.remove();
+    }
+  } catch {}
+  // ─── END DIAGNOSTIC ─────────────────────────────────────────
+
   const allTasks = state.tasks.filter(t => taskScheduledFor(t, dayISO));
 
   // Split into pending (or mid-animation) and done. Tasks currently
