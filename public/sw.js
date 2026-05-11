@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v11 — Premium gate redesign (single clean upgrade card
-// replacing the noisy blur+overlay-pill stack from v10).
-const CACHE = 'gofirst-v11';
+// Bumped to v12 — Premium card sizing fix (compact density to match
+// the visual weight of standard content cards).
+const CACHE = 'gofirst-v12';
 const ASSETS = [
   './',
   './index.html',
