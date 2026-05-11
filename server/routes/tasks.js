@@ -3,9 +3,44 @@ const { Prisma } = require('@prisma/client');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { userToday, userTomorrow, isOverrideActive, isFirstDay } = require('../time');
+const { attachActor } = require('../collab');
+const pushModule = require('./push');
 
 const router = express.Router();
 router.use(requireAuth);
+// Resolves req.acting (the user we're operating on behalf of). Without
+// ?as=<premiumOwnerId>, req.acting === req.user. With ?as= present and
+// the caller authorized as a collaborator, req.acting is the OWNER and
+// req.collab is the signed-in collaborator. All downstream queries scope
+// off req.acting.id; req.collab is consulted only to fire the
+// "collaborator changed your list" push.
+router.use(attachActor);
+
+// Fire a push to the Premium owner when a collaborator mutates their
+// list. No-op when the request is self-acting (no req.collab) or when
+// the owner has notifySystem off. Fire-and-forget; never blocks the
+// response.
+function notifyOwnerOfCollabAction(req, verb, taskText) {
+  if (!req.collab) return;
+  const ownerId = req.acting.id;
+  const collabName = req.collab.name || req.collab.email || 'Your collaborator';
+  const text = (taskText || '').toString().slice(0, 120);
+  (async () => {
+    try {
+      const owner = await prisma.user.findUnique({
+        where: { id: ownerId },
+        select: { id: true, notifySystem: true },
+      });
+      if (!owner || owner.notifySystem === false) return;
+      await pushModule.sendPushToUser(owner.id, {
+        title: `${collabName} ${verb} a task`,
+        body:  text || ' ',
+        url:   '/',
+        tag:   'collab-action',
+      });
+    } catch (e) { console.warn('[collab/push]', e.message); }
+  })();
+}
 
 const VALID_CATEGORIES = new Set(['Family', 'Fitness', 'Career', 'Self-Improvement', 'Other']);
 function sanitizeCategory(v) {
@@ -136,15 +171,15 @@ function rejectLocked(res, guard) {
 
 router.get('/', async (req, res) => {
   const rows = await prisma.task.findMany({
-    where: { userId: req.user.id },
+    where: { userId: req.acting.id },
     orderBy: { createdAt: 'desc' },
   });
   res.json({
     tasks: rows.map(shape),
-    today: userToday(req.user),
-    tomorrow: userTomorrow(req.user),
-    todayComplete: await isTodayComplete(req.user),
-    overrideActive: isOverrideActive(req.user),
+    today: userToday(req.acting),
+    tomorrow: userTomorrow(req.acting),
+    todayComplete: await isTodayComplete(req.acting),
+    overrideActive: isOverrideActive(req.acting),
   });
 });
 
@@ -154,20 +189,20 @@ router.post('/', async (req, res) => {
   if (!trimmed) return res.status(400).json({ error: 'text required' });
 
   const isRecurring = !!recurrence;
-  const date = scheduledDate || (isRecurring ? null : userToday(req.user));
+  const date = scheduledDate || (isRecurring ? null : userToday(req.acting));
 
   // Recurring tasks are permanent habit templates, not entries in any single
   // day's committed list — so they bypass the day-lock entirely.
   // One-shot tasks must pass the lock check on their scheduled date.
   if (!isRecurring) {
-    const guard = await canMutateForDate(req.user, date);
+    const guard = await canMutateForDate(req.acting, date);
     if (!guard.ok) return rejectLocked(res, guard);
   }
 
   const isDaily = recurrence && recurrence.type === 'daily';
   const task = await prisma.task.create({
     data: {
-      userId: req.user.id,
+      userId: req.acting.id,
       text: trimmed,
       startedAt: startedAt || new Date().toISOString(),
       scheduledDate: isRecurring ? null : date,
@@ -180,13 +215,14 @@ router.post('/', async (req, res) => {
       completedDates: [],
     },
   });
+  notifyOwnerOfCollabAction(req, 'added', task.text);
   res.json({ task: shape(task) });
 });
 
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
   const existing = await prisma.task.findUnique({ where: { id } });
-  if (!existing || existing.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
+  if (!existing || existing.userId !== req.acting.id) return res.status(404).json({ error: 'not found' });
 
   const data = {};
   const allowed = ['text', 'startedAt', 'recurrence', 'trackStreak', 'done', 'completedDates', 'category', 'scheduledDate', 'scheduledTime', 'notes'];
@@ -208,8 +244,8 @@ router.patch('/:id', async (req, res) => {
   const onlyCompletionFields = Object.keys(data).every(k => k === 'done' || k === 'completedDates');
   const editingRecurring = !!existing.recurrence;
   if (!onlyCompletionFields && !editingRecurring) {
-    const date = existing.scheduledDate || userToday(req.user);
-    const guard = await canMutateForDate(req.user, date);
+    const date = existing.scheduledDate || userToday(req.acting);
+    const guard = await canMutateForDate(req.acting, date);
     if (!guard.ok) return rejectLocked(res, guard);
   }
 
@@ -217,22 +253,28 @@ router.patch('/:id', async (req, res) => {
   if (!effectiveRecurrence || effectiveRecurrence.type !== 'daily') data.trackStreak = false;
 
   const task = await prisma.task.update({ where: { id }, data });
+  // Suppress the owner-notify ping for completion-only updates: the
+  // collaborator just ticking off a task isn't something the owner
+  // needs a push about. Anything else (text edit, schedule change,
+  // category change, recurrence edit) does fire.
+  if (!onlyCompletionFields) notifyOwnerOfCollabAction(req, 'edited', task.text);
   res.json({ task: shape(task) });
 });
 
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   const existing = await prisma.task.findUnique({ where: { id } });
-  if (!existing || existing.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
+  if (!existing || existing.userId !== req.acting.id) return res.status(404).json({ error: 'not found' });
 
   // Recurring tasks can always be deleted — they're not part of the daily lock.
   if (!existing.recurrence) {
-    const date = existing.scheduledDate || userToday(req.user);
-    const guard = await canMutateForDate(req.user, date);
+    const date = existing.scheduledDate || userToday(req.acting);
+    const guard = await canMutateForDate(req.acting, date);
     if (!guard.ok) return rejectLocked(res, guard);
   }
 
   await prisma.task.delete({ where: { id } });
+  notifyOwnerOfCollabAction(req, 'removed', existing.text);
   res.json({ ok: true });
 });
 
@@ -241,13 +283,13 @@ router.post('/import', async (req, res) => {
   const { tasks } = req.body || {};
   if (!Array.isArray(tasks)) return res.status(400).json({ error: 'tasks array required' });
 
-  const existingCount = await prisma.task.count({ where: { userId: req.user.id } });
+  const existingCount = await prisma.task.count({ where: { userId: req.acting.id } });
   if (existingCount > 0) return res.status(409).json({ error: 'tasks already exist' });
 
-  const today = userToday(req.user);
+  const today = userToday(req.acting);
   const rows = await prisma.$transaction(tasks.map((t) => prisma.task.create({
     data: {
-      userId: req.user.id,
+      userId: req.acting.id,
       text: String(t.text || '').slice(0, 240),
       startedAt: t.startedAt || new Date().toISOString(),
       // Imported one-shots land on today so they show up immediately.
@@ -267,11 +309,11 @@ router.post('/import', async (req, res) => {
 // timeout so a slow DB query never hangs the client's Store.load() indefinitely.
 router.get('/missed', async (req, res) => {
   try {
-    const today = userToday(req.user);
+    const today = userToday(req.acting);
     const rows = await Promise.race([
       prisma.task.findMany({
         where: {
-          userId: req.user.id,
+          userId: req.acting.id,
           done: false,
           recurrence: Prisma.DbNull,
           scheduledDate: { not: null, lt: today },
@@ -295,16 +337,16 @@ router.get('/missed', async (req, res) => {
 router.post('/missed/:id/retry', async (req, res) => {
   const { id } = req.params;
   const original = await prisma.task.findUnique({ where: { id } });
-  if (!original || original.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
+  if (!original || original.userId !== req.acting.id) return res.status(404).json({ error: 'not found' });
   if (original.recurrence) return res.status(400).json({ error: 'recurring tasks cannot be carried over' });
   if (original.done) return res.status(400).json({ error: 'task is not missed' });
 
-  const today = userToday(req.user);
+  const today = userToday(req.acting);
   if (original.scheduledDate >= today) return res.status(400).json({ error: 'task is not in the past' });
 
   const dup = await prisma.task.create({
     data: {
-      userId: req.user.id,
+      userId: req.acting.id,
       text: original.text,
       startedAt: original.startedAt,
       scheduledDate: today,

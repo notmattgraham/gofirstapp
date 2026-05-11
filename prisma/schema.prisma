@@ -77,6 +77,13 @@ model User {
   // works before anyone is flagged in the DB.
   isAdmin             Boolean  @default(false)
 
+  // Premium is a STACKABLE attribute (not a mutually-exclusive role like
+  // User/Client/Coach/Admin). A Coach can be Premium, the Admin can be
+  // Premium, etc. Currently unlocks the Collaboration feature — a Premium
+  // user can grant a single other account add/edit/delete access to their
+  // task list (executive-assistant / spouse use case). Toggled from /dev.
+  isPremium           Boolean  @default(false)
+
   // True once the user has finished or skipped the first-login welcome
   // tour. Used to gate auto-display of the tutorial carousel on subsequent
   // sessions. Users can re-trigger the tour from Profile regardless.
@@ -128,6 +135,28 @@ model User {
   pushSubscriptions   PushSubscription[]
   dayCommits          DayCommit[]
   nudgeLogs           NudgeLog[]
+  // Outgoing — collaborations where I'm the Premium owner letting
+  // someone manage my list.
+  ownedCollaborations Collaboration[] @relation("CollaborationOwner")
+  // Incoming — accounts I have collaborator access to.
+  collaboratingOn     Collaboration[] @relation("CollaborationCollaborator")
+}
+
+// Collaboration grant: Premium user (premiumUserId) gave another user
+// (collaboratorUserId) the ability to add/edit/delete/complete tasks on
+// their behalf. v1 is a 1:1 relationship — at most one collaborator per
+// Premium user, enforced by @@unique on premiumUserId. Drop that
+// constraint later to support multi-collaborator setups.
+model Collaboration {
+  id                 String   @id @default(cuid())
+  premiumUserId      String
+  premiumUser        User     @relation("CollaborationOwner",         fields: [premiumUserId],      references: [id], onDelete: Cascade)
+  collaboratorUserId String
+  collaboratorUser   User     @relation("CollaborationCollaborator",  fields: [collaboratorUserId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+
+  @@unique([premiumUserId])
+  @@index([collaboratorUserId])
 }
 
 // Per-(user, kind, date) record of a deadline-nudge push having fired,
