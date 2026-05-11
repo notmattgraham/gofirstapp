@@ -7,10 +7,11 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v17 — week-bar-card padding now symmetric 8/8 (was
-// 12/4 which centered the gap math but uncentered the circles
-// inside the card).
-const CACHE = 'gofirst-v17';
+// Bumped to v18 — premium-locked-card margin-top dropped to 0 when
+// it directly follows a section-title (profile collaborator). The
+// 16px stays for the analytics case where there's no preceding
+// title.
+const CACHE = 'gofirst-v18';
 const ASSETS = [
   './',
   './index.html',
