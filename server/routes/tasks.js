@@ -79,9 +79,11 @@ function sanitizeNotes(v) {
 
 // "Today is complete" → no remaining incomplete tasks scheduled for today.
 // Recurring tasks count as complete if today's ISO is in completedDates.
-async function todayCompletionState(user) {
+// Pure synchronous — operates on a tasks array the caller already has,
+// so /api/tasks doesn't have to hit the DB twice. (Used to be async +
+// re-fetch the same task list, doubling the per-request DB roundtrips.)
+function todayCompletionStateFromTasks(user, tasks) {
   const today = userToday(user);
-  const tasks = await prisma.task.findMany({ where: { userId: user.id } });
   let total = 0, incomplete = 0;
   const dow = new Date(today + 'T00:00:00').getDay();
   const todayDay = parseInt(today.slice(8, 10), 10);
@@ -105,6 +107,13 @@ async function todayCompletionState(user) {
     }
   }
   return { total, incomplete, complete: incomplete === 0 };
+}
+
+// Async path retained for the few callers that don't already have
+// the task list in hand. Re-fetches and delegates.
+async function todayCompletionState(user) {
+  const tasks = await prisma.task.findMany({ where: { userId: user.id } });
+  return todayCompletionStateFromTasks(user, tasks);
 }
 
 async function isTodayComplete(user) {
@@ -174,11 +183,16 @@ router.get('/', async (req, res) => {
     where: { userId: req.acting.id },
     orderBy: { createdAt: 'desc' },
   });
+  // Compute todayComplete from the rows we already have rather than
+  // hitting the DB a second time. Used to be a separate findMany on
+  // the same table — doubled per-request DB roundtrips and noticeably
+  // slow for users with hundreds of tasks (especially when a
+  // collaborator is viewing them on a slower mobile connection).
   res.json({
     tasks: rows.map(shape),
     today: userToday(req.acting),
     tomorrow: userTomorrow(req.acting),
-    todayComplete: await isTodayComplete(req.acting),
+    todayComplete: todayCompletionStateFromTasks(req.acting, rows).complete,
     overrideActive: isOverrideActive(req.acting),
   });
 });

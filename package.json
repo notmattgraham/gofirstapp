@@ -6,7 +6,7 @@
   "main": "server/index.js",
   "scripts": {
     "dev": "NODE_ENV=development node server/index.js",
-    "start": "prisma generate && prisma db push --skip-generate --accept-data-loss && node server/index.js",
+    "start": "prisma db push --skip-generate --accept-data-loss && node server/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "postinstall": "prisma generate"
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "compression": "^1.7.4",
     "connect-pg-simple": "^10.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
