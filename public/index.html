@@ -2794,6 +2794,45 @@
   }
   .chat-promo-cta:active { background: var(--accent-hover); }
 
+  /* Premium gate — wraps any block that should be visible-but-locked
+     for free users. Applies a blur to the underlying content and
+     overlays a centered "Premium Feature" CTA that opens Stripe. The
+     wrapper element must be `position: relative` (we set that here)
+     so the overlay anchors correctly. Add the `is-premium-gated` class
+     on the body / html to activate; the SPA toggles it once Auth.user
+     is known to be non-Premium. */
+  .premium-gate { position: relative; }
+  html.is-premium-gated .premium-gate.locked > * { filter: blur(4px) saturate(0.7); pointer-events: none; user-select: none; }
+  .premium-gate-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 17, 21, 0.35);
+    border-radius: inherit;
+  }
+  html.is-premium-gated .premium-gate.locked > .premium-gate-overlay { display: flex; }
+  .premium-gate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #1a1d25;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .premium-gate-badge:active { transform: translateY(1px); }
+  .premium-gate-badge svg { width: 14px; height: 14px; }
+
   /* App Store rule (3.1.1): in-app UI may not link to external
      payment or steer users to a web checkout. When the SPA detects
      it's running inside the native iOS wrapper, every Stripe/coach-
@@ -4943,30 +4982,35 @@
         <div class="section-title">This week</div>
         <div class="card week-bar-card">
           <div id="analytics-week-bar" class="week-bar"></div>
-          <details class="month-cal-wrap" id="month-cal-wrap">
-            <summary class="month-cal-toggle">
-              <span class="month-cal-toggle-label">View month</span>
-            </summary>
-            <div class="month-cal" id="month-cal">
-              <div class="month-cal-header">
-                <button class="month-cal-nav" id="month-cal-prev" aria-label="Previous month">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <span class="month-cal-label" id="month-cal-label">—</span>
-                <button class="month-cal-nav" id="month-cal-next" aria-label="Next month">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
+          <!-- View Month is the expandable monthly calendar. Premium —
+               the wrapper picks up the blur + overlay when the user
+               isn't a Premium subscriber. -->
+          <div class="premium-gate">
+            <details class="month-cal-wrap" id="month-cal-wrap">
+              <summary class="month-cal-toggle">
+                <span class="month-cal-toggle-label">View month</span>
+              </summary>
+              <div class="month-cal" id="month-cal">
+                <div class="month-cal-header">
+                  <button class="month-cal-nav" id="month-cal-prev" aria-label="Previous month">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span class="month-cal-label" id="month-cal-label">—</span>
+                  <button class="month-cal-nav" id="month-cal-next" aria-label="Next month">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+                <div class="month-cal-weekdays">
+                  <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+                </div>
+                <div class="month-cal-grid" id="month-cal-grid"></div>
               </div>
-              <div class="month-cal-weekdays">
-                <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-              </div>
-              <div class="month-cal-grid" id="month-cal-grid"></div>
-            </div>
-          </details>
+            </details>
+          </div>
         </div>
 
         <div class="section-title">Period</div>
-        <div class="select-wrap">
+        <div class="select-wrap premium-gate">
           <select id="analytics-period" class="field-input">
             <option value="7days">Last 7 days</option>
             <option value="14days">Last 14 days</option>
@@ -4983,16 +5027,9 @@
           <div class="analytics-sub" id="analytics-sub">No data yet</div>
         </div>
 
-        <div class="section-title">Execution streak</div>
-        <div class="card analytics-streak-card">
-          <div class="analytics-streak-num" id="analytics-streak-num" data-animate-streak="0">0</div>
-          <div class="analytics-streak-label" id="analytics-streak-label">days at 100%</div>
-        </div>
-
-        <!-- Quit-streaks section. Lists every habit the user committed
-             to walking away from at onboarding (or added since), with a
-             day-count since the streak started. Hidden when the user
-             hasn't declared anything to quit. -->
+        <!-- Quit-streaks section. Moved ABOVE Execution streak per the
+             premium-tier layout — Walking Away From + everything above
+             stays free; Execution streak + everything below is gated. -->
         <div id="quit-streaks-section" hidden>
           <div class="section-title">Walking away from</div>
           <div class="card" style="padding: 8px 0;">
@@ -5000,24 +5037,37 @@
           </div>
         </div>
 
-        <div class="section-title">By category</div>
-        <div class="card" id="analytics-categories-card">
-          <ul class="category-list" id="analytics-categories"></ul>
-        </div>
+        <!-- ════════════ Premium gate cutoff ════════════
+             Everything BELOW this comment is wrapped in a single
+             `.premium-gate` so non-Premium users see one continuous
+             blurred area with one upgrade CTA, rather than a stack
+             of individually-locked cards. -->
+        <div class="premium-gate" id="analytics-premium-section">
+          <div class="section-title">Execution streak</div>
+          <div class="card analytics-streak-card">
+            <div class="analytics-streak-num" id="analytics-streak-num" data-animate-streak="0">0</div>
+            <div class="analytics-streak-label" id="analytics-streak-label">days at 100%</div>
+          </div>
 
-        <div class="section-title">Best executed</div>
-        <div class="card">
-          <ul class="rank-list" id="analytics-best"></ul>
-        </div>
+          <div class="section-title">By category</div>
+          <div class="card" id="analytics-categories-card">
+            <ul class="category-list" id="analytics-categories"></ul>
+          </div>
 
-        <div class="section-title">Needs work</div>
-        <div class="card">
-          <ul class="rank-list" id="analytics-worst"></ul>
-        </div>
+          <div class="section-title">Best executed</div>
+          <div class="card">
+            <ul class="rank-list" id="analytics-best"></ul>
+          </div>
 
-        <div class="section-title">Longest streaks</div>
-        <div class="card">
-          <ul class="rank-list" id="analytics-streaks"></ul>
+          <div class="section-title">Needs work</div>
+          <div class="card">
+            <ul class="rank-list" id="analytics-worst"></ul>
+          </div>
+
+          <div class="section-title">Longest streaks</div>
+          <div class="card">
+            <ul class="rank-list" id="analytics-streaks"></ul>
+          </div>
         </div>
       </section>
 
@@ -5197,13 +5247,13 @@
           </div>
         </div>
 
-        <!-- Premium → Collaborator manager. Visible only for Premium users.
-             Lets the Premium user grant ONE other account (executive
-             assistant / spouse pattern) add/edit/delete access to their
-             task list. Server-side: routes/collaborators.js. -->
-        <div id="premium-collab-section" hidden>
+        <!-- Collaborator manager. Visible to everyone — but for non-
+             Premium users it renders blurred + premium-locked so they
+             see what they're missing. Premium users get the full
+             interactive section. Server-side: routes/collaborators.js. -->
+        <div id="premium-collab-section">
           <div class="section-title">Collaborator</div>
-          <div class="card">
+          <div class="card premium-gate">
             <div class="setting-row" id="collab-current-row" hidden>
               <div class="setting-copy">
                 <div class="setting-title" id="collab-current-name">—</div>
@@ -5999,6 +6049,16 @@ async function api(method, path, body) {
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
+    // 402 Payment Required → free-tier cap reached. Surface the
+    // upgrade flow centrally so every call site doesn't have to
+    // detect this individually. Banner first, then the Stripe
+    // checkout opens after a brief read-the-message beat.
+    if (res.status === 402 && data && data.error === 'free_tier_cap') {
+      try {
+        if (typeof banner === 'function') banner(msg, true, 4500);
+        if (window.Premium) setTimeout(() => Premium.openCheckout(), 800);
+      } catch {}
+    }
     throw err;
   }
   return data;
@@ -7377,39 +7437,6 @@ function renderTasksView(state) {
   const tasksTitle = document.getElementById('tasks-title');
   if (tasksTitle) tasksTitle.hidden = true;
 
-  // ─── TEMPORARY DIAGNOSTIC ───────────────────────────────────
-  // Renders a small grey strip at the top of the Tasks tab when
-  // a viewing scope is active. Shows enough state to triage the
-  // "switched view but still seeing my own tasks" report from a
-  // single screenshot. Remove once the bug is locked down.
-  try {
-    const viewingId = (window.Collab && Collab.viewingAsId && Collab.viewingAsId()) || null;
-    const acct      = (window.Collab && Collab.viewingAsAccount && Collab.viewingAsAccount()) || null;
-    const dbg = document.getElementById('collab-debug-strip');
-    if (viewingId) {
-      const sample = (state.tasks || []).slice(0, 3).map(t => (t.text || '').slice(0, 24)).join(' / ') || '(none)';
-      const html = `
-        <div style="font-size:11px;line-height:1.4;padding:8px 10px;background:#3b2410;color:#facc15;border-radius:8px;margin-bottom:10px;font-family:ui-monospace,monospace;">
-          <div><b>viewing as:</b> ${esc((acct && (acct.name || acct.email)) || viewingId)}</div>
-          <div><b>state.tasks:</b> ${state.tasks.length} · <b>today:</b> ${esc(state.today || '?')} · <b>selectedDate:</b> ${esc(selectedDateISO || '(empty)')}</div>
-          <div style="opacity:0.85;margin-top:2px;"><b>first 3:</b> ${esc(sample)}</div>
-        </div>
-      `;
-      if (dbg) dbg.innerHTML = html;
-      else {
-        const box = document.createElement('div');
-        box.id = 'collab-debug-strip';
-        box.innerHTML = html;
-        const list = document.getElementById('tasks-list');
-        if (list && list.parentNode) list.parentNode.insertBefore(box, list);
-      }
-    } else {
-      const dbg2 = document.getElementById('collab-debug-strip');
-      if (dbg2) dbg2.remove();
-    }
-  } catch {}
-  // ─── END DIAGNOSTIC ─────────────────────────────────────────
-
   const allTasks = state.tasks.filter(t => taskScheduledFor(t, dayISO));
 
   // Split into pending (or mid-animation) and done. Tasks currently
@@ -8371,6 +8398,11 @@ function render(state) {
   // Re-sync the Profile view on every render so the visible state never drifts
   // from `Auth.user`.
   renderProfile();
+  // Re-anchor every premium-gate overlay — some sections re-render
+  // their inner DOM (which would wipe a previously-injected overlay)
+  // and others may have just been added if the user upgraded
+  // mid-session. Idempotent, cheap.
+  if (window.Premium) Premium.applyGates();
 }
 
 /* ============================================================
@@ -9039,6 +9071,93 @@ function renderProfile() {
    (null = self). All task / day-state network calls funnel through
    `Collab.scopedUrl(path)` which appends ?as=… when set.
    ============================================================ */
+/* ============================================================
+   Premium module. Owns the html.is-premium-gated body class +
+   the upgrade handler that opens Stripe checkout. Sync'd with
+   Auth.user.isPremium on every auth load.
+   ============================================================ */
+window.Premium = (function setupPremium() {
+  const STRIPE_URL = 'https://buy.stripe.com/fZu28r7epbkefKv2SO77O06';
+  const FREE_QUIT_STREAK_CAP = 3;
+  const FREE_TRACKED_HABIT_CAP = 3;
+
+  function isActive() {
+    return !!(typeof Auth !== 'undefined' && Auth.user && Auth.user.isPremium);
+  }
+  function refresh() {
+    document.documentElement.classList.toggle('is-premium-gated', !isActive());
+  }
+  function openCheckout() {
+    // Anchor click is treated as a user gesture and reliably hands
+    // off to Stripe in a new tab on every browser. window.location =
+    // would also work but blocks the back-nav to the app.
+    const a = document.createElement('a');
+    a.href = STRIPE_URL;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.click();
+  }
+  // Standard overlay markup we append into any `.premium-gate` wrapper
+  // at render time. Centralized so the copy / icon stays consistent.
+  function overlayMarkup() {
+    return `
+      <div class="premium-gate-overlay">
+        <button type="button" class="premium-gate-badge" data-premium-upgrade>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 9l-5.18 4.04L17 20l-5-3.5L7 20l2.18-6.96L4 9l5.91-.74z"/></svg>
+          Premium Feature — Upgrade
+        </button>
+      </div>`;
+  }
+  // Walk every .premium-gate, mark it locked when the user isn't
+  // premium, and ensure each has an overlay child. Idempotent — safe
+  // to re-call after every render.
+  function applyGates() {
+    const gated = document.querySelectorAll('.premium-gate');
+    const active = isActive();
+    gated.forEach((el) => {
+      el.classList.toggle('locked', !active);
+      if (!el.querySelector('.premium-gate-overlay')) {
+        el.insertAdjacentHTML('beforeend', overlayMarkup());
+      }
+    });
+  }
+
+  // Cap-related affordances live here too so callers don't have to
+  // recompute them. caller passes the current count of the relevant
+  // collection; helper returns true iff the user can add another.
+  function canAddQuitStreak(currentCount) {
+    return isActive() || currentCount < FREE_QUIT_STREAK_CAP;
+  }
+  function canAddTrackedHabit(currentCount) {
+    return isActive() || currentCount < FREE_TRACKED_HABIT_CAP;
+  }
+  function quitStreakCap() { return isActive() ? Infinity : FREE_QUIT_STREAK_CAP; }
+  function trackedHabitCap() { return isActive() ? Infinity : FREE_TRACKED_HABIT_CAP; }
+
+  // Apply on auth resolve + every Store update so the gates re-anchor
+  // when the markup of analytics / profile re-renders.
+  document.addEventListener('auth:userloaded', () => { refresh(); applyGates(); });
+
+  // Click delegation for any Premium upgrade CTA.
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest && e.target.closest('[data-premium-upgrade]');
+    if (btn) { e.preventDefault(); openCheckout(); }
+  });
+
+  return {
+    isActive,
+    refresh,
+    openCheckout,
+    applyGates,
+    canAddQuitStreak,
+    canAddTrackedHabit,
+    quitStreakCap,
+    trackedHabitCap,
+    FREE_QUIT_STREAK_CAP,
+    FREE_TRACKED_HABIT_CAP,
+  };
+})();
+
 window.Collab = (function setupCollab() {
   let _state = { isPremium: false, mine: null, accessibleAccounts: [] };
   let viewingAs = null; // null → acting as self; else owner user id
@@ -9133,17 +9252,20 @@ window.Collab = (function setupCollab() {
     const nameEl     = document.getElementById('collab-current-name');
     const subEl      = document.getElementById('collab-current-sub');
     if (ownerSec) {
-      ownerSec.hidden = !_state.isPremium;
-      if (_state.isPremium) {
-        if (_state.mine) {
-          currentRow.hidden = false;
-          emptyRow.hidden = true;
-          if (nameEl) nameEl.textContent = _state.mine.name || _state.mine.email;
-          if (subEl)  subEl.textContent  = _state.mine.email + ' — full task-list access.';
-        } else {
-          currentRow.hidden = true;
-          emptyRow.hidden = false;
-        }
+      // Section is now always visible — non-Premium users see it as
+      // a blurred preview with an upgrade CTA on top (handled by the
+      // .premium-gate wrapper around the inner card). Only the
+      // contents differ based on whether they have a collaborator
+      // currently set.
+      ownerSec.hidden = false;
+      if (_state.mine) {
+        currentRow.hidden = false;
+        emptyRow.hidden = true;
+        if (nameEl) nameEl.textContent = _state.mine.name || _state.mine.email;
+        if (subEl)  subEl.textContent  = _state.mine.email + ' — full task-list access.';
+      } else {
+        currentRow.hidden = true;
+        emptyRow.hidden = false;
       }
     }
 
