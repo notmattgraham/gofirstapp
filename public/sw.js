@@ -7,11 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped from v4 → v5 to evict stale install-gate code from clients
-// that haven't had a chance to refresh since the Android beforeinstallprompt
-// support shipped. The activate handler below deletes anything not
-// matching this name on first new-SW activation.
-const CACHE = 'gofirst-v5';
+// Bumped to v6 to evict stale collaborator-switch + DM-scroll code
+// from clients that may still be on v5. The activate handler below
+// deletes anything not matching this name on first new-SW activation.
+const CACHE = 'gofirst-v6';
 const ASSETS = [
   './',
   './index.html',

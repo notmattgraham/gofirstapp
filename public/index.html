@@ -99,16 +99,25 @@
 
   .app {
     position: fixed;
-    inset: 0;
+    /* Explicit centering via translateX rather than `inset: 0` +
+       `margin: 0 auto`. The latter is supposed to work on a fixed
+       element with both left:0 and right:0 set, but Android
+       Samsung Internet + a few Chrome variants don't honor it
+       consistently — the app would render right-aligned with a
+       black void on the left. translateX(-50%) is bulletproof. */
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
     /* The viewport meta has `interactive-widget=resizes-content`, so on
        iOS 17+ / modern Chrome the layout viewport shrinks when the
-       keyboard opens. inset:0 + flex-column then reflows naturally —
-       header pinned at top, .main flexes in the middle, tabbar/dock
-       sit just above the keyboard. No JS sync needed. */
+       keyboard opens. Flex-column reflows naturally — header pinned
+       at top, .main flexes in the middle, tabbar/dock sit just above
+       the keyboard. No JS sync needed. */
     display: flex;
     flex-direction: column;
-    max-width: 480px;
-    margin: 0 auto;
     background: var(--bg);
   }
 
@@ -8963,9 +8972,13 @@ function renderProfile() {
   // lock-time picker) to re-read its value. Cheaper than each one
   // polling the auth state on its own.
   document.dispatchEvent(new CustomEvent('auth:userloaded'));
-  // Refresh collaboration UI — needs Auth.user.isPremium AND fresh
-  // server-side state (a Premium grant could've been added/revoked).
-  if (window.Collab) Collab.refresh().catch(() => {});
+  // NOTE: Collab.refresh() is NOT called from here. renderProfile fires
+  // on every Store.subscribe tick, and a fresh /api/collaborators call
+  // briefly empties _state before the response lands — long enough for
+  // the snap-back check (viewingAs set + no accessibleAccounts) to
+  // revert the active viewer back to self, which made the
+  // collaborator switch look broken. Refreshes happen on auth:userloaded
+  // and on Profile-tab visit instead — see Collab module below.
 }
 
 /* ============================================================
@@ -9201,6 +9214,19 @@ window.Collab = (function setupCollab() {
   } else {
     wireUI();
   }
+
+  // Refresh once when auth resolves (initial population of mine /
+  // accessibleAccounts) and once whenever the user opens the Profile
+  // tab (catches admin-side Premium toggling and collaborator
+  // adds/removes from the other side). Keep this AWAY from the
+  // render-on-every-Store-tick path — the temporary _state empty
+  // window during the fetch can race against the snap-back check
+  // and yank the active viewer back to self mid-switch.
+  document.addEventListener('auth:userloaded', () => { refresh().catch(() => {}); });
+  document.addEventListener('click', (e) => {
+    const tab = e.target && e.target.closest && e.target.closest('.tab[data-tab="profile"]');
+    if (tab) refresh().catch(() => {});
+  });
 
   return {
     refresh,
@@ -10316,12 +10342,39 @@ const Coaching = (() => {
     if (!seen) { seen = new Set(); _seenDmMsgIds.set(dmPeerId, seen); }
     container.classList.toggle('has-messages', msgs.length > 0);
     const me = Auth.user;
+    // Capture whether the user was reading at the bottom BEFORE we
+    // wipe and rebuild. If they had scrolled up to read history,
+    // we don't yank them back down on every incoming message — same
+    // behavior as iMessage / WhatsApp / Slack. 80px of slack so a
+    // hair off the bottom still counts as "at bottom".
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const wasAtBottom = distanceFromBottom < 80;
+
     container.innerHTML = msgs.map(m => {
       const isNew = !seen.has(m.id);
       if (isNew) seen.add(m.id);
       return buildBubble(m, me.id, isNew);
     }).join('');
-    container.scrollTop = container.scrollHeight;
+
+    if (wasAtBottom) {
+      // Snap to bottom synchronously, AND again on the next frame —
+      // some Android browsers compute scrollHeight before the freshly
+      // appended bubble's enter animation has settled, and the first
+      // scroll lands a few pixels off. The rAF retry plants us at
+      // true bottom once layout has settled.
+      container.scrollTop = container.scrollHeight;
+      requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+      // Image attachments load async — when they finally decode, they
+      // expand the bubble height and the user is no longer at bottom.
+      // Re-anchor as each image lands.
+      const imgs = container.querySelectorAll('img.msg-image');
+      imgs.forEach((img) => {
+        if (!img.complete) {
+          img.addEventListener('load',  () => { container.scrollTop = container.scrollHeight; }, { once: true });
+          img.addEventListener('error', () => { container.scrollTop = container.scrollHeight; }, { once: true });
+        }
+      });
+    }
   }
 
   async function sendDmMessage() {
@@ -11869,9 +11922,9 @@ const Coaching = (() => {
           emitTyping(isCoachPeer ? null : dmPeerId);
         }
       });
-      dmInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDmMessage(); }
-      });
+      // Enter is for newline only — sends happen exclusively via the
+      // dedicated send button so a stray Enter while composing never
+      // ships a half-written message.
     }
     if (dmSend) dmSend.addEventListener('click', sendDmMessage);
     if (dmAttach) dmAttach.addEventListener('click', () => {
@@ -11914,9 +11967,9 @@ const Coaching = (() => {
         // Notify the open client thread the coach is typing.
         if (coachInput.value.trim() && currentClientId) emitTyping(currentClientId);
       });
-      coachInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCoachMessage(); }
-      });
+      // No keydown handler — Enter is left as a plain newline so the
+      // coach never sends a message accidentally; the dedicated send
+      // button is the only commit path.
     }
     if (coachSend) coachSend.addEventListener('click', sendCoachMessage);
 
