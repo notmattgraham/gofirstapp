@@ -7,11 +7,11 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v18 — premium-locked-card margin-top dropped to 0 when
-// it directly follows a section-title (profile collaborator). The
-// 16px stays for the analytics case where there's no preceding
-// title.
-const CACHE = 'gofirst-v18';
+// Bumped to v19 — flattened the #premium-collab-section wrapper so
+// the COLLABORATOR section-title isn't accidentally :first-child of
+// a nested wrapper (which gave it only 4px top margin instead of
+// the standard 16px).
+const CACHE = 'gofirst-v19';
 const ASSETS = [
   './',
   './index.html',
