@@ -2305,6 +2305,7 @@
   /* Sign in with Apple button — Apple's branding rules require black
      pill, white text, white Apple logo, and a specific aspect ratio.
      Same physical size as the Google button so they line up. */
+  .btn-apple[hidden] { display: none !important; }
   .btn-apple {
     display: inline-flex;
     align-items: center;
@@ -5273,9 +5274,12 @@
         </svg>
         Continue with Google
       </a>
-      <!-- Sign in with Apple — App Store guideline 4.8 requires this
-           when other third-party providers are offered. -->
-      <a class="btn-apple" id="btn-apple" href="/api/auth/apple">
+      <!-- Sign in with Apple — hidden until the iOS App Store build
+           is back on the front burner. Server-side endpoint + schema
+           field still in place; just the splash button is suppressed
+           so users don't tap an unconfigured provider. Drop the
+           `hidden` attribute below to re-expose it. -->
+      <a class="btn-apple" id="btn-apple" href="/api/auth/apple" hidden>
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M19.665 15.93c-.435.998-.95 1.917-1.546 2.762-.812 1.15-1.477 1.948-1.989 2.39-.794.71-1.645 1.073-2.555 1.094-.654 0-1.443-.184-2.362-.557-.922-.371-1.77-.555-2.546-.555-.813 0-1.685.184-2.617.555-.934.373-1.687.567-2.262.586-.872.037-1.743-.336-2.612-1.123-.556-.482-1.25-1.31-2.083-2.486C.624 17.31-.027 16.005-.61 14.51c-.626-1.615-.94-3.18-.94-4.693 0-1.733.375-3.227 1.126-4.481.59-1.007 1.376-1.802 2.357-2.385.98-.584 2.04-.881 3.18-.9.694 0 1.604.215 2.737.638 1.13.424 1.855.638 2.176.638.24 0 1.046-.252 2.412-.755 1.292-.467 2.382-.66 3.276-.585 2.421.196 4.24 1.15 5.452 2.866-2.166 1.314-3.236 3.151-3.215 5.508.019 1.835.685 3.36 1.992 4.572.594.561 1.256.995 1.991 1.301-.16.464-.327.91-.508 1.34zM15.81.34c0 1.293-.473 2.499-1.414 3.616-1.137 1.328-2.51 2.094-4.001 1.972-.019-.155-.03-.318-.03-.49 0-1.241.541-2.57 1.502-3.656.479-.55 1.09-1.008 1.832-1.373.74-.359 1.44-.558 2.097-.594.02.176.03.351.03.524z"/>
         </svg>
