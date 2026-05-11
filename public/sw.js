@@ -7,10 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v10 — Premium tier rollout (gates on analytics, profile
-// collaborator, View Month, Period dropdown; free-tier caps on quit
-// streaks and tracked habits with upgrade nudges).
-const CACHE = 'gofirst-v10';
+// Bumped to v11 — Premium gate redesign (single clean upgrade card
+// replacing the noisy blur+overlay-pill stack from v10).
+const CACHE = 'gofirst-v11';
 const ASSETS = [
   './',
   './index.html',
