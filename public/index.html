@@ -5302,37 +5302,38 @@
           </div>
         </div>
 
-        <!-- Collaborator manager. Free users see a single
+        <!-- Collaborator manager. Free users see the
              .premium-locked-card upsell; Premium users see the
-             actual interactive section. -->
-        <div id="premium-collab-section">
-          <div class="section-title">Collaborator</div>
-          <div class="premium-locked-card">
-            <div class="premium-locked-card-eyebrow">
-              <svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26L20 9l-5.18 4.04L17 20l-5-3.5L7 20l2.18-6.96L4 9l5.91-.74z"/></svg>
-              Premium Feature
-            </div>
-            <div class="premium-locked-card-title">Add a collaborator to your task list.</div>
-            <div class="premium-locked-card-body">
-              Give an executive assistant, your spouse, or anyone you trust the ability to add, edit, and complete tasks on your behalf. They keep their own account.
-            </div>
-            <button type="button" class="premium-locked-card-cta" data-premium-upgrade>Upgrade to Premium</button>
+             real interactive section below it. NO outer wrapper —
+             keeping these as direct children of .view so the
+             .section-title:first-child rule (which gives 4px top
+             margin) doesn't accidentally fire on COLLABORATOR. -->
+        <div class="section-title">Collaborator</div>
+        <div class="premium-locked-card">
+          <div class="premium-locked-card-eyebrow">
+            <svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26L20 9l-5.18 4.04L17 20l-5-3.5L7 20l2.18-6.96L4 9l5.91-.74z"/></svg>
+            Premium Feature
           </div>
-          <div class="card premium-only">
-            <div class="setting-row" id="collab-current-row" hidden>
-              <div class="setting-copy">
-                <div class="setting-title" id="collab-current-name">—</div>
-                <div class="setting-sub" id="collab-current-sub">—</div>
-              </div>
-              <button class="action-btn ghost setting-btn" id="collab-remove-btn">Remove</button>
+          <div class="premium-locked-card-title">Add a collaborator to your task list.</div>
+          <div class="premium-locked-card-body">
+            Give an executive assistant, your spouse, or anyone you trust the ability to add, edit, and complete tasks on your behalf. They keep their own account.
+          </div>
+          <button type="button" class="premium-locked-card-cta" data-premium-upgrade>Upgrade to Premium</button>
+        </div>
+        <div class="card premium-only">
+          <div class="setting-row" id="collab-current-row" hidden>
+            <div class="setting-copy">
+              <div class="setting-title" id="collab-current-name">—</div>
+              <div class="setting-sub" id="collab-current-sub">—</div>
             </div>
-            <div class="setting-row" id="collab-empty-row">
-              <div class="setting-copy">
-                <div class="setting-title">No collaborator yet</div>
-                <div class="setting-sub">Invite someone (by email) who can manage your task list — add, edit, delete, mark complete. They keep their own account too.</div>
-              </div>
-              <button class="action-btn ghost setting-btn" id="collab-add-btn">Add</button>
+            <button class="action-btn ghost setting-btn" id="collab-remove-btn">Remove</button>
+          </div>
+          <div class="setting-row" id="collab-empty-row">
+            <div class="setting-copy">
+              <div class="setting-title">No collaborator yet</div>
+              <div class="setting-sub">Invite someone (by email) who can manage your task list — add, edit, delete, mark complete. They keep their own account too.</div>
             </div>
+            <button class="action-btn ghost setting-btn" id="collab-add-btn">Add</button>
           </div>
         </div>
 
@@ -9293,19 +9294,16 @@ window.Collab = (function setupCollab() {
   }
 
   function renderProfileSections() {
-    // Premium owner section
-    const ownerSec   = document.getElementById('premium-collab-section');
+    // The collaborator section's section-title + cards are now
+    // flat children of .view (no wrapper div) so the first-child
+    // 4px-top-margin rule doesn't accidentally fire. Visibility
+    // of the inner content is handled by the .premium-only /
+    // .premium-locked-card CSS classes alone — no JS toggle needed.
     const currentRow = document.getElementById('collab-current-row');
     const emptyRow   = document.getElementById('collab-empty-row');
     const nameEl     = document.getElementById('collab-current-name');
     const subEl      = document.getElementById('collab-current-sub');
-    if (ownerSec) {
-      // Section is now always visible — non-Premium users see it as
-      // a blurred preview with an upgrade CTA on top (handled by the
-      // .premium-gate wrapper around the inner card). Only the
-      // contents differ based on whether they have a collaborator
-      // currently set.
-      ownerSec.hidden = false;
+    if (currentRow && emptyRow) {
       if (_state.mine) {
         currentRow.hidden = false;
         emptyRow.hidden = true;
