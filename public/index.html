@@ -3565,8 +3565,42 @@
 
   /* Variant gating — show only the matching content + arrow. */
   .install-prompt .install-content { display: none; }
-  .install-prompt[data-variant="chrome"] .install-content-chrome { display: contents; }
-  .install-prompt[data-variant="safari"] .install-content-safari { display: contents; }
+  .install-prompt[data-variant="chrome"]  .install-content-chrome  { display: contents; }
+  .install-prompt[data-variant="safari"]  .install-content-safari  { display: contents; }
+  .install-prompt[data-variant="android"] .install-content-android { display: contents; }
+
+  /* Android install button — primary CTA replacing the step-by-step
+     instructions when the browser exposes beforeinstallprompt. The
+     fallback instructions sit underneath and are revealed only if
+     the prompt isn't available (or the user dismissed the native
+     dialog). */
+  .install-android-action[hidden],
+  .install-android-fallback[hidden] { display: none; }
+  .install-btn {
+    appearance: none;
+    width: 100%;
+    min-height: 56px;
+    padding: 16px 28px;
+    border: none;
+    border-radius: 14px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  .install-btn:active { transform: translateY(1px); opacity: 0.95; }
+  .install-android-fallback-eyebrow {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-align: center;
+    margin-top: 6px;
+  }
 
 
   /* ── Commitment onboarding ───────────────────────────────────
@@ -5654,6 +5688,28 @@
             <div class="install-step-body">Open GoFirst from your home screen — not from Chrome.</div>
           </div>
         </div>
+        <!-- Android variant: real Install button via beforeinstallprompt,
+             with fallback step-by-step instructions if that event hasn't
+             fired (or the user dismissed the native dialog). -->
+        <div class="install-content install-content-android">
+          <div class="install-android-action" id="install-android-action" hidden>
+            <button type="button" class="install-btn" id="install-btn">Install GoFirst</button>
+          </div>
+          <div class="install-android-fallback" id="install-android-fallback">
+            <div class="install-step">
+              <div class="install-step-num">1</div>
+              <div class="install-step-body">Tap the <b>⋮</b> menu in the top-right corner of your browser.</div>
+            </div>
+            <div class="install-step">
+              <div class="install-step-num">2</div>
+              <div class="install-step-body">Tap <b>Install app</b> or <b>Add to Home screen</b>.</div>
+            </div>
+            <div class="install-step">
+              <div class="install-step-num">3</div>
+              <div class="install-step-body">Open GoFirst from your home screen — not from your browser.</div>
+            </div>
+          </div>
+        </div>
         <!-- Safari variant: ••• menu at the bottom-right of the URL bar -->
         <div class="install-content install-content-safari">
           <div class="install-step">
@@ -5749,27 +5805,54 @@
 })();
 
 /* ============================================================
-   iOS install gate — runs first, before any other JS work.
-   On iOS, web push + a real PWA experience only happen once the user
-   has added the app to their home screen. So when we detect we're
-   running in an iOS browser tab (NOT a standalone PWA), we hard-block
-   with browser-specific install instructions:
-     iOS Chrome / Firefox / Edge / etc → top-right share-icon arrow
-     iOS Safari                        → bottom-toolbar share-icon arrow
-   Once the user adds it to their home screen and reopens, display-mode
-   is "standalone" (or navigator.standalone === true on legacy iOS) and
-   this gate is skipped entirely.
+   beforeinstallprompt capture — must register BEFORE any other
+   work, because Chromium fires this event very early in the page
+   lifecycle and there's no way to retrieve it later. We stash it
+   in a global so the install-gate UI below can wire it up to a
+   real Install button. Android Chrome / Edge and desktop Chrome /
+   Edge / Brave all fire this event when PWA criteria are met
+   (manifest, service worker, HTTPS, icons). iOS Safari does not.
    ============================================================ */
-(function iosInstallGate() {
-  const ua = navigator.userAgent || '';
-  const isIos = /iPhone|iPad|iPod/.test(ua) || (
-    // iPadOS reports as Mac in modern Safari but exposes touch.
-    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-  );
-  if (!isIos) return;
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // If the install gate is already showing the Android variant, swap
+  // from fallback instructions to the real button now.
+  const action   = document.getElementById('install-android-action');
+  const fallback = document.getElementById('install-android-fallback');
+  if (action)   action.hidden = false;
+  if (fallback) fallback.hidden = true;
+});
+window.addEventListener('appinstalled', () => {
+  _deferredInstallPrompt = null;
+  // Hide the gate and re-enable scrolling — the user's about to
+  // open the freshly installed PWA from their home screen, but if
+  // they happen to come back to this browser tab in the meantime,
+  // it shouldn't keep blocking them.
+  const root = document.getElementById('install-prompt');
+  if (root) root.hidden = true;
+  document.body.style.overflow = '';
+});
 
-  // Inside the App Store native wrapper — already "installed", skip
-  // the home-screen prompt entirely.
+/* ============================================================
+   Install gate — hard-blocks mobile users until they add GoFirst
+   to their home screen. Skipped entirely on:
+     - the App Store native wrapper (window.__GoFirstNative)
+     - any standalone PWA (display-mode: standalone OR legacy
+       navigator.standalone === true)
+     - desktop browsers (no platform-aware install flow needed)
+   Three mobile variants:
+     iOS Safari                          → manual share-icon steps
+     iOS Chrome / Firefox / Edge / etc.  → manual share-icon steps
+     Android Chrome / Edge / Brave / etc → real Install button
+       (powered by the captured beforeinstallprompt event), with
+       fallback step instructions if that event never fires.
+   ============================================================ */
+(function installGate() {
+  const ua = navigator.userAgent || '';
+
+  // Inside the App Store native wrapper — already "installed".
   if (window.__GoFirstNative) return;
 
   const isStandalone =
@@ -5777,19 +5860,66 @@
     navigator.standalone === true;
   if (isStandalone) return;
 
-  // Distinguish Safari from the alt-browser-on-iOS family. iOS Safari
-  // adds no special UA marker, so absence of the alt-browser tokens
-  // IS Safari. We bucket every alt browser into the "chrome" variant
-  // because they all surface their share affordance in the upper bar,
-  // not the bottom toolbar.
-  const isAlt = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|Yandex|UCBrowser/.test(ua);
-  const variant = isAlt ? 'chrome' : 'safari';
+  const isIos = /iPhone|iPad|iPod/.test(ua) || (
+    // iPadOS reports as Mac in modern Safari but exposes touch.
+    navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+  );
+  const isAndroid = /Android/.test(ua);
+
+  if (!isIos && !isAndroid) return; // desktop / unknown — let through
+
+  let variant;
+  if (isIos) {
+    // Distinguish Safari from the alt-browser-on-iOS family. iOS Safari
+    // adds no special UA marker, so absence of the alt-browser tokens
+    // IS Safari. We bucket every alt browser into the "chrome" variant
+    // because they all surface their share affordance in the upper bar,
+    // not the bottom toolbar.
+    const isAlt = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|Yandex|UCBrowser/.test(ua);
+    variant = isAlt ? 'chrome' : 'safari';
+  } else {
+    variant = 'android';
+  }
 
   const root = document.getElementById('install-prompt');
   if (!root) return;
   root.dataset.variant = variant;
   root.hidden = false;
   document.body.style.overflow = 'hidden';
+
+  // Android: wire the Install button to the captured beforeinstallprompt
+  // event. If the event was already captured before this code ran (via
+  // the document-start listener above), un-hide the action row now;
+  // otherwise it'll un-hide itself when the event fires later. Either
+  // way the fallback instructions are visible until the button works.
+  if (variant === 'android') {
+    const action   = document.getElementById('install-android-action');
+    const fallback = document.getElementById('install-android-fallback');
+    if (action && _deferredInstallPrompt) { action.hidden = false; if (fallback) fallback.hidden = true; }
+
+    const btn = document.getElementById('install-btn');
+    if (btn) btn.addEventListener('click', async () => {
+      if (!_deferredInstallPrompt) return;
+      try {
+        _deferredInstallPrompt.prompt();
+        const { outcome } = await _deferredInstallPrompt.userChoice;
+        // Single-shot: regardless of outcome, the event can't be re-used.
+        _deferredInstallPrompt = null;
+        if (outcome === 'accepted') {
+          // appinstalled handler above will hide the gate.
+        } else {
+          // User dismissed — fall back to manual instructions so they
+          // can still try via the browser menu.
+          if (action)   action.hidden = true;
+          if (fallback) fallback.hidden = false;
+        }
+      } catch (err) {
+        console.warn('[install] prompt failed', err);
+        if (action)   action.hidden = true;
+        if (fallback) fallback.hidden = false;
+      }
+    });
+  }
 })();
 
 /* ============================================================
