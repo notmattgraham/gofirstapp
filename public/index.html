@@ -280,21 +280,20 @@
      never shifts the first content line up or down. */
   .view > :first-child { margin-top: 4px !important; }
 
+  /* Section-title vertical rhythm. Top margin of 16px matches the
+     visible header→first-section gap (12px view padding + 4px
+     first-child margin = 16px) so every box-bottom → next-label-top
+     gap reads as identical regardless of where the section sits in
+     the scroll. */
   .section-title {
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--text-dim);
-    margin: 18px 6px 8px;
+    margin: 16px 6px 8px;
   }
   .section-title:first-child { margin-top: 4px; }
-  /* Analytics tab uses wider top spacing on every section so the
-     pure-whitespace gap above each label matches the 38px gap above
-     the Premium card. Targeted here (not global) so Profile / Tasks
-     stay compact. */
-  #view-analytics .section-title { margin-top: 38px; }
-  #view-analytics .section-title:first-child { margin-top: 4px; }
 
   /* Date navigation bar */
   .date-nav {
@@ -2810,19 +2809,17 @@
   html.is-premium-gated .hide-when-free { display: none !important; }
 
   /* Premium upsell card — sized to match the visual weight of a
-     standard content card. Compact padding + minimal gap so it
-     doesn't dominate the page above the tab bar.
-     margin-top matches the vertical contribution of a section-title
-     elsewhere on the page (18 top + ~12 height + 8 bottom ≈ 38),
-     so every card-to-card gap on the analytics tab reads as equal
-     whether or not there's a title between them. */
+     standard content card. margin-top matches the section-title's
+     16px top margin so the gap above this card reads as the same
+     pure-whitespace amount that sits above every other label on
+     the page. */
   .premium-locked-card {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 16px 16px 14px;
-    margin-top: 38px;
+    margin-top: 16px;
     border-radius: var(--radius);
     background: linear-gradient(160deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.04));
     border: 1px solid rgba(250, 204, 21, 0.25);
