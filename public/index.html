@@ -2805,13 +2805,18 @@
 
   /* Premium upsell card — sized to match the visual weight of a
      standard content card. Compact padding + minimal gap so it
-     doesn't dominate the page above the tab bar. */
+     doesn't dominate the page above the tab bar.
+     margin-top matches the vertical contribution of a section-title
+     elsewhere on the page (18 top + ~12 height + 8 bottom ≈ 38),
+     so every card-to-card gap on the analytics tab reads as equal
+     whether or not there's a title between them. */
   .premium-locked-card {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
     padding: 16px 16px 14px;
+    margin-top: 38px;
     border-radius: var(--radius);
     background: linear-gradient(160deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.04));
     border: 1px solid rgba(250, 204, 21, 0.25);
