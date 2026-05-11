@@ -289,6 +289,12 @@
     margin: 18px 6px 8px;
   }
   .section-title:first-child { margin-top: 4px; }
+  /* Analytics tab uses wider top spacing on every section so the
+     pure-whitespace gap above each label matches the 38px gap above
+     the Premium card. Targeted here (not global) so Profile / Tasks
+     stay compact. */
+  #view-analytics .section-title { margin-top: 38px; }
+  #view-analytics .section-title:first-child { margin-top: 4px; }
 
   /* Date navigation bar */
   .date-nav {
