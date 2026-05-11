@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v12 — Premium card sizing fix (compact density to match
-// the visual weight of standard content cards).
-const CACHE = 'gofirst-v12';
+// Bumped to v13 — Premium card vertical spacing fix (38px top margin
+// so the card-to-card rhythm matches sections that have a title).
+const CACHE = 'gofirst-v13';
 const ASSETS = [
   './',
   './index.html',
