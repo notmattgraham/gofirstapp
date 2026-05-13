@@ -488,8 +488,18 @@
     justify-content: space-between;
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
   }
   .quit-streak-list li:last-child { border-bottom: none; }
+  .quit-streak-list li:active { background: var(--surface-2); }
+  .quit-streak-chev {
+    flex-shrink: 0;
+    margin-left: 10px;
+    color: var(--text-dim);
+    display: inline-flex;
+  }
+  .quit-streak-chev svg { width: 16px; height: 16px; }
   .quit-streak-name {
     font-size: 15px;
     font-weight: 600;
@@ -5075,9 +5085,11 @@
         </div>
 
         <!-- Quit-streaks section. Free + Premium both see it; the
-             3-streak cap on free users is enforced server-side. -->
+             3-streak cap on free users is enforced server-side.
+             Each row is tappable → opens the edit sheet (rename /
+             "I slipped up" reset / delete with confirm). -->
         <div id="quit-streaks-section" hidden>
-          <div class="section-title">Walking away from</div>
+          <div class="section-title">Quitting</div>
           <div class="card" style="padding: 8px 0;">
             <ul class="quit-streak-list" id="quit-streaks-list"></ul>
           </div>
@@ -8245,43 +8257,126 @@ function renderQuitStreaks(state) {
     .map(s => ({ ...s, days: daysSinceLocal(s.startAt, today) }))
     .sort((a, b) => b.days - a.days) // longest first
     .map(s => `
-      <li>
+      <li data-quit-edit="${esc(s.id)}"
+          data-quit-name="${esc(s.name || '')}"
+          data-quit-start="${esc(s.startAt || '')}">
         <div class="quit-streak-name">${esc(s.name || '—')}</div>
         <div class="quit-streak-days">
           <div class="num">${s.days}</div>
           <div class="label">${s.days === 1 ? 'day' : 'days'}</div>
         </div>
-        <button type="button" class="quit-streak-reset"
-                data-quit-reset="${esc(s.id)}"
-                data-quit-name="${esc(s.name || 'this streak')}">
-          Reset
-        </button>
+        <span class="quit-streak-chev" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </span>
       </li>
     `).join('');
 }
 
-// Reset-streak click handler. Confirms, then PATCHes startAt to now
-// so the day count rolls back to 0. Optimistically updates Store so
-// the change reflects immediately, then refreshes from the server.
-document.addEventListener('click', async (e) => {
-  const btn = e.target.closest('[data-quit-reset]');
-  if (!btn) return;
-  const id = btn.dataset.quitReset;
-  const name = btn.dataset.quitName || 'this streak';
-  if (!confirm(`Reset ${name}? The day count goes back to 0.`)) return;
-  btn.disabled = true;
-  try {
-    await api('PATCH', `/api/streaks/${encodeURIComponent(id)}`, {
-      startAt: new Date().toISOString(),
-    });
-    if (typeof Store !== 'undefined' && Store.load) await Store.load();
-  } catch (err) {
-    console.warn('[quit-reset] failed', err);
-    alert('Could not reset streak. Try again.');
-  } finally {
-    btn.disabled = false;
-  }
+// Tap any quit-streak row → open the edit sheet (rename, "I slipped
+// up" to reset the day count, or delete the commitment with a
+// secondary confirm). Replaces the old inline Reset button.
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('[data-quit-edit]');
+  if (!row) return;
+  openQuitEditSheet({
+    id:      row.dataset.quitEdit,
+    name:    row.dataset.quitName || '',
+    startAt: row.dataset.quitStart || '',
+  });
 });
+
+function openQuitEditSheet(streak) {
+  const el = document.createElement('div');
+  el.className = 'confirm-overlay';
+  el.innerHTML = `
+    <div class="confirm-sheet">
+      <div class="confirm-title">Edit habit</div>
+      <input type="text" id="quit-edit-name" class="feedback-textarea"
+             style="min-height:auto;height:46px;font-size:15px;font-weight:500;"
+             value="${esc(streak.name)}" maxlength="80" />
+      <div class="confirm-actions">
+        <button class="confirm-btn primary" data-choice="save">Save</button>
+        <button class="confirm-btn" data-choice="slipped">I slipped up</button>
+        <button class="confirm-btn danger" data-choice="delete">Delete habit</button>
+        <button class="confirm-btn muted" data-choice="cancel">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const input = el.querySelector('#quit-edit-name');
+  setTimeout(() => { try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } catch {} }, 50);
+
+  function close() { if (el.parentNode) document.body.removeChild(el); }
+  async function patchStreak(payload, errMsg) {
+    try {
+      await api('PATCH', `/api/streaks/${encodeURIComponent(streak.id)}`, payload);
+      if (typeof Store !== 'undefined' && Store.load) await Store.load();
+      close();
+    } catch (err) {
+      console.warn('[quit-edit] failed', err);
+      alert(errMsg);
+    }
+  }
+
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-choice]');
+    const choice = btn ? btn.dataset.choice : (e.target === el ? 'cancel' : null);
+    if (choice === null) return;
+    if (choice === 'cancel') { close(); return; }
+    if (choice === 'save') {
+      const next = (input.value || '').trim().slice(0, 80);
+      if (!next) { input.focus(); return; }
+      if (next === streak.name) { close(); return; }
+      await patchStreak({ name: next }, 'Could not save. Try again.');
+      return;
+    }
+    if (choice === 'slipped') {
+      // Reset the day counter to 0 by stamping startAt to now.
+      await patchStreak({ startAt: new Date().toISOString() }, 'Could not reset. Try again.');
+      return;
+    }
+    if (choice === 'delete') {
+      close();
+      openQuitDeleteConfirm(streak);
+      return;
+    }
+  });
+}
+
+// Two-step delete — the wording is intentionally weighty so a stray
+// tap doesn't undo a meaningful commitment.
+function openQuitDeleteConfirm(streak) {
+  const el = document.createElement('div');
+  el.className = 'confirm-overlay';
+  el.innerHTML = `
+    <div class="confirm-sheet">
+      <div class="confirm-title">Are you sure?</div>
+      <div class="confirm-msg" style="white-space:normal;line-height:1.45;">
+        Deleting "${esc(streak.name || 'this habit')}" means you're giving up on this commitment.
+      </div>
+      <div class="confirm-actions">
+        <button class="confirm-btn primary" data-choice="keep">No — Keep going</button>
+        <button class="confirm-btn danger" data-choice="confirm">Yes — I'm giving up</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  function close() { if (el.parentNode) document.body.removeChild(el); }
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-choice]');
+    const choice = btn ? btn.dataset.choice : (e.target === el ? 'keep' : null);
+    if (choice === null) return;
+    if (choice === 'keep') { close(); return; }
+    if (choice === 'confirm') {
+      try {
+        await api('DELETE', `/api/streaks/${encodeURIComponent(streak.id)}`);
+        if (typeof Store !== 'undefined' && Store.load) await Store.load();
+        close();
+      } catch (err) {
+        console.warn('[quit-delete] failed', err);
+        alert('Could not delete. Try again.');
+      }
+    }
+  });
+}
 
 function renderAnalyticsView(state) {
   // Off-tab? Skip entirely. We don't want to update the snapshot or fire
@@ -13144,7 +13239,7 @@ window.Onboarding = (() => {
       <div class="onb-eyebrow">Step 4 of 4</div>
       <h1 class="onb-h1">Your commitment.</h1>
       <div class="onb-summary-section">
-        <div class="onb-summary-label">Walking away from</div>
+        <div class="onb-summary-label">Quitting</div>
         ${habitsHtml}
       </div>
       <div class="onb-summary-section">

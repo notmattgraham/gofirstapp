@@ -7,11 +7,10 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v19 — flattened the #premium-collab-section wrapper so
-// the COLLABORATOR section-title isn't accidentally :first-child of
-// a nested wrapper (which gave it only 4px top margin instead of
-// the standard 16px).
-const CACHE = 'gofirst-v19';
+// Bumped to v20 — rename Walking Away From → Quitting + editable
+// quit-streak rows with edit sheet ("I slipped up" reset, weighty
+// two-step delete confirm).
+const CACHE = 'gofirst-v20';
 const ASSETS = [
   './',
   './index.html',
