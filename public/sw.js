@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v24 — left-align the Quitting Add button under the
-// section title (was centered).
-const CACHE = 'gofirst-v24';
+// Bumped to v25 — extra 10px below the Quitting Add button so the
+// next section doesn't crowd it.
+const CACHE = 'gofirst-v25';
 const ASSETS = [
   './',
   './index.html',
