@@ -184,8 +184,8 @@ function shape(u) {
     // DB flag is the source of truth. Set via /dev role picker.
     isCoach: !!u.isCoach,
     isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
-    // Stackable attribute — Premium users can grant a collaborator
-    // task-list access (executive-assistant pattern). Toggled in /dev.
+    // Stackable attribute — gates analytics depth, unlimited tracked
+    // habits, unlimited quit streaks. Toggled in /dev.
     isPremium: !!u.isPremium,
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,

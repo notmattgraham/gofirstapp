@@ -60,12 +60,6 @@ function countTaskOnDay(t, dayISO, todayISO) {
   if (t.recurrence.endsBefore && dayISO >= t.recurrence.endsBefore) return { scheduled: 0, completed: 0 };
   const cd = t.completedDates || [];
   if (cd.includes('skip:' + dayISO)) return { scheduled: 0, completed: 0 };
-  if (t.recurrence.type === 'monthly') {
-    const startDay = parseInt((t.startedAt || '').slice(8, 10), 10);
-    const dayPart  = parseInt(dayISO.slice(8, 10), 10);
-    if (!Number.isFinite(startDay) || startDay !== dayPart) return { scheduled: 0, completed: 0 };
-    return { scheduled: 1, completed: cd.includes(dayISO) ? 1 : 0 };
-  }
   const days = t.recurrence.daysOfWeek || [];
   if (!days.length) return { scheduled: 0, completed: 0 };
   const [y, m, d] = dayISO.split('-').map(Number);

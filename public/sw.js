@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v25 — extra 10px below the Quitting Add button so the
-// next section doesn't crowd it.
-const CACHE = 'gofirst-v25';
+// Bumped to v26 — trimmed Collaborator, Notes, App Tour, Monthly
+// recurrence; flipped Coach Upsell trigger to success-based.
+const CACHE = 'gofirst-v26';
 const ASSETS = [
   './',
   './index.html',

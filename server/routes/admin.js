@@ -204,26 +204,17 @@ router.get('/users', wrap(async (_req, res) => {
 }));
 
 // PATCH /api/admin/users/:id/premium — toggle the Premium attribute
-// (stackable — orthogonal to the User/Client/Coach/Admin role). When
-// turned OFF, also clears any existing Collaboration grant the user
-// owns, since a non-Premium user can't have a collaborator.
+// (stackable — orthogonal to the User/Client/Coach/Admin role).
 router.patch('/users/:id/premium', wrap(async (req, res) => {
   const { isPremium } = req.body || {};
   if (typeof isPremium !== 'boolean') {
     return res.status(400).json({ error: 'isPremium_required' });
   }
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      const u = await tx.user.update({
-        where: { id: req.params.id },
-        data: { isPremium },
-        select: { id: true, email: true, name: true, isPremium: true },
-      });
-      if (!isPremium) {
-        // Cascade: revoke their outstanding collaborator grant.
-        await tx.collaboration.deleteMany({ where: { premiumUserId: u.id } });
-      }
-      return u;
+    const updated = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { isPremium },
+      select: { id: true, email: true, name: true, isPremium: true },
     });
     res.json({ user: updated });
   } catch (e) {

@@ -89,7 +89,6 @@ app.use('/api/friends', require('./routes/friends'));
 app.use('/api/push', require('./routes/push'));
 app.use('/api/days', require('./routes/days'));
 app.use('/api/feedback', require('./routes/feedback'));
-app.use('/api/collaborators', require('./routes/collaborators'));
 
 // Static assets — the SPA lives in /public.
 const publicDir = path.join(__dirname, '..', 'public');
