@@ -548,6 +548,24 @@
     color: var(--danger);
     border-color: var(--danger);
   }
+  /* "+ Add another" row at the bottom of the Quitting list. Styled
+     as a separate row so the list visually stays uniform — same
+     padding as a habit row, accent color for the label, border-top
+     to separate it from the habits above. */
+  .quit-streak-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .quit-streak-list li.quit-streak-add:first-child { border-top: none; }
+  .quit-streak-add:active { background: var(--surface-2); }
 
   /* ── Day-mode banner ───────────────────────────────────────────
      Sits at the top of the Tasks tab and tells the user what they
@@ -8287,14 +8305,12 @@ function renderQuitStreaks(state) {
   // The QuitStreak rows have no `type` field — the model is dedicated to
   // quit-tracking. Filter defensively in case legacy rows ever show up.
   const quits = (state.streaks || []).filter(s => !s.type || s.type === 'quit');
-  if (!quits.length) {
-    sec.hidden = true;
-    list.innerHTML = '';
-    return;
-  }
+  // Always show the section — even when the user has no quit-habits
+  // yet, they need the "+ Add" affordance to get started without
+  // having to replay the onboarding ritual.
   sec.hidden = false;
   const today = state.today || todayISO();
-  list.innerHTML = quits
+  const rowsHtml = quits
     .map(s => ({ ...s, days: daysSinceLocal(s.startAt, today) }))
     .sort((a, b) => b.days - a.days) // longest first
     .map(s => `
@@ -8311,20 +8327,86 @@ function renderQuitStreaks(state) {
         </span>
       </li>
     `).join('');
+  const addLabel = quits.length === 0 ? '+ Add something to quit' : '+ Add another';
+  const addRow = `<li class="quit-streak-add" data-quit-add>${addLabel}</li>`;
+  list.innerHTML = rowsHtml + addRow;
 }
 
-// Tap any quit-streak row → open the edit sheet (rename, "I slipped
-// up" to reset the day count, or delete the commitment with a
-// secondary confirm). Replaces the old inline Reset button.
+// Tap any quit-streak row → open the edit sheet. Tap the trailing
+// "+ Add another" row → open the add sheet (or Stripe checkout if
+// the free user has hit the 3-streak cap).
 document.addEventListener('click', (e) => {
-  const row = e.target.closest('[data-quit-edit]');
-  if (!row) return;
-  openQuitEditSheet({
-    id:      row.dataset.quitEdit,
-    name:    row.dataset.quitName || '',
-    startAt: row.dataset.quitStart || '',
-  });
+  const editRow = e.target.closest('[data-quit-edit]');
+  if (editRow) {
+    openQuitEditSheet({
+      id:      editRow.dataset.quitEdit,
+      name:    editRow.dataset.quitName || '',
+      startAt: editRow.dataset.quitStart || '',
+    });
+    return;
+  }
+  const addRow = e.target.closest('[data-quit-add]');
+  if (addRow) {
+    const state = (typeof Store !== 'undefined') ? Store.get() : { streaks: [] };
+    const count = (state.streaks || []).filter(s => !s.type || s.type === 'quit').length;
+    if (window.Premium && !Premium.canAddQuitStreak(count)) {
+      // Free user at cap → upsell instead of opening the form.
+      Premium.openCheckout();
+      return;
+    }
+    openQuitAddSheet();
+  }
 });
+
+function openQuitAddSheet() {
+  const el = document.createElement('div');
+  el.className = 'confirm-overlay';
+  el.innerHTML = `
+    <div class="confirm-sheet">
+      <div class="confirm-title">What are you quitting?</div>
+      <input type="text" id="quit-add-name" class="feedback-textarea"
+             style="min-height:auto;height:46px;font-size:15px;font-weight:500;"
+             placeholder='e.g. "Energy drinks"' maxlength="80" />
+      <div class="confirm-actions">
+        <button class="confirm-btn primary" data-choice="save" disabled>Start the streak</button>
+        <button class="confirm-btn muted" data-choice="cancel">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  const input   = el.querySelector('#quit-add-name');
+  const saveBtn = el.querySelector('[data-choice="save"]');
+  setTimeout(() => { try { input.focus(); } catch {} }, 50);
+  input.addEventListener('input', () => { saveBtn.disabled = !input.value.trim(); });
+
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-choice]');
+    const choice = btn ? btn.dataset.choice : (e.target === el ? 'cancel' : null);
+    if (choice === null) return;
+    if (choice === 'cancel') { closeOverlayAnimated(el); return; }
+    if (choice === 'save') {
+      const name = (input.value || '').trim().slice(0, 80);
+      if (!name) { input.focus(); return; }
+      saveBtn.disabled = true;
+      try {
+        await api('POST', '/api/streaks', { name });
+        if (typeof Store !== 'undefined' && Store.load) await Store.load();
+        closeOverlayAnimated(el);
+      } catch (err) {
+        // Server-side cap (a client cache + server-truth mismatch
+        // could let a free user squeak through the client check at
+        // exactly cap). Hand off to Stripe in that case.
+        if (err && (err.status === 402 || /free_tier_cap/.test(err.message || ''))) {
+          closeOverlayAnimated(el, true);
+          if (window.Premium) Premium.openCheckout();
+          return;
+        }
+        console.warn('[quit-add] failed', err);
+        saveBtn.disabled = false;
+        alert('Could not save. Try again.');
+      }
+    }
+  });
+}
 
 // Animation-aware close — adds .closing to the overlay so the
 // reverse keyframes run, then removes the node after the longer of

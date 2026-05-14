@@ -7,13 +7,11 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v21 — slide-up animation on the Quitting edit sheet
-// + centered zoom-in popup variant for the delete confirm. All
-// .confirm-overlay sheets app-wide get the open animation
-// automatically; close animation kicks in when callers add
-// the `.closing` class (Quitting flow does this via the new
-// closeOverlayAnimated helper).
-const CACHE = 'gofirst-v21';
+// Bumped to v22 — "+ Add another" row on the Quitting list with
+// add sheet flow. Section is now always visible (no longer hidden
+// when empty) so the user has an entry point for their first
+// habit-to-quit outside of onboarding.
+const CACHE = 'gofirst-v22';
 const ASSETS = [
   './',
   './index.html',
