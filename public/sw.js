@@ -7,11 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v22 — "+ Add another" row on the Quitting list with
-// add sheet flow. Section is now always visible (no longer hidden
-// when empty) so the user has an entry point for their first
-// habit-to-quit outside of onboarding.
-const CACHE = 'gofirst-v22';
+// Bumped to v23 — "+ Add another" is now a small ghost button
+// below the Quitting card, not a row inside the list.
+const CACHE = 'gofirst-v23';
 const ASSETS = [
   './',
   './index.html',
