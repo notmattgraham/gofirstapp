@@ -548,24 +548,28 @@
     color: var(--danger);
     border-color: var(--danger);
   }
-  /* "+ Add another" row at the bottom of the Quitting list. Styled
-     as a separate row so the list visually stays uniform — same
-     padding as a habit row, accent color for the label, border-top
-     to separate it from the habits above. */
-  .quit-streak-add {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px 16px;
-    border-top: 1px solid var(--border);
-    cursor: pointer;
+  /* "+ Add another" button — sits below the Quitting card as its
+     own element rather than inside the list. Small ghost button,
+     centered, accent text. Doesn't compete with the actual habit
+     rows for visual weight. */
+  .quit-streak-add-btn {
+    display: block;
+    margin: 10px auto 0;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: transparent;
     color: var(--accent);
-    font-size: 14px;
+    font: inherit;
+    font-size: 13px;
     font-weight: 600;
-    transition: background 0.15s;
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
   }
-  .quit-streak-list li.quit-streak-add:first-child { border-top: none; }
-  .quit-streak-add:active { background: var(--surface-2); }
+  .quit-streak-add-btn:hover { border-color: var(--accent); }
+  .quit-streak-add-btn:active { background: var(--surface-2); }
 
   /* ── Day-mode banner ───────────────────────────────────────────
      Sits at the top of the Tasks tab and tells the user what they
@@ -5146,12 +5150,15 @@
         <!-- Quit-streaks section. Free + Premium both see it; the
              3-streak cap on free users is enforced server-side.
              Each row is tappable → opens the edit sheet (rename /
-             "I slipped up" reset / delete with confirm). -->
+             "I slipped up" reset / delete with confirm). The Add
+             button lives BELOW the card, not inside the list, so
+             it reads as a discrete action rather than another row. -->
         <div id="quit-streaks-section" hidden>
           <div class="section-title">Quitting</div>
           <div class="card" style="padding: 8px 0;">
             <ul class="quit-streak-list" id="quit-streaks-list"></ul>
           </div>
+          <button type="button" class="quit-streak-add-btn" id="quit-streak-add-btn" data-quit-add>+ Add another</button>
         </div>
 
         <!-- ════════════ Premium cutoff ════════════
@@ -8301,6 +8308,8 @@ function daysSinceLocal(startISO, todayISO) {
 function renderQuitStreaks(state) {
   const sec  = document.getElementById('quit-streaks-section');
   const list = document.getElementById('quit-streaks-list');
+  const card = sec ? sec.querySelector('.card') : null;
+  const addBtn = document.getElementById('quit-streak-add-btn');
   if (!sec || !list) return;
   // The QuitStreak rows have no `type` field — the model is dedicated to
   // quit-tracking. Filter defensively in case legacy rows ever show up.
@@ -8309,8 +8318,12 @@ function renderQuitStreaks(state) {
   // yet, they need the "+ Add" affordance to get started without
   // having to replay the onboarding ritual.
   sec.hidden = false;
+  // Hide the card itself when the list is empty (the Add button is
+  // enough to convey "tap to start"). Avoids an empty bordered card.
+  if (card) card.hidden = quits.length === 0;
+  if (addBtn) addBtn.textContent = quits.length === 0 ? '+ Add something to quit' : '+ Add another';
   const today = state.today || todayISO();
-  const rowsHtml = quits
+  list.innerHTML = quits
     .map(s => ({ ...s, days: daysSinceLocal(s.startAt, today) }))
     .sort((a, b) => b.days - a.days) // longest first
     .map(s => `
@@ -8327,9 +8340,6 @@ function renderQuitStreaks(state) {
         </span>
       </li>
     `).join('');
-  const addLabel = quits.length === 0 ? '+ Add something to quit' : '+ Add another';
-  const addRow = `<li class="quit-streak-add" data-quit-add>${addLabel}</li>`;
-  list.innerHTML = rowsHtml + addRow;
 }
 
 // Tap any quit-streak row → open the edit sheet. Tap the trailing
