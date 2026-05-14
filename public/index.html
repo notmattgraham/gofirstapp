@@ -550,11 +550,12 @@
   }
   /* "+ Add another" button — sits below the Quitting card as its
      own element rather than inside the list. Small ghost button,
-     centered, accent text. Doesn't compete with the actual habit
-     rows for visual weight. */
+     left-aligned with 6px left margin so it sits flush under the
+     section title (.section-title uses `margin: 16px 6px 8px`,
+     so 6px is the title's left inset). */
   .quit-streak-add-btn {
-    display: block;
-    margin: 10px auto 0;
+    display: inline-block;
+    margin: 10px 6px 0;
     appearance: none;
     border: 1px solid var(--border);
     background: transparent;
