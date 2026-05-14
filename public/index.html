@@ -552,10 +552,14 @@
      own element rather than inside the list. Small ghost button,
      left-aligned with 6px left margin so it sits flush under the
      section title (.section-title uses `margin: 16px 6px 8px`,
-     so 6px is the title's left inset). */
+     so 6px is the title's left inset). Extra 10px bottom margin
+     so the next section's title doesn't feel cramped against the
+     small button — buttons read with less visual weight than a
+     card, and the standard 16px section-title gap looked tight
+     directly beneath one. */
   .quit-streak-add-btn {
     display: inline-block;
-    margin: 10px 6px 0;
+    margin: 10px 6px 10px;
     appearance: none;
     border: 1px solid var(--border);
     background: transparent;
