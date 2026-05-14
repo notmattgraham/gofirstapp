@@ -1150,7 +1150,11 @@
     border-top: 1px solid var(--border);
   }
 
-  /* Recurring-delete confirmation sheet */
+  /* Recurring-delete confirmation sheet + reused for the Quitting
+     edit / Share Feedback / etc. Open animation: backdrop fades in,
+     sheet slides up from the bottom. Close animation: when the
+     overlay carries the `.closing` class, both run in reverse and
+     callers should remove the DOM node after ~250ms. */
   .confirm-overlay {
     position: fixed;
     inset: 0;
@@ -1158,6 +1162,43 @@
     background: rgba(0, 0, 0, 0.55);
     display: flex;
     align-items: flex-end;
+    animation: confirmOverlayIn 0.18s ease-out;
+  }
+  .confirm-overlay.closing { animation: confirmOverlayOut 0.18s ease-in forwards; pointer-events: none; }
+  .confirm-sheet { animation: confirmSheetIn 0.28s cubic-bezier(0.22, 0.9, 0.28, 1); }
+  .confirm-overlay.closing .confirm-sheet { animation: confirmSheetOut 0.22s cubic-bezier(0.4, 0, 0.6, 1) forwards; }
+
+  /* Center-popup variant for "weighty" confirmations (Quitting
+     delete) — zooms in from 90% scale rather than sliding from
+     the bottom. Triggered by adding `.center` to the overlay and
+     using a `.confirm-popup` child instead of `.confirm-sheet`. */
+  .confirm-overlay.center {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .confirm-popup {
+    width: 100%;
+    max-width: 340px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px 22px 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    animation: confirmPopupIn 0.22s cubic-bezier(0.32, 1.55, 0.5, 1);
+  }
+  .confirm-overlay.closing .confirm-popup { animation: confirmPopupOut 0.16s ease-in forwards; }
+
+  @keyframes confirmOverlayIn  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes confirmOverlayOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes confirmSheetIn    { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes confirmSheetOut   { from { transform: translateY(0); } to { transform: translateY(100%); } }
+  @keyframes confirmPopupIn    { from { opacity: 0; transform: scale(0.88); } to { opacity: 1; transform: scale(1); } }
+  @keyframes confirmPopupOut   { from { opacity: 1; transform: scale(1); }   to { opacity: 0; transform: scale(0.9); } }
+  @media (prefers-reduced-motion: reduce) {
+    .confirm-overlay, .confirm-sheet, .confirm-popup,
+    .confirm-overlay.closing, .confirm-overlay.closing .confirm-sheet,
+    .confirm-overlay.closing .confirm-popup { animation: none !important; }
   }
 
   /* Profile-picture crop modal — drag to pan, pinch (or wheel) to zoom. */
@@ -8285,6 +8326,24 @@ document.addEventListener('click', (e) => {
   });
 });
 
+// Animation-aware close — adds .closing to the overlay so the
+// reverse keyframes run, then removes the node after the longer of
+// the two animations (~250ms). When `instant` is true (e.g. when
+// chaining straight into another modal so the user perceives a
+// hand-off rather than a sequential close-then-open), skips the
+// outro entirely.
+function closeOverlayAnimated(el, instant) {
+  if (!el || !el.parentNode) return Promise.resolve();
+  if (instant) { el.remove(); return Promise.resolve(); }
+  el.classList.add('closing');
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      if (el.parentNode) el.remove();
+      resolve();
+    }, 260);
+  });
+}
+
 function openQuitEditSheet(streak) {
   const el = document.createElement('div');
   el.className = 'confirm-overlay';
@@ -8305,12 +8364,11 @@ function openQuitEditSheet(streak) {
   const input = el.querySelector('#quit-edit-name');
   setTimeout(() => { try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } catch {} }, 50);
 
-  function close() { if (el.parentNode) document.body.removeChild(el); }
   async function patchStreak(payload, errMsg) {
     try {
       await api('PATCH', `/api/streaks/${encodeURIComponent(streak.id)}`, payload);
       if (typeof Store !== 'undefined' && Store.load) await Store.load();
-      close();
+      closeOverlayAnimated(el);
     } catch (err) {
       console.warn('[quit-edit] failed', err);
       alert(errMsg);
@@ -8321,11 +8379,11 @@ function openQuitEditSheet(streak) {
     const btn = e.target.closest('[data-choice]');
     const choice = btn ? btn.dataset.choice : (e.target === el ? 'cancel' : null);
     if (choice === null) return;
-    if (choice === 'cancel') { close(); return; }
+    if (choice === 'cancel') { closeOverlayAnimated(el); return; }
     if (choice === 'save') {
       const next = (input.value || '').trim().slice(0, 80);
       if (!next) { input.focus(); return; }
-      if (next === streak.name) { close(); return; }
+      if (next === streak.name) { closeOverlayAnimated(el); return; }
       await patchStreak({ name: next }, 'Could not save. Try again.');
       return;
     }
@@ -8335,20 +8393,23 @@ function openQuitEditSheet(streak) {
       return;
     }
     if (choice === 'delete') {
-      close();
+      // Hand off to the delete confirm. Close the edit sheet
+      // instantly (no slide-down) so the centered popup feels like
+      // a direct continuation, not two separate animations stacked.
+      closeOverlayAnimated(el, true);
       openQuitDeleteConfirm(streak);
       return;
     }
   });
 }
 
-// Two-step delete — the wording is intentionally weighty so a stray
-// tap doesn't undo a meaningful commitment.
+// Centered-popup confirm — weightier than a bottom sheet, signals
+// that this is a meaningful commitment. Zooms in from 88% scale.
 function openQuitDeleteConfirm(streak) {
   const el = document.createElement('div');
-  el.className = 'confirm-overlay';
+  el.className = 'confirm-overlay center';
   el.innerHTML = `
-    <div class="confirm-sheet">
+    <div class="confirm-popup">
       <div class="confirm-title">Are you sure?</div>
       <div class="confirm-msg" style="white-space:normal;line-height:1.45;">
         Deleting "${esc(streak.name || 'this habit')}" means you're giving up on this commitment.
@@ -8359,17 +8420,16 @@ function openQuitDeleteConfirm(streak) {
       </div>
     </div>`;
   document.body.appendChild(el);
-  function close() { if (el.parentNode) document.body.removeChild(el); }
   el.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-choice]');
     const choice = btn ? btn.dataset.choice : (e.target === el ? 'keep' : null);
     if (choice === null) return;
-    if (choice === 'keep') { close(); return; }
+    if (choice === 'keep') { closeOverlayAnimated(el); return; }
     if (choice === 'confirm') {
       try {
         await api('DELETE', `/api/streaks/${encodeURIComponent(streak.id)}`);
         if (typeof Store !== 'undefined' && Store.load) await Store.load();
-        close();
+        closeOverlayAnimated(el);
       } catch (err) {
         console.warn('[quit-delete] failed', err);
         alert('Could not delete. Try again.');
