@@ -7,9 +7,8 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v26 — trimmed Collaborator, Notes, App Tour, Monthly
-// recurrence; flipped Coach Upsell trigger to success-based.
-const CACHE = 'gofirst-v26';
+// Bumped to v27 — Profile now exposes Dev dashboard link for admins/coaches.
+const CACHE = 'gofirst-v27';
 const ASSETS = [
   './',
   './index.html',

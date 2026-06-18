@@ -5351,6 +5351,21 @@
           </div>
         </div>
 
+        <!-- Admin/Coach entry point. Hidden by default; renderProfile()
+             unhides for users with isAdmin or isCoach. -->
+        <div id="profile-admin-section" hidden>
+          <div class="section-title">Admin</div>
+          <div class="card">
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">Dev dashboard</div>
+                <div class="setting-sub">Manage users, roles, premium, overrides.</div>
+              </div>
+              <a class="action-btn setting-btn" href="/dev" id="profile-dev-link">Open</a>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Session</div>
         <div class="card">
           <div class="setting-row">
@@ -9095,6 +9110,8 @@ function renderProfile() {
       ? u.location
       : 'Where you live — others can find you by searching their area.';
   }
+  const adminSection = document.getElementById('profile-admin-section');
+  if (adminSection) adminSection.hidden = !(u && (u.isAdmin || u.isCoach));
   // Notify any setting-row IIFE that depends on Auth.user (e.g. the
   // lock-time picker) to re-read its value. Cheaper than each one
   // polling the auth state on its own.
