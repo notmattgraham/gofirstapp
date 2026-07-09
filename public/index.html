@@ -460,21 +460,6 @@
   }
   .cal-today-btn:active { opacity: 0.7; }
 
-  /* Lock state banner */
-  .lock-banner {
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    margin-bottom: 12px;
-    font-size: 13px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .lock-banner[hidden] { display: none; }
-
   /* Quit-streak rows on the Analytics tab. Each shows the habit name
      + days since the user committed to walking away from it. */
   .quit-streak-list {
@@ -576,98 +561,6 @@
   .quit-streak-add-btn:hover { border-color: var(--accent); }
   .quit-streak-add-btn:active { background: var(--surface-2); }
 
-  /* ── Day-mode banner ───────────────────────────────────────────
-     Sits at the top of the Tasks tab and tells the user what they
-     should be doing right now. Different copy per mode is set in
-     JS — see DayState.applyToTodoView. */
-  .mode-banner {
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    margin-bottom: 12px;
-  }
-
-  .mode-banner[hidden] { display: none; }
-  .mode-banner-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.3;
-  }
-  .mode-banner-sub {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-top: 4px;
-    line-height: 1.45;
-  }
-
-  /* Commit button — bottom of the planning task list. Locks today
-     (or tomorrow, depending on mode) when tapped. */
-  .commit-row {
-    margin: 18px 0 24px;
-    display: flex;
-    justify-content: center;
-  }
-  .commit-row[hidden] { display: none; }
-  .commit-btn {
-    appearance: none;
-    border: 0;
-    font: inherit;
-    font-size: 16px;
-    font-weight: 800;
-    height: 52px;
-    padding: 0 36px;
-    border-radius: 999px;
-    background: var(--text);
-    color: var(--bg);
-    cursor: pointer;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    transition: box-shadow 0.2s ease, transform 0.08s ease;
-  }
-  .commit-btn:active { transform: scale(0.98); }
-  .commit-btn:disabled { opacity: 0.5; cursor: default; }
-
-  /* "You crushed today" full-screen waiting state. Replaces the task
-     list when mode === 'tomorrow-committed'. */
-  .crushed-card {
-    margin: 36px 0;
-    padding: 28px 22px;
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    text-align: center;
-  }
-  .crushed-card[hidden] { display: none; }
-  .crushed-eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.10em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-  }
-  .crushed-title {
-    font-size: clamp(22px, 6vw, 28px);
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    color: var(--text);
-    line-height: 1.25;
-    margin: 0 0 14px;
-  }
-  .crushed-sub {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 18px;
-  }
-  .crushed-countdown {
-    font-size: 36px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-
   /* "X tasks left" / green-glow states for the top New-Task button. */
   .top-action-disabled {
     opacity: 0.55;
@@ -689,7 +582,6 @@
   }
   .badge .icon { vertical-align: -2px; margin-right: 3px; }
   .row-meta .icon { vertical-align: -2px; margin-right: 3px; }
-  .lock-banner .icon { color: currentColor; }
 
   /* Missed-task row variant */
   .row-missed {
@@ -4016,46 +3908,6 @@
     animation: none !important;
   }
 
-  /* Lock-time picker on onboarding step 1. Each preset is a stacked
-     label/sub button; the active one gets the accent ring. The custom
-     branch reveals an HH:MM <input type="time"> below the grid. */
-  .onb-lock-presets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .onb-lock-preset {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    border-radius: 14px;
-    padding: 14px 14px;
-    text-align: left;
-    cursor: pointer;
-    font: inherit;
-    transition: border-color 0.15s ease, background 0.15s ease;
-  }
-  .onb-lock-preset:hover { border-color: var(--text-dim); }
-  .onb-lock-preset.active {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-  .onb-lock-preset-label {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .onb-lock-preset-sub {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-top: 2px;
-  }
-  .onb-lock-input {
-    /* Stretches under the preset grid when Custom is selected. */
-    margin-top: 8px;
-  }
-
   /* ── Commit ceremony ─────────────────────────────────────────
      Plays for ~2.4s after a successful commit, then the page
      reloads into the user's fresh task list. The pop + check-draw
@@ -4874,25 +4726,7 @@
       <div class="view-slider" id="view-slider">
       <!-- To Do List view -->
       <section id="view-todo" class="view">
-        <!-- Mode banner. Driven by DayState.applyToTodoView() — copy
-             changes per mode (planning today / today incomplete /
-             planning tomorrow / tomorrow committed). -->
-        <div class="mode-banner" id="mode-banner" hidden>
-          <div class="mode-banner-title" id="mode-banner-title"></div>
-          <div class="mode-banner-sub" id="mode-banner-sub"></div>
-        </div>
-
-        <!-- "You crushed today" waiting state. Replaces the entire task
-             list when mode is tomorrow-committed; the countdown ticks
-             down to the user's next lockTime. -->
-        <div class="crushed-card" id="crushed-card" hidden>
-          <div class="crushed-eyebrow">Day complete</div>
-          <h2 class="crushed-title">You crushed today.</h2>
-          <p class="crushed-sub">You can begin your next tasks in:</p>
-          <div class="crushed-countdown" id="crushed-countdown">—</div>
-        </div>
-
-        <div class="date-nav" id="date-nav" hidden>
+        <div class="date-nav" id="date-nav">
           <button class="date-nav-arrow" id="date-prev" aria-label="Previous day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <button class="date-nav-label" id="date-label-btn" aria-label="Open calendar">
             <span class="date-nav-day-text" id="date-nav-day">Today</span>
@@ -4930,8 +4764,6 @@
             </select>
           </div>
         </div>
-        <div class="lock-banner" id="lock-banner" hidden></div>
-
         <div class="stat-strip" id="stat-strip" hidden>
           <div class="stat-ring" id="stat-ring"
                style="background: conic-gradient(var(--accent) 0deg, var(--surface-2) 0deg);">
@@ -4973,11 +4805,6 @@
           <ul class="list completed-list" id="completed-list"></ul>
         </details>
 
-        <!-- Commit button — only visible in planning modes. Locks the
-             current planning day's list when tapped. -->
-        <div class="commit-row" id="commit-row" hidden>
-          <button type="button" class="commit-btn" id="commit-btn">Commit</button>
-        </div>
       </section>
 
       <!-- Streaks view (retired — habits/streaks now live on the Tasks view) -->
@@ -5255,26 +5082,6 @@
           </div>
         </div>
 
-        <div class="section-title">Day end</div>
-        <div class="card">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <div class="setting-title">Tasks lock at</div>
-              <div class="setting-sub" id="lock-time-sub">You have until this time each day to finish the tasks you committed to.</div>
-            </div>
-            <input type="time" id="profile-lock-time" class="field-input setting-select" style="height:32px;font-size:13px;padding:0 8px;width:auto;" />
-          </div>
-        </div>
-
-        <!-- Overrides hidden — replaced by the day-commit lifecycle.
-             Markup kept (hidden) so the renderOverrides() handler doesn't
-             throw on missing nodes. -->
-        <div hidden>
-          <div class="setting-title" id="override-title"></div>
-          <div class="setting-sub" id="override-sub"></div>
-          <button id="use-override"></button>
-        </div>
-
         <div class="section-title">Missed tasks</div>
         <div class="card" id="missed-card">
           <ul class="list" id="missed-list"></ul>
@@ -5359,7 +5166,7 @@
             <div class="setting-row">
               <div class="setting-copy">
                 <div class="setting-title">Dev dashboard</div>
-                <div class="setting-sub">Manage users, roles, premium, overrides.</div>
+                <div class="setting-sub">Manage users, roles, and premium.</div>
               </div>
               <a class="action-btn setting-btn" href="/dev" id="profile-dev-link">Open</a>
             </div>
@@ -6114,35 +5921,11 @@ const Auth = {
 function pad(n) { return String(n).padStart(2, '0'); }
 function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 
-// Parse a "HH:MM" lockTime into minutes-since-midnight. Defensive against
-// missing / malformed input — anything we can't parse falls back to 0
-// (equivalent to "lock at midnight", which is the original behaviour).
-function lockMinutes() {
-  const raw = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
-  const m = String(raw).match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return 0;
-  const h  = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
-  const mm = Math.max(0, Math.min(59, parseInt(m[2], 10) || 0));
-  return h * 60 + mm;
-}
-
-// "Today" respects the user's lockTime — see server/time.js for the
-// full rationale. lockTime is a DEADLINE; the day's name is the
-// calendar date of its deadline.
-//   lockMin > 720 (evening): today = end-date. Shift forward by
-//      (1440 - lockMin) min, then back 1ms to dodge the midnight flip.
-//   lockMin <= 720 (morning/midnight): today = start-date. Shift back
-//      by lockMin minutes.
-function _refOffsetMs() {
-  const lockMin = lockMinutes();
-  if (lockMin > 720) return (1440 - lockMin) * 60_000 - 1;
-  return -(lockMin * 60_000);
-}
 function todayISO() {
-  return toISO(new Date(Date.now() + _refOffsetMs()));
+  return toISO(new Date());
 }
 function todayDow() {
-  return new Date(Date.now() + _refOffsetMs()).getDay();
+  return new Date().getDay();
 }
 function addDaysISO(iso, n) {
   const d = new Date(iso + 'T00:00:00');
@@ -6243,17 +6026,15 @@ const Store = (() => {
     tasks: [],
     streaks: [],
     missed: [],
-    overrides: { used: 0, remaining: 3, active: false },
     today: todayISO(),
     tomorrow: addDaysISO(todayISO(), 1),
     todayComplete: true, // if there are no tasks, today is vacuously complete
-    overrideActive: false,
   };
   const listeners = new Set();
   const emit = () => listeners.forEach(fn => fn(state));
 
   async function load() {
-    const [t, s, m, o] = await Promise.all([
+    const [t, s, m] = await Promise.all([
       api('GET', '/api/tasks'),
       api('GET', '/api/streaks'),
       // Timeout-guarded fetch so a hanging /missed query never stalls load()
@@ -6264,41 +6045,26 @@ const Store = (() => {
           .then(r => r.json()).then(d => { clearTimeout(timer); resolve(d); })
           .catch(() => { clearTimeout(timer); resolve({ missed: [] }); });
       }),
-      api('GET', '/api/overrides').catch(() => ({ overrides: state.overrides })),
     ]);
     state = {
       ...state,
       tasks: (t && t.tasks) || [],
       streaks: (s && s.streaks) || [],
       missed: (m && m.missed) || [],
-      overrides: (o && o.overrides) || state.overrides,
       today: (t && t.today) || todayISO(),
       tomorrow: (t && t.tomorrow) || addDaysISO(todayISO(), 1),
       todayComplete: !!(t && t.todayComplete),
-      overrideActive: !!(t && t.overrideActive),
     };
     emit();
-    // Task data just refreshed — pull the day-state machine alongside
-    // so the mode banner / Commit button / countdown reflect the new
-    // counts (e.g. user just completed today's last task, mode flips
-    // to planning-tomorrow).
-    //
-    // Deferred by 250ms so the check-mark / list-row animations from
-    // the just-completed mutation get to finish before any DayState-
-    // driven re-render interrupts them. Without this the user sees
-    // the check animation skip mid-frame.
-    if (window.DayState) setTimeout(() => DayState.refresh(), 250);
     // Persist a snapshot so the next boot can render instantly from cache
     // while fresh data loads in the background.
     try {
       localStorage.setItem('gofirst:ui-cache', JSON.stringify({
         tasks: state.tasks,
         streaks: state.streaks,
-        overrides: state.overrides,
         today: state.today,
         tomorrow: state.tomorrow,
         todayComplete: state.todayComplete,
-        overrideActive: state.overrideActive,
         ts: Date.now(),
       }));
     } catch {}
@@ -6409,11 +6175,9 @@ const Store = (() => {
         ...state,
         tasks: Array.isArray(cached.tasks) ? cached.tasks : state.tasks,
         streaks: Array.isArray(cached.streaks) ? cached.streaks : state.streaks,
-        overrides: cached.overrides || state.overrides,
         today: cached.today || state.today,
         tomorrow: cached.tomorrow || state.tomorrow,
         todayComplete: !!cached.todayComplete,
-        overrideActive: !!cached.overrideActive,
       };
     },
 
@@ -6554,22 +6318,6 @@ const Store = (() => {
       );
     },
 
-    // Overrides + missed-task carry-over.
-    async useOverride() {
-      let overrides;
-      try {
-        const result = await api('POST', '/api/overrides/use');
-        overrides = result.overrides;
-      } catch (e) {
-        return { ok: false, error: e && e.message };
-      }
-      // Server confirmed; commit locally before attempting a refresh so a
-      // transient load failure doesn't roll back the visible override state.
-      state = { ...state, overrides, overrideActive: !!overrides.active };
-      emit();
-      await safeLoad();
-      return { ok: true };
-    },
     async retryMissed(id) {
       try {
         await api('POST', `/api/tasks/missed/${id}/retry`);
@@ -6844,23 +6592,8 @@ function setTopAction() {
   }
   els.topAction.hidden = false;
   els.topAction.classList.remove('top-action-disabled', 'top-action-glow');
-  // Mode-aware label / disabled / glow. Falls back to the original
-  // "+ New task" / "Close" toggle when DayState hasn't loaded yet.
-  const mode = (window.DayState && DayState.current && DayState.current.mode) || null;
   const dockOpen = !els.dockWrap.classList.contains('closed');
-  if (dockOpen) { els.topAction.textContent = 'Close'; return; }
-  if (mode === 'today-incomplete') {
-    const left = (DayState.current && DayState.current.todayRemaining) || 0;
-    els.topAction.textContent = `${left} task${left === 1 ? '' : 's'} left`;
-    els.topAction.classList.add('top-action-disabled');
-  } else if (mode === 'tomorrow-committed') {
-    els.topAction.hidden = true;
-  } else if (mode === 'planning-tomorrow') {
-    els.topAction.textContent = '+ New task';
-    els.topAction.classList.add('top-action-glow');
-  } else {
-    els.topAction.textContent = '+ New task';
-  }
+  els.topAction.textContent = dockOpen ? 'Close' : '+ New task';
 }
 
 // Dock open/close helpers — toggle the `closed` class so the transition runs.
@@ -6901,7 +6634,7 @@ function setTab(name) {
 
 /* ---- Task-check animation ----
    Two parallel sets track the per-task animation state so re-renders
-   triggered by background syncs (Store.load, DayState.refresh) during
+   triggered by background syncs (Store.load) during
    the animation window don't destroy the in-progress animation:
      _poppingTasks  — the check-button is mid-pop (0–220 ms)
      _exitingTasks  — the row is mid-slide-out (220–720 ms)
@@ -7040,9 +6773,6 @@ let selectedDateISO = '';
 // Calendar view state
 let calViewYear = 0, calViewMonth = 0;
 
-// Day-lock is suspended — always editable.
-function canEditDay() { return true; }
-
 // Offset an ISO date string by N days
 function offsetDate(iso, days) {
   const d = new Date(iso + 'T00:00:00');
@@ -7136,55 +6866,6 @@ function taskScheduledFor(t, dayISO) {
 function isTaskDoneOn(t, dayISO) {
   if (!t.recurrence) return t.done;
   return (t.completedDates || []).includes(dayISO);
-}
-
-function renderDayToggle(state) {
-  const tomorrowEnabled = canEditDay(state, 'tomorrow') || state.tasks.some(t => taskScheduledFor(t, state.tomorrow));
-  const todayBtn = document.querySelector('.day-chip[data-day="today"]');
-  const tomorrowBtn = document.querySelector('.day-chip[data-day="tomorrow"]');
-  if (todayBtn) todayBtn.classList.toggle('selected', selectedDay === 'today');
-  if (tomorrowBtn) {
-    tomorrowBtn.classList.toggle('selected', selectedDay === 'tomorrow');
-    tomorrowBtn.disabled = !tomorrowEnabled;
-  }
-}
-
-function renderLockBanner(state) {
-  const banner = document.getElementById('lock-banner');
-  if (!banner) return;
-  // Day-lock suspended \u2014 banner hidden until locking is re-enabled.
-  banner.hidden = true;
-  if (false) {
-  let icon = lockIcon, msg = '';
-  if (selectedDay === 'today') {
-    if (state.overrideActive) {
-      icon = unlockIcon;
-      msg = 'Override active \u2014 today is editable until midnight.';
-    } else {
-      const todayTaskCount = state.tasks.filter(t =>
-        taskScheduledFor(t, state.today)
-      ).length;
-      icon = lockIcon;
-      msg = todayTaskCount > 0
-        ? 'Today is locked. Complete all tasks to unlock tomorrow.'
-        : 'Today is locked. Start planning for tomorrow.';
-    }
-  } else {
-    if (state.todayComplete) {
-      icon = checkIcon;
-      msg = 'Today is complete. Plan tomorrow \u2014 list locks at midnight.';
-    } else {
-      const incomplete = state.tasks.filter(t =>
-        taskScheduledFor(t, state.today) && !isTaskDoneOn(t, state.today)
-      ).length;
-      const word = incomplete === 1 ? 'task' : 'tasks';
-      icon = lockIcon;
-      msg = `Finish today\u2019s ${incomplete} unchecked ${word} before planning tomorrow.`;
-    }
-  }
-  banner.innerHTML = `${icon}<span>${msg}</span>`;
-  banner.hidden = false;
-  } // end if (false) \u2014 lock banner disabled
 }
 
 // ---- View mode state ('category' | 'recent' | 'chronological' | 'custom') ----
@@ -7366,7 +7047,6 @@ function renderViewModeBar() {
 function renderTasksView(state) {
   if (!selectedDateISO) selectedDateISO = state.today;
   renderDateNav(state);
-  renderLockBanner(state);
   renderViewModeBar();
 
   const dayISO = selectedDateISO;
@@ -8475,7 +8155,6 @@ function render(state) {
   renderTasksView(state);
   renderStreaksView(state);
   renderAnalyticsView(state);
-  renderOverrides(state);
   renderMissed(state);
   // Re-sync the Profile view on every render so the visible state never drifts
   // from `Auth.user`.
@@ -8545,20 +8224,6 @@ document.getElementById('cal-grid').addEventListener('click', (e) => {
   selectedDateISO = cell.dataset.iso;
   closeCalendar();
   render(Store.get());
-});
-
-// --- Use Override button on Profile ---
-document.getElementById('use-override').addEventListener('click', async () => {
-  const r = await Store.useOverride();
-  if (!r.ok) {
-    if (r.error === 'paywall') {
-      banner('Out of free overrides — $4.99 IAP coming soon.', true, 4000);
-    } else {
-      banner('Could not use override', true);
-    }
-    return;
-  }
-  banner('Override active — today is editable.');
 });
 
 // --- Missed-list click delegation (retry button) ---
@@ -9188,30 +8853,6 @@ window.Premium = (function setupPremium() {
   };
 })();
 
-function renderOverrides(state) {
-  const ov = state.overrides || { used: 0, remaining: 3, active: false };
-  const title = document.getElementById('override-title');
-  const sub = document.getElementById('override-sub');
-  const btn = document.getElementById('use-override');
-  if (!title || !btn) return;
-  if (ov.active) {
-    title.textContent = 'Override active until midnight';
-    sub.textContent = `${ov.remaining} free overrides remaining this month.`;
-    btn.textContent = 'Active';
-    btn.disabled = true;
-  } else if (ov.remaining > 0) {
-    title.textContent = `${ov.remaining} override${ov.remaining === 1 ? '' : 's'} left this month`;
-    sub.textContent = 'Use one to unlock today\u2019s list when you missed planning the night before.';
-    btn.textContent = 'Use';
-    btn.disabled = false;
-  } else {
-    title.textContent = 'Out of free overrides this month';
-    sub.textContent = 'Additional overrides are $4.99 each (in-app purchase coming soon).';
-    btn.textContent = '$4.99';
-    btn.disabled = false;
-  }
-}
-
 function renderMissed(state) {
   const list = document.getElementById('missed-list');
   const empty = document.getElementById('missed-empty');
@@ -9339,82 +8980,6 @@ function openFeedbackSheet() {
   });
 }
 document.getElementById('feedback-btn').addEventListener('click', openFeedbackSheet);
-
-// Profile → Day-end lock time. Initial value is seeded from Auth.user
-// once it's populated; PATCHes /api/auth/me on change. Page is NOT
-// reloaded — the SPA's todayISO already reads Auth.user.lockTime
-// directly, so the new boundary takes effect immediately.
-(function wireLockTimeSetting() {
-  const input = document.getElementById('profile-lock-time');
-  const sub   = document.getElementById('lock-time-sub');
-  if (!input) return;
-  function fmt(s) {
-    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return '12:00 AM';
-    let h = parseInt(m[1], 10);
-    const mm = m[2];
-    const period = h >= 12 ? 'PM' : 'AM';
-    h = h % 12; if (h === 0) h = 12;
-    return `${h}:${mm} ${period}`;
-  }
-  // Format an ISO timestamp as a short countdown ("4 days") or
-  // calendar date ("May 23") depending on how far out it is.
-  function fmtAvailable(nextISO) {
-    if (!nextISO) return null;
-    const next = new Date(nextISO);
-    const ms = next.getTime() - Date.now();
-    if (ms <= 0) return null;
-    const days = Math.ceil(ms / 86_400_000);
-    if (days <= 1) {
-      const hrs = Math.ceil(ms / 3_600_000);
-      return `${hrs} hour${hrs === 1 ? '' : 's'}`;
-    }
-    return `${days} day${days === 1 ? '' : 's'}`;
-  }
-  function refresh() {
-    const t = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
-    input.value = t;
-    const nextISO = Auth && Auth.user && Auth.user.nextLockChangeAt;
-    const available = fmtAvailable(nextISO);
-    if (available) {
-      // Within the 14-day cooldown window — block the input and show
-      // when it can change again.
-      input.disabled = true;
-      if (sub) sub.textContent = `Locked at ${fmt(t)}. Available to change in ${available}.`;
-    } else {
-      input.disabled = false;
-      if (sub) sub.textContent = `Currently ${fmt(t)}. After you change it, you can't change it again for 14 days.`;
-    }
-  }
-  // Initial render — wait until Auth resolves. boot() calls renderProfile
-  // after auth, so a microtask delay is enough; otherwise refresh manually.
-  refresh();
-  document.addEventListener('auth:userloaded', refresh);
-  input.addEventListener('change', async () => {
-    const v = input.value;
-    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(v)) return;
-    try {
-      const r = await fetch('/api/auth/me', {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lockTime: v }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (r.status === 429 && data && data.error === 'lock_time_cooldown') {
-        const available = fmtAvailable(data.nextChangeAt);
-        alert(`You can only change this once every 14 days. Available again in ${available || 'a bit'}.`);
-        // Sync the auth shape so the UI reflects the locked state.
-        if (Auth && Auth.user) Auth.user.nextLockChangeAt = data.nextChangeAt;
-        refresh();
-        return;
-      }
-      if (!r.ok) throw new Error(data && data.error || `status_${r.status}`);
-      if (data && data.user) Auth.user = data.user;
-      refresh();
-    } catch (e) { console.warn('[lock-time] save failed', e); }
-  });
-})();
 
 /* ============================================================
    Push notifications — Profile toggle.
@@ -12134,11 +11699,6 @@ async function boot() {
   // start out unchecked even when notifyMessages/Friends/System are true.
   if (window.PushNotifications) PushNotifications.refreshState();
 
-  // Pull the day-state machine immediately so the Tasks tab shows the
-  // right mode (planning / today-incomplete / etc.) on first paint.
-  // Subsequent refreshes are triggered by Store.load on task changes.
-  if (window.DayState) DayState.refresh();
-
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
   try {
@@ -12242,239 +11802,6 @@ document.querySelectorAll('details').forEach(smoothDetails);
    it's plain prose by design (Option A from the design discussion).
    ============================================================ */
 
-/* ============================================================
-   DayState — the Tasks tab's state machine.
-   Pulls /api/days/state on boot and after every task mutation, then
-   drives:
-     - mode-banner copy (planning/today-incomplete/planning-tomorrow/...)
-     - the New Task button (label / disabled / glow)
-     - the Commit button at the bottom of the planning list
-     - the "You crushed today" countdown card
-     - which date the task list is rendering (today vs tomorrow)
-   ============================================================ */
-window.DayState = (() => {
-  let current = null;          // last response from /api/days/state
-  let countdownTimer = null;   // setInterval handle for crushed-card
-
-  async function refresh() {
-    try {
-      const r = await fetch('/api/days/state', { credentials: 'same-origin' });
-      if (!r.ok) return null;
-      current = await r.json();
-      apply();
-      return current;
-    } catch (e) {
-      console.warn('[day-state] fetch failed', e);
-      return null;
-    }
-  }
-
-  // Force-render whatever's currently in `current` to the DOM.
-  function apply() {
-    if (!current) return;
-    const banner       = document.getElementById('mode-banner');
-    const bannerTitle  = document.getElementById('mode-banner-title');
-    const bannerSub    = document.getElementById('mode-banner-sub');
-    const crushed      = document.getElementById('crushed-card');
-    const commitRow    = document.getElementById('commit-row');
-    const commitBtn    = document.getElementById('commit-btn');
-    const dateNav      = document.getElementById('date-nav');
-    const tasksList    = document.getElementById('tasks-list');
-    const tasksEmpty   = document.getElementById('tasks-empty');
-    const completedSec = document.getElementById('completed-section');
-
-    // Format an ISO date as "Sat, May 9" — used in the sub line so the
-    // user can always see which calendar date the system thinks they're
-    // looking at. This was added after a confused-day-rollover report
-    // ("it's May 10 but the app says May 9 with 10 tasks left"); making
-    // the date visible removes the guesswork.
-    const fmtBannerDate = (iso) => {
-      try {
-        const d = new Date(iso + 'T00:00:00');
-        return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-      } catch { return iso; }
-    };
-
-    // Mode-specific copy + visibility.
-    let title = '', sub = '', commitLabel = '';
-    let showCrushed = false, showCommit = false, showList = true;
-    switch (current.mode) {
-      case 'planning-today':
-        title = `Plan today — ${fmtBannerDate(current.today)}.`;
-        sub   = 'Add the things you\'re committing to today, then tap Commit.';
-        commitLabel = 'Commit today';
-        showCommit = (current.todayCount > 0);
-        break;
-      case 'today-incomplete':
-        // No banner — the "X tasks left" pill in the header already
-        // tells the user how much is left, so this would just be
-        // duplicate noise at the top of the list.
-        title = '';
-        sub   = '';
-        showCommit = false;
-        break;
-      case 'planning-tomorrow':
-        title = 'You crushed today.';
-        sub   = `Plan tomorrow (${fmtBannerDate(current.tomorrow)}) and commit.`;
-        commitLabel = 'Commit tomorrow';
-        showCommit = (current.tomorrowCount > 0);
-        break;
-      case 'tomorrow-committed':
-        showCrushed = true;
-        showList = false;
-        showCommit = false;
-        break;
-    }
-
-    if (banner)      banner.hidden = !title && !sub;
-    if (bannerTitle) bannerTitle.textContent = title;
-    if (bannerSub)   bannerSub.textContent   = sub;
-    if (crushed)     crushed.hidden = !showCrushed;
-    if (commitBtn)   commitBtn.textContent = 'Commit';
-    if (commitRow)   commitRow.hidden = !showCommit;
-
-    // Date navigator is permanently hidden — the whole point of the
-    // commit lifecycle is "focus on what's in front of you, no
-    // wandering around past or future days."
-    if (dateNav)      dateNav.hidden    = true;
-    if (tasksList)    tasksList.hidden  = !showList;
-    if (completedSec) completedSec.style.display = showList ? '' : 'none';
-    if (tasksEmpty && !showList) tasksEmpty.hidden = true;
-
-    // Make sure the Tasks tab is rendering the RIGHT day. In planning-
-    // tomorrow mode we shift to tomorrow; everywhere else, today. The
-    // SPA tracks the visible date in `selectedDateISO`; setting it +
-    // re-rendering moves the list.
-    try {
-      const target = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
-      if (typeof selectedDateISO !== 'undefined' && selectedDateISO !== target) {
-        selectedDateISO = target;
-        if (typeof Store !== 'undefined' && typeof render === 'function') render(Store.get());
-      }
-    } catch {}
-
-    // Top-action button reflects the mode too — re-render via the
-    // existing helper.
-    if (typeof setTopAction === 'function') setTopAction();
-
-    // Countdown ticking — only in committed-waiting mode.
-    stopCountdown();
-    if (showCrushed && current.msUntilNextLock > 0) startCountdown(current.msUntilNextLock);
-  }
-
-  function startCountdown(initialMs) {
-    const el = document.getElementById('crushed-countdown');
-    if (!el) return;
-    const target = Date.now() + initialMs;
-    const tick = () => {
-      const ms = Math.max(0, target - Date.now());
-      const totalSec = Math.floor(ms / 1000);
-      const h = Math.floor(totalSec / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      if (ms <= 0) { stopCountdown(); refresh(); /* lockTime hit, re-pull state */ }
-    };
-    tick();
-    countdownTimer = setInterval(tick, 1000);
-  }
-  function stopCountdown() {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-  }
-
-  // Bare commit — POSTs to the server and resolves. Caller decides
-  // when to refresh DayState / Store; the wired Commit button defers
-  // those updates until the ceremony has fully appeared so the
-  // underlying re-render doesn't fight the animation for paint frames.
-  async function commit(date) {
-    if (!date) return;
-    const r = await fetch(`/api/days/${encodeURIComponent(date)}/commit`, {
-      method: 'POST', credentials: 'same-origin',
-    });
-    if (!r.ok) throw new Error('commit_failed');
-  }
-
-  // Replays the onboarding's commit ceremony (green check pop +
-  // "Committed." text + sub line) on top of the Tasks tab. We rewrite
-  // the ceremony container's innerHTML so the CSS animations run from
-  // the start each time — animations are tied to element creation,
-  // and just toggling hidden doesn't replay them.
-  function playCeremony(subText) {
-    const cel = document.getElementById('onb-celebration');
-    if (!cel) return;
-    cel.innerHTML = `
-      <div class="onb-celebration-icon">
-        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-      </div>
-      <h1 class="onb-celebration-title">Committed.</h1>
-      <p class="onb-celebration-sub">${subText || ''}</p>
-    `;
-    cel.hidden = false;
-    cel.setAttribute('aria-hidden', 'false');
-  }
-  function hideCeremony() {
-    const cel = document.getElementById('onb-celebration');
-    if (!cel) return;
-    cel.hidden = true;
-    cel.setAttribute('aria-hidden', 'true');
-  }
-
-  // Wire the Commit button — picks the right date based on current
-  // mode, plays the ceremony, then refreshes + scrolls to the top of
-  // the page so the user lands at the top (mode banner) rather than
-  // looking at where the now-gone Commit button was.
-  function wire() {
-    const btn = document.getElementById('commit-btn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      if (!current) return;
-      const date = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
-      const isTomorrow = (current.mode === 'planning-tomorrow');
-      const count = isTomorrow ? current.tomorrowCount : current.todayCount;
-      btn.disabled = true;
-      try {
-        await commit(date);
-        // Sub-line: shows what the user just locked in. Brief by
-        // design — the ceremony is the moment, not the data.
-        const noun = count === 1 ? 'task' : 'tasks';
-        const sub  = isTomorrow
-          ? `${count} ${noun} ready for tomorrow.`
-          : `${count} ${noun} for today. Now execute.`;
-        playCeremony(sub);
-        // Smoothness: defer the DayState refresh until the ceremony
-        // has fully animated in (~1.5s). Otherwise the underlying
-        // mode-banner / commit-button DOM updates compete with the
-        // ceremony for paint frames and the animation stutters.
-        // No Store.load here — the task data didn't change, only the
-        // DayCommit row did, and that's covered by refresh() below.
-        setTimeout(() => { refresh(); }, 1500);
-        // Hide ceremony at 2.4s + snap to the top of the Tasks tab.
-        // Instant scroll (not smooth) — smooth scrolling animates
-        // alongside the ceremony fade and tends to stutter on long
-        // task lists.
-        setTimeout(() => {
-          hideCeremony();
-          const view = document.getElementById('view-todo');
-          if (view && view.scrollTo) view.scrollTo({ top: 0, behavior: 'auto' });
-          window.scrollTo({ top: 0, behavior: 'auto' });
-        }, 2400);
-      } catch (e) {
-        alert('Could not commit. ' + (e.message || e));
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  }
-  wire();
-
-  return {
-    get current() { return current; },
-    refresh,
-    apply,
-    commit,
-  };
-})();
-
 window.Tour = (() => {
   const STEPS = [
     {
@@ -12485,8 +11812,8 @@ window.Tour = (() => {
     {
       eyebrow: 'Tasks',
       title: 'Plan it, then do it.',
-      body: `<p>Tap <b>+</b> to add a task — one-shot for today, or recurring (daily or weekly) for habits. Tap a row to mark it done.</p>
-             <p>You plan today, hit <b>Commit</b>, and the list locks until your day ends. Finish them all to unlock tomorrow's planning.</p>`,
+      body: `<p>Tap <b>+</b> to add a task — one-shot for a specific date, or recurring (daily or weekly) for habits. Tap a row to mark it done.</p>
+             <p>Use the date navigator to jump to any past or future day.</p>`,
     },
     {
       eyebrow: 'Analytics',
@@ -12614,8 +11941,7 @@ window.Onboarding = (() => {
   const MAX_TASKS  = 30;
 
   const STATE = {
-    step: 0,           // 0=welcome, 1=how-it-works, 2=lock-time, 3=habits, 4=tasks, 5=commit
-    lockTime: '00:00', // HH:MM, 24-hour. Day-end / lock instant.
+    step: 0,           // 0=welcome, 1=how-it-works, 2=habits, 3=tasks, 4=commit
     habits: ['', '', ''],
     tasks: ['', '', ''],
     submitting: false,
@@ -12648,7 +11974,7 @@ window.Onboarding = (() => {
 
   function pullInputsIntoState() {
     // Collect the current input values so they survive a step change.
-    const list = STATE.step === 3 ? 'habits' : STATE.step === 4 ? 'tasks' : null;
+    const list = STATE.step === 2 ? 'habits' : STATE.step === 3 ? 'tasks' : null;
     if (!list) return;
     const inputs = $('onb-content').querySelectorAll('.onb-input');
     STATE[list] = [...inputs].map((el) => el.value);
@@ -12669,14 +11995,13 @@ window.Onboarding = (() => {
     c.innerHTML = '';
     if      (STATE.step === 0) c.innerHTML = stepWelcome();
     else if (STATE.step === 1) c.innerHTML = stepHowItWorks();
-    else if (STATE.step === 2) c.innerHTML = stepLockTime();
-    else if (STATE.step === 3) c.innerHTML = stepHabits();
-    else if (STATE.step === 4) c.innerHTML = stepTasks();
-    else if (STATE.step === 5) c.innerHTML = stepCommit();
+    else if (STATE.step === 2) c.innerHTML = stepHabits();
+    else if (STATE.step === 3) c.innerHTML = stepTasks();
+    else if (STATE.step === 4) c.innerHTML = stepCommit();
     wireStep();
     // Auto-focus the first empty input on data-entry steps so the
     // keyboard pops on mobile without a second tap.
-    if (STATE.step === 3 || STATE.step === 4) {
+    if (STATE.step === 2 || STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const target = [...inputs].find((el) => !el.value.trim()) || inputs[0];
       if (target) target.focus({ preventScroll: true });
@@ -12693,7 +12018,7 @@ window.Onboarding = (() => {
       </p>
       <p class="onb-body">
         In the next two minutes you'll name what's been holding you back
-        and decide what you'll <b>do today</b>. Then you'll lock it in.
+        and decide what you'll <b>do today</b>.
       </p>
       <div class="onb-actions">
         <button class="onb-btn primary" data-action="next">Begin</button>
@@ -12704,27 +12029,27 @@ window.Onboarding = (() => {
   function stepHowItWorks() {
     return `
       <div class="onb-eyebrow">How it works</div>
-      <h1 class="onb-h1">Plan, lock, execute.</h1>
+      <h1 class="onb-h1">Plan and execute.</h1>
       <div class="onb-explain-list">
         <div class="onb-explain-row">
           <div class="onb-explain-num">1</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Each day, plan the next.</div>
-            <div class="onb-explain-sub">Before your day ends, set tomorrow's list.</div>
+            <div class="onb-explain-title">Name what you'll do.</div>
+            <div class="onb-explain-sub">Add tasks to any day — today, tomorrow, or further out.</div>
           </div>
         </div>
         <div class="onb-explain-row">
           <div class="onb-explain-num">2</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Commit. The list locks.</div>
-            <div class="onb-explain-sub">No additions. No deletions. No excuses.</div>
+            <div class="onb-explain-title">Execute.</div>
+            <div class="onb-explain-sub">Check them off as you finish them.</div>
           </div>
         </div>
         <div class="onb-explain-row">
           <div class="onb-explain-num">3</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Execute before your day ends.</div>
-            <div class="onb-explain-sub">What you finish counts. What you don't, doesn't.</div>
+            <div class="onb-explain-title">Track the hit rate.</div>
+            <div class="onb-explain-sub">Analytics shows the days you actually followed through.</div>
           </div>
         </div>
       </div>
@@ -12733,69 +12058,6 @@ window.Onboarding = (() => {
         <button class="onb-btn primary" data-action="next">Got it</button>
       </div>
     `;
-  }
-
-  function stepLockTime() {
-    // Pre-built presets keyed off when the user actually goes to sleep.
-    // "Day ends" = the moment today's list locks, which lines up with
-    // when they wind down for the night. Custom covers everyone else.
-    const presets = [
-      { label: '12 AM', sub: 'Most people',     value: '00:00' },
-      { label: '3 AM',  sub: 'Up late',         value: '03:00' },
-      { label: '8 AM',  sub: 'Overnight shift', value: '08:00' },
-    ];
-    const isCustom = !presets.some(p => p.value === STATE.lockTime);
-    const buttons = presets.map(p => `
-      <button type="button" class="onb-lock-preset${STATE.lockTime === p.value ? ' active' : ''}" data-action="lock-set" data-value="${p.value}">
-        <div class="onb-lock-preset-label">${p.label}</div>
-        <div class="onb-lock-preset-sub">${p.sub}</div>
-      </button>
-    `).join('');
-    const customRow = `
-      <button type="button" class="onb-lock-preset${isCustom ? ' active' : ''}" data-action="lock-custom">
-        <div class="onb-lock-preset-label">Custom</div>
-        <div class="onb-lock-preset-sub">${isCustom ? formatLockLabel(STATE.lockTime) : 'Pick any time'}</div>
-      </button>
-    `;
-    const customInput = isCustom ? `
-      <input class="onb-input onb-lock-input" type="time"
-             value="${escHtml(STATE.lockTime)}" data-lock-input />
-    ` : '';
-    return `
-      <div class="onb-eyebrow">Step 1 of 4</div>
-      <h1 class="onb-h1">When does your day end?</h1>
-      <p class="onb-body">
-        Pick the time you usually <b>go to sleep</b>. That's the
-        <b>deadline</b> to finish the tasks you committed to — and
-        the moment tomorrow's planning unlocks. Most people pick
-        midnight — go later if you stay up past it, or much later
-        (8 AM) if you work overnight.
-      </p>
-      <p class="onb-body" style="font-size:13px;color:var(--text-faint);">
-        You get one free adjustment after onboarding to fix this if
-        you pick wrong. After that, it's locked for <b>14 days</b>.
-      </p>
-      <div class="onb-lock-presets">
-        ${buttons}
-        ${customRow}
-      </div>
-      ${customInput}
-      <div class="onb-actions">
-        <button class="onb-btn ghost" data-action="back">Back</button>
-        <button class="onb-btn primary" data-action="next">Continue</button>
-      </div>
-    `;
-  }
-
-  // Pretty-print "HH:MM" 24h → "h:MM AM/PM" for the Custom preset's sub.
-  function formatLockLabel(s) {
-    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return '12:00 AM';
-    let h = parseInt(m[1], 10);
-    const mm = m[2];
-    const period = h >= 12 ? 'PM' : 'AM';
-    h = h % 12; if (h === 0) h = 12;
-    return `${h}:${mm} ${period}`;
   }
 
   function stepHabits() {
@@ -12812,7 +12074,7 @@ window.Onboarding = (() => {
              placeholder="${escHtml(placeholder)}" />`;
     }).join('');
     return `
-      <div class="onb-eyebrow">Step 2 of 4</div>
+      <div class="onb-eyebrow">Step 1 of 3</div>
       <h1 class="onb-h1">What's been holding you back?</h1>
       <p class="onb-body">
         Everyone has at least one bad habit holding them back that they
@@ -12840,7 +12102,7 @@ window.Onboarding = (() => {
     const filled = nonEmpty(STATE.tasks).length;
     const enough = filled >= MIN_TASKS;
     return `
-      <div class="onb-eyebrow">Step 3 of 4</div>
+      <div class="onb-eyebrow">Step 2 of 3</div>
       <h1 class="onb-h1">What can you do today?</h1>
       <p class="onb-body">
         At least <b>three things</b> you can do today that move you closer
@@ -12869,7 +12131,7 @@ window.Onboarding = (() => {
     const tasksHtml = `<ul class="onb-summary-list">${tasks.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul>`;
     const errorHtml = STATE.error ? `<div class="onb-error">${escHtml(STATE.error)}</div>` : '';
     return `
-      <div class="onb-eyebrow">Step 4 of 4</div>
+      <div class="onb-eyebrow">Step 3 of 3</div>
       <h1 class="onb-h1">Your commitment.</h1>
       <div class="onb-summary-section">
         <div class="onb-summary-label">Quitting</div>
@@ -12880,9 +12142,7 @@ window.Onboarding = (() => {
         ${tasksHtml}
       </div>
       <div class="onb-fineprint">
-        Once you commit, this list <b>locks immediately</b>. You have
-        until <b>${escHtml(formatLockLabel(STATE.lockTime))}</b> to
-        finish them. The streaks start now.
+        The streaks start now.
       </div>
       ${errorHtml}
       <div class="onb-actions">
@@ -12903,7 +12163,7 @@ window.Onboarding = (() => {
         const action = btn.dataset.action;
         if (action === 'next') {
           pullInputsIntoState();
-          if (STATE.step === 4 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
+          if (STATE.step === 3 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
           STATE.step += 1;
           render();
         } else if (action === 'back') {
@@ -12918,35 +12178,17 @@ window.Onboarding = (() => {
           pullInputsIntoState();
           if (STATE.tasks.length < MAX_TASKS) STATE.tasks.push('');
           render({ skipAnim: true });
-        } else if (action === 'lock-set') {
-          STATE.lockTime = btn.dataset.value || '00:00';
-          render({ skipAnim: true });
-        } else if (action === 'lock-custom') {
-          // If they tap Custom while one of the fixed presets is active,
-          // seed the custom value to a sensible "in-between" time so the
-          // time input doesn't snap to a default they didn't intend.
-          if (['00:00','03:00','08:00'].includes(STATE.lockTime)) STATE.lockTime = '22:00';
-          render({ skipAnim: true });
         } else if (action === 'commit') {
           await commit();
         }
       });
     });
 
-    // Custom HH:MM input (only present when Custom is selected). Updates
-    // STATE.lockTime live so the summary on the commit step reflects it.
-    const lockInput = c.querySelector('[data-lock-input]');
-    if (lockInput) {
-      lockInput.addEventListener('input', () => {
-        if (lockInput.value) STATE.lockTime = lockInput.value;
-      });
-    }
-
     // Live-update the Continue button on the tasks step. Without this,
     // STATE.tasks only refreshes when an action button is tapped, so the
     // button stays disabled / shows "Add N more" even after the user has
     // typed in the third task.
-    if (STATE.step === 4) {
+    if (STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const nextBtn = c.querySelector('[data-action="next"]');
       const sync = () => {
@@ -12975,7 +12217,6 @@ window.Onboarding = (() => {
         body: JSON.stringify({
           habits: nonEmpty(STATE.habits),
           tasks: nonEmpty(STATE.tasks),
-          lockTime: STATE.lockTime,
         }),
       });
       if (!r.ok) {

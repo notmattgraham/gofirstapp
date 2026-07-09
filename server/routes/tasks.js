@@ -2,7 +2,7 @@ const express = require('express');
 const { Prisma } = require('@prisma/client');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
-const { userToday, userTomorrow, isOverrideActive, isFirstDay } = require('../time');
+const { userToday, userTomorrow } = require('../time');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -84,64 +84,6 @@ async function isTodayComplete(user) {
   return (await todayCompletionState(user)).complete;
 }
 
-// Decide if a task with the given scheduledDate may be created / edited /
-// deleted, given the day-commit lifecycle:
-//   past dates  → never mutable (history is history)
-//   today       → mutable only if NOT committed (planning-today mode)
-//   tomorrow    → mutable only if today is committed AND today is done
-//                 AND tomorrow is NOT yet committed
-//   further out → never (the system only ever lets you plan one day out)
-//
-// Completion-only updates (done / completedDates) bypass this — see
-// PATCH handler. Recurring tasks bypass too — they're habit templates,
-// not entries in any single day's committed list.
-async function canMutateForDate(user, scheduledDate) {
-  if (!scheduledDate) return { ok: true };
-  const today    = userToday(user);
-  const tomorrow = userTomorrow(user);
-
-  if (scheduledDate < today) {
-    return { ok: false, reason: 'past_date', message: 'Past days are locked.' };
-  }
-
-  if (scheduledDate === today) {
-    const commit = await prisma.dayCommit.findUnique({
-      where: { userId_date: { userId: user.id, date: today } },
-    });
-    if (commit) return { ok: false, reason: 'today_committed', message: 'Today is locked.' };
-    return { ok: true };
-  }
-
-  if (scheduledDate === tomorrow) {
-    const todayCommit = await prisma.dayCommit.findUnique({
-      where: { userId_date: { userId: user.id, date: today } },
-    });
-    if (!todayCommit) {
-      return { ok: false, reason: 'today_not_committed', message: 'Commit today first.' };
-    }
-    const todayState = await todayCompletionState(user);
-    if (todayState.total > 0 && !todayState.complete) {
-      return { ok: false, reason: 'today_incomplete', message: 'Finish today first.' };
-    }
-    const tomorrowCommit = await prisma.dayCommit.findUnique({
-      where: { userId_date: { userId: user.id, date: tomorrow } },
-    });
-    if (tomorrowCommit) {
-      return { ok: false, reason: 'tomorrow_committed', message: 'Tomorrow is locked.' };
-    }
-    return { ok: true };
-  }
-
-  return { ok: false, reason: 'too_far_ahead', message: "Can't plan more than one day ahead." };
-}
-function rejectLocked(res, guard) {
-  return res.status(403).json({
-    error: 'locked',
-    reason: guard.reason,
-    message: guard.message,
-  });
-}
-
 router.get('/', async (req, res) => {
   const rows = await prisma.task.findMany({
     where: { userId: req.user.id },
@@ -156,7 +98,6 @@ router.get('/', async (req, res) => {
     today: userToday(req.user),
     tomorrow: userTomorrow(req.user),
     todayComplete: todayCompletionStateFromTasks(req.user, rows).complete,
-    overrideActive: isOverrideActive(req.user),
   });
 });
 
@@ -167,14 +108,6 @@ router.post('/', async (req, res) => {
 
   const isRecurring = !!recurrence;
   const date = scheduledDate || (isRecurring ? null : userToday(req.user));
-
-  // Recurring tasks are permanent habit templates, not entries in any single
-  // day's committed list — so they bypass the day-lock entirely.
-  // One-shot tasks must pass the lock check on their scheduled date.
-  if (!isRecurring) {
-    const guard = await canMutateForDate(req.user, date);
-    if (!guard.ok) return rejectLocked(res, guard);
-  }
 
   const isDaily = recurrence && recurrence.type === 'daily';
   const wantsTrackStreak = !!(isDaily && trackStreak);
@@ -227,16 +160,6 @@ router.patch('/:id', async (req, res) => {
     data.notes = sanitizeNotes(data.notes);
   }
 
-  // Lock check — but completion-only updates (done / completedDates) bypass the lock,
-  // as does editing a recurring task (habit templates aren't part of the daily lock).
-  const onlyCompletionFields = Object.keys(data).every(k => k === 'done' || k === 'completedDates');
-  const editingRecurring = !!existing.recurrence;
-  if (!onlyCompletionFields && !editingRecurring) {
-    const date = existing.scheduledDate || userToday(req.user);
-    const guard = await canMutateForDate(req.user, date);
-    if (!guard.ok) return rejectLocked(res, guard);
-  }
-
   // Free-tier cap on tracked habits, applied when this PATCH would
   // FLIP the field from false→true. Skip when it's already on (no
   // delta) or when the owner is Premium.
@@ -267,13 +190,6 @@ router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   const existing = await prisma.task.findUnique({ where: { id } });
   if (!existing || existing.userId !== req.user.id) return res.status(404).json({ error: 'not found' });
-
-  // Recurring tasks can always be deleted — they're not part of the daily lock.
-  if (!existing.recurrence) {
-    const date = existing.scheduledDate || userToday(req.user);
-    const guard = await canMutateForDate(req.user, date);
-    if (!guard.ok) return rejectLocked(res, guard);
-  }
 
   await prisma.task.delete({ where: { id } });
   res.json({ ok: true });

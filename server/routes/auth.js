@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 const passport = require('../auth');
 const prisma = require('../db');
-const { userToday, dateInTz } = require('../time');
+const { userToday } = require('../time');
 const { verifyIdentityToken } = require('../apple-signin');
 
 const router = express.Router();
@@ -177,8 +177,6 @@ function shape(u) {
     // Free-form "where I live" string (e.g. "Austin, TX"). Public — every
     // other user can see this on friend-search results. Null if unset.
     location: u.location || null,
-    overridesUsed: u.overridesUsed,
-    overrideActiveDate: u.overrideActiveDate,
     // Coaching fields — frontend uses these to switch tab layout + show chat.
     coachingClient: u.coachingClient || false,
     // DB flag is the source of truth. Set via /dev role picker.
@@ -189,27 +187,6 @@ function shape(u) {
     isPremium: !!u.isPremium,
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
-    lockTime: (typeof u.lockTime === 'string' && u.lockTime) || '00:00',
-    lockTimeChangedAt: u.lockTimeChangedAt ? (u.lockTimeChangedAt.toISOString?.() || u.lockTimeChangedAt) : null,
-    // Computed convenience for the SPA — the earliest moment the user
-    // can change their lockTime again. Null if no change has been
-    // recorded yet (i.e., never set, so no cooldown). Mirrors the
-    // PATCH /me logic that treats "lockTimeChangedAt set within 5s of
-    // onboardedAt" as "never changed" — gives the user one free
-    // post-onboarding adjustment.
-    nextLockChangeAt: (() => {
-      if (!u.lockTimeChangedAt) return null;
-      const last = u.lockTimeChangedAt instanceof Date ? u.lockTimeChangedAt : new Date(u.lockTimeChangedAt);
-      if (u.onboardedAt) {
-        const ob = u.onboardedAt instanceof Date ? u.onboardedAt : new Date(u.onboardedAt);
-        if (Math.abs(last.getTime() - ob.getTime()) <= 5000) return null;
-      }
-      return new Date(last.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
-    })(),
-    // Coalesce nullables defensively for users created before these
-    // columns existed — Prisma returns the column as the default `true`
-    // once the migration runs, but a stale shape returned mid-deploy
-    // would otherwise leak `undefined` into the SPA.
     notifyMessages: u.notifyMessages !== false,
     notifyFriends:  u.notifyFriends  !== false,
     notifySystem:   u.notifySystem   !== false,
@@ -239,27 +216,6 @@ router.get('/me', async (req, res) => {
       });
     }
   }
-  // NOTE: deliberately no lockTimeChangedAt backfill here.
-  // Onboarding doesn't set the field anymore — every user gets one
-  // free post-onboarding adjustment to fix a wrong preset pick. The
-  // cooldown clock only starts on the first PATCH to /me with a
-  // genuinely changed lockTime.
-  // Backfill DayCommit for users who onboarded TODAY before the
-  // commit-lifecycle feature shipped. Their onboarding-commit didn't
-  // create the row, so today reads as "uncommitted" and locks them in
-  // planning mode despite having a committed list. Idempotent via upsert.
-  if (user.onboardedAt) {
-    const tz = user.timezone || 'UTC';
-    const onboardedDate = dateInTz(user.onboardedAt, tz);
-    const today = userToday(user);
-    if (onboardedDate === today) {
-      await prisma.dayCommit.upsert({
-        where: { userId_date: { userId: user.id, date: today } },
-        update: {},
-        create: { userId: user.id, date: today, committedAt: user.onboardedAt },
-      }).catch(() => {});
-    }
-  }
   res.json({ user: shape(user) });
 });
 
@@ -280,41 +236,6 @@ router.patch('/me', express.json({ limit: '2mb' }), async (req, res) => {
       return res.status(400).json({ error: 'invalid picture' });
     }
     data.picture = req.body.picture || null;
-  }
-  if (typeof req.body.lockTime === 'string') {
-    // HH:MM, 24-hour. Anything else is silently ignored.
-    if (/^([01]?\d|2[0-3]):[0-5]\d$/.test(req.body.lockTime)) {
-      const [h, m] = req.body.lockTime.split(':').map(Number);
-      const next = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-      // Only enforce the 14-day cooldown when the value would actually
-      // change — re-PATCHing the same value is a harmless no-op.
-      if (next !== req.user.lockTime) {
-        let last = req.user.lockTimeChangedAt;
-        // Treat "lockTimeChangedAt set by onboarding" as null so the
-        // user gets one free post-onboarding adjustment to fix a wrong
-        // preset pick. We detect this by lockTimeChangedAt being within
-        // 5 seconds of onboardedAt (they were written in the same
-        // transaction, before this change shipped).
-        if (last && req.user.onboardedAt) {
-          const lastMs = (last instanceof Date ? last : new Date(last)).getTime();
-          const obMs   = (req.user.onboardedAt instanceof Date ? req.user.onboardedAt : new Date(req.user.onboardedAt)).getTime();
-          if (Math.abs(lastMs - obMs) <= 5000) last = null;
-        }
-        const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-        if (last) {
-          const lastDate = last instanceof Date ? last : new Date(last);
-          const elapsed = Date.now() - lastDate.getTime();
-          if (elapsed < COOLDOWN_MS) {
-            return res.status(429).json({
-              error: 'lock_time_cooldown',
-              nextChangeAt: new Date(lastDate.getTime() + COOLDOWN_MS).toISOString(),
-            });
-          }
-        }
-        data.lockTime = next;
-        data.lockTimeChangedAt = new Date();
-      }
-    }
   }
   if (typeof req.body.timezone === 'string') {
     // Trust IANA-shaped strings only ("Region/City" or fixed names like "UTC").
@@ -375,39 +296,17 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
     return res.status(400).json({ error: 'min_three_tasks_required' });
   }
 
-  // Lock time — required during onboarding (the SPA enforces this, but
-  // we double-check). HH:MM, 24-hour, normalized to two-digit fields.
-  let lockTime = '00:00';
-  if (typeof req.body.lockTime === 'string'
-      && /^([01]?\d|2[0-3]):[0-5]\d$/.test(req.body.lockTime)) {
-    const [h, m] = req.body.lockTime.split(':').map(Number);
-    lockTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-
-  // userToday respects the lock time we're about to save, so apply
-  // it locally first to compute the right "today" for the new tasks.
-  const userWithLock = { ...req.user, lockTime };
-  const today = userToday(userWithLock);
+  const today = userToday(req.user);
   // Local-time "now" for startedAt — same format the SPA uses (YYYY-MM-DDTHH:MM).
   // We don't have the user's exact wall-clock down to the minute on the
-  // server, so we approximate using their TZ-localized date + 00:00. The
-  // SPA will tweak this when needed; what matters is the date is correct.
+  // server, so we approximate using their TZ-localized date + 00:00.
   const startedAt = `${today}T00:00`;
   const now = new Date();
 
-  // One transaction so a half-write never leaves the user partially
-  // onboarded with an empty task list. We commit today's list (via
-  // DayCommit) but DELIBERATELY leave lockTimeChangedAt null — the
-  // onboarding pick doesn't burn the user's first cooldown-free
-  // change. They get one free post-onboarding adjustment to fix a
-  // wrong preset choice, and only THAT starts the 14-day clock.
   const [updated] = await prisma.$transaction([
     prisma.user.update({
       where: { id: req.user.id },
-      data: {
-        onboardedAt: now, tutorialSeen: true,
-        lockTime,
-      },
+      data: { onboardedAt: now, tutorialSeen: true },
     }),
     ...habits.map((name) =>
       prisma.quitStreak.create({
@@ -424,9 +323,6 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
         },
       })
     ),
-    prisma.dayCommit.create({
-      data: { userId: req.user.id, date: today },
-    }),
   ]);
   res.json({ user: shape(updated), habits: habits.length, tasks: tasks.length });
 });

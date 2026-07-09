@@ -27,7 +27,7 @@ model User {
   updatedAt   DateTime     @updatedAt
 
   // IANA timezone (e.g. "America/New_York"). Sent by the client on each load.
-  // Drives midnight calculations and lock enforcement server-side.
+  // Drives what date the server calls "today" for this user.
   timezone    String?
 
   // Free-form "where I live" string the user enters in Profile (e.g.
@@ -36,27 +36,6 @@ model User {
   // help users find people in their area, and rendered alongside
   // the name on search result rows. Up to 80 chars.
   location    String?
-
-  // Time-of-day at which "today" rolls over for this user — i.e. when
-  // their list locks and a fresh day begins. Stored as "HH:MM" in their
-  // local timezone. Default 00:00 (midnight) matches the original
-  // behaviour. Lets night-shift workers set e.g. "18:00" so their
-  // commitment day runs from 6 PM to 6 PM. Set during onboarding;
-  // changeable from Profile (rate-limited via lockTimeChangedAt).
-  lockTime    String   @default("00:00")
-  // When the user last changed (or first set) their lockTime. Drives
-  // the 14-day cooldown — PATCH /api/auth/me rejects further changes
-  // while now() < lockTimeChangedAt + 14 days. Initialised at the
-  // commit step of onboarding so the cooldown clock starts there.
-  lockTimeChangedAt DateTime?
-
-  // Override (a.k.a. mulligan) bookkeeping. 3 free per rolling month.
-  overridesUsed       Int      @default(0)
-  // First day of the current month-long quota window. Reset every 30 days.
-  overrideMonthStart  DateTime @default(now())
-  // YYYY-MM-DD string. When this matches the user's local "today", the lock
-  // is bypassed for today only (allows add/edit/delete on today's list).
-  overrideActiveDate  String?
 
   // Marks a user as one of the admin's coaching clients. Coaching clients
   // surface in the hidden /admin dashboard with their full task list and
@@ -132,42 +111,6 @@ model User {
   sentFriendships     Friendship[] @relation("SentFriendships")
   receivedFriendships Friendship[] @relation("ReceivedFriendships")
   pushSubscriptions   PushSubscription[]
-  dayCommits          DayCommit[]
-  nudgeLogs           NudgeLog[]
-}
-
-// Per-(user, kind, date) record of a deadline-nudge push having fired,
-// so the scheduled job (server/nudges.js) doesn't double-send when its
-// 5-minute tick falls inside the same firing window twice.
-//   kind: '2h' | '1h' — distance from lockTime when this nudge fires
-//   date: YYYY-MM-DD of the day the nudge is for (in user's TZ)
-model NudgeLog {
-  id      String   @id @default(cuid())
-  userId  String
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kind    String
-  date    String
-  sentAt  DateTime @default(now())
-
-  @@unique([userId, kind, date])
-  @@index([userId])
-}
-
-// One row per (user, date) the user has explicitly committed. The
-// presence of a row means "the list for this date is locked — no
-// adds, no edits, no deletes." Past dates without a row are treated
-// as implicitly committed (the day passed, the plan is what it was).
-// Today + future require an explicit row to count as committed.
-model DayCommit {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // YYYY-MM-DD in the user's timezone. Same shape as Task.scheduledDate.
-  date        String
-  committedAt DateTime @default(now())
-
-  @@unique([userId, date])
-  @@index([userId])
 }
 
 // Web-push subscription. One row per device the user has enabled

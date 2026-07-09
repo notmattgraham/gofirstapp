@@ -82,12 +82,10 @@ app.get('/ping', (_req, res) => res.status(200).send('pong'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/streaks', require('./routes/streaks'));
-app.use('/api/overrides', require('./routes/overrides'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/friends', require('./routes/friends'));
 app.use('/api/push', require('./routes/push'));
-app.use('/api/days', require('./routes/days'));
 app.use('/api/feedback', require('./routes/feedback'));
 
 // Static assets — the SPA lives in /public.
@@ -286,12 +284,6 @@ server.on('upgrade', async (request, socket, head) => {
 
 server.listen(port, () => {
   console.log(`GoFirst listening on :${port}  (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
-  // Start the deadline-nudge scheduler — fires the 2h / 1h push
-  // notifications when a user's day-end is approaching and they
-  // still have unfinished work or a uncommitted tomorrow.
-  try { require('./nudges').start(); }
-  catch (e) { console.warn('[nudges] failed to start', e.message); }
-
   // Welcome-DM scheduler — sends a one-time "Thanks for downloading"
   // DM from admin to each new account once they've been active for
   // 15+ minutes. Hidden from the admin's inbox until they reply.

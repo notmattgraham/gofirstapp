@@ -187,7 +187,6 @@ router.get('/users', wrap(async (_req, res) => {
       timezone: u.timezone,
       createdAt: u.createdAt,
       lastActivityAt: lastTaskTouch ? new Date(lastTaskTouch).toISOString() : null,
-      overridesUsed: u.overridesUsed,
       coachingClient: u.coachingClient,
       isCoach: u.isCoach,
       isAdmin: u.isAdmin,
@@ -223,25 +222,6 @@ router.patch('/users/:id/premium', wrap(async (req, res) => {
   }
 }));
 
-// POST /api/admin/users/:id/uncommit — rollback a committed day for a user.
-// Body: { date? } where date defaults to the user's own current "today"
-// per their timezone + lockTime. Deletes the DayCommit row so the day
-// flips back to planning-today mode — the user's existing tasks stay
-// attached (no task data is touched), the lock just lifts so they can
-// add / remove / edit and re-commit. Admin-only; coach can't trigger this.
-router.post('/users/:id/uncommit', wrap(async (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
-  const target = await prisma.user.findUnique({ where: { id: req.params.id } });
-  if (!target) return res.status(404).json({ error: 'not_found' });
-  const date = (req.body && typeof req.body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date))
-    ? req.body.date
-    : userToday(target);
-  const result = await prisma.dayCommit.deleteMany({
-    where: { userId: target.id, date },
-  });
-  res.json({ ok: true, date, deleted: result.count });
-}));
-
 // PATCH /api/admin/users/:id/coaching — toggle coachingClient for a user.
 // Body: { coachingClient: boolean }
 router.patch('/users/:id/coaching', wrap(async (req, res) => {
@@ -254,35 +234,6 @@ router.patch('/users/:id/coaching', wrap(async (req, res) => {
       where: { id: req.params.id },
       data: { coachingClient },
       select: { id: true, email: true, name: true, coachingClient: true },
-    });
-    res.json({ user: updated });
-  } catch (e) {
-    if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
-    throw e;
-  }
-}));
-
-// PATCH /api/admin/users/:id/overrides — adjust a user's monthly override
-// quota usage. Body: { overridesUsed: number } (clamped 0..3 — same cap
-// as the per-user runtime). Lets the admin reset (0), bump (++), or
-// claw back (--) overrides without the user having to wait out the
-// monthly window.
-router.patch('/users/:id/overrides', wrap(async (req, res) => {
-  const raw = req.body && req.body.overridesUsed;
-  if (typeof raw !== 'number' || !Number.isFinite(raw)) {
-    return res.status(400).json({ error: 'overridesUsed_required' });
-  }
-  const clamped = Math.max(0, Math.min(3, Math.floor(raw)));
-  try {
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data: {
-        overridesUsed: clamped,
-        // Reset the monthly window when admin sets to 0 so the next
-        // organic monthly rollover doesn't immediately reset again.
-        ...(clamped === 0 ? { overrideMonthStart: new Date() } : {}),
-      },
-      select: { id: true, email: true, name: true, overridesUsed: true, overrideMonthStart: true },
     });
     res.json({ user: updated });
   } catch (e) {
@@ -508,8 +459,6 @@ router.get('/coaching-clients', wrap(async (_req, res) => {
         timezone: u.timezone,
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
-        overridesUsed: u.overridesUsed,
-        overrideActiveDate: u.overrideActiveDate,
         coachingClient: u.coachingClient,
       },
       summary,
@@ -560,9 +509,6 @@ router.get('/users/:id', wrap(async (req, res) => {
       timezone: user.timezone,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      overridesUsed: user.overridesUsed,
-      overrideMonthStart: user.overrideMonthStart,
-      overrideActiveDate: user.overrideActiveDate,
       coachingClient: user.coachingClient,
     },
     summary,
