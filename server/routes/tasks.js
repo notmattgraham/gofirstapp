@@ -4,6 +4,15 @@ const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 const { userToday, userTomorrow } = require('../time');
 
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
+// Effective premium — DB flag OR admin (admins get everything).
+function hasPremiumAccess(u) {
+  if (!u) return false;
+  if (u.isPremium) return true;
+  if (u.isAdmin) return true;
+  return (u.email || '').toLowerCase() === ADMIN_EMAIL;
+}
+
 const router = express.Router();
 router.use(requireAuth);
 
@@ -112,7 +121,7 @@ router.post('/', async (req, res) => {
   const isDaily = recurrence && recurrence.type === 'daily';
   const wantsTrackStreak = !!(isDaily && trackStreak);
   // Cap free users at FREE_TRACKED_HABIT_CAP tracked daily habits.
-  if (wantsTrackStreak && !req.user.isPremium) {
+  if (wantsTrackStreak && !hasPremiumAccess(req.user)) {
     const count = await trackedHabitCount(req.user.id);
     if (count >= FREE_TRACKED_HABIT_CAP) {
       return res.status(402).json({
@@ -167,7 +176,7 @@ router.patch('/:id', async (req, res) => {
     Object.prototype.hasOwnProperty.call(data, 'trackStreak')
     && data.trackStreak === true
     && existing.trackStreak !== true
-    && !req.user.isPremium
+    && !hasPremiumAccess(req.user)
   ) {
     const count = await trackedHabitCount(req.user.id);
     if (count >= FREE_TRACKED_HABIT_CAP) {

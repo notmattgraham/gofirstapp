@@ -2,6 +2,15 @@ const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
 
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
+// Effective premium — DB flag OR admin (admins get everything).
+function hasPremiumAccess(u) {
+  if (!u) return false;
+  if (u.isPremium) return true;
+  if (u.isAdmin) return true;
+  return (u.email || '').toLowerCase() === ADMIN_EMAIL;
+}
+
 // Free-tier cap on quit streaks ("walking away from"). Premium is
 // unlimited. Mirrored client-side in window.Premium.FREE_QUIT_STREAK_CAP
 // so the SPA can disable the Add button + show the upgrade prompt
@@ -36,7 +45,7 @@ router.post('/', async (req, res) => {
   // Cap free users at FREE_QUIT_STREAK_CAP. The SPA suppresses the Add
   // button at the cap (with an upgrade nudge), but defense-in-depth
   // here so a direct API call can't bypass it.
-  if (!req.user.isPremium) {
+  if (!hasPremiumAccess(req.user)) {
     const count = await prisma.quitStreak.count({ where: { userId: req.user.id } });
     if (count >= FREE_QUIT_STREAK_CAP) {
       return res.status(402).json({

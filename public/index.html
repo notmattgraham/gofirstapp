@@ -1157,6 +1157,41 @@
   .confirm-btn.danger { color: var(--danger); border-color: var(--danger); }
   .confirm-btn.muted { color: var(--text-dim); background: transparent; border-color: transparent; }
 
+  /* Start-date + start-time pair inside the quit-streak edit sheet. */
+  .quit-edit-fields {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0 16px;
+  }
+  .quit-edit-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .quit-edit-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .quit-edit-field input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 15px;
+  }
+  .quit-edit-field input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
   /* Task-level analytics panel */
   .task-analytics-panel {
     list-style: none;
@@ -7897,7 +7932,27 @@ function closeOverlayAnimated(el, instant) {
   });
 }
 
+// Split any startAt (local "YYYY-MM-DDTHH:MM" OR ISO "…Z") into
+// {date, time} in the user's local zone. Used to seed the edit sheet.
+function splitStartAt(startAt) {
+  if (!startAt) return { date: '', time: '00:00' };
+  const s = String(startAt);
+  if (/Z|[+-]\d\d:?\d\d$/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d)) {
+      return {
+        date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+        time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      };
+    }
+  }
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/);
+  if (m) return { date: m[1], time: m[2] || '00:00' };
+  return { date: '', time: '00:00' };
+}
+
 function openQuitEditSheet(streak) {
+  const { date: initDate, time: initTime } = splitStartAt(streak.startAt);
   const el = document.createElement('div');
   el.className = 'confirm-overlay';
   el.innerHTML = `
@@ -7906,16 +7961,28 @@ function openQuitEditSheet(streak) {
       <input type="text" id="quit-edit-name" class="feedback-textarea"
              style="min-height:auto;height:46px;font-size:15px;font-weight:500;"
              value="${esc(streak.name)}" maxlength="80" />
+      <div class="quit-edit-fields">
+        <label class="quit-edit-field">
+          <span class="quit-edit-label">Start date</span>
+          <input type="date" id="quit-edit-date" value="${esc(initDate)}" />
+        </label>
+        <label class="quit-edit-field">
+          <span class="quit-edit-label">Start time</span>
+          <input type="time" id="quit-edit-time" value="${esc(initTime)}" />
+        </label>
+      </div>
       <div class="confirm-actions">
         <button class="confirm-btn primary" data-choice="save">Save</button>
-        <button class="confirm-btn" data-choice="slipped">I slipped up</button>
+        <button class="confirm-btn" data-choice="slipped">I slipped up (reset to now)</button>
         <button class="confirm-btn danger" data-choice="delete">Delete habit</button>
         <button class="confirm-btn muted" data-choice="cancel">Cancel</button>
       </div>
     </div>`;
   document.body.appendChild(el);
-  const input = el.querySelector('#quit-edit-name');
-  setTimeout(() => { try { input.focus(); input.setSelectionRange(input.value.length, input.value.length); } catch {} }, 50);
+  const nameInput = el.querySelector('#quit-edit-name');
+  const dateInput = el.querySelector('#quit-edit-date');
+  const timeInput = el.querySelector('#quit-edit-time');
+  setTimeout(() => { try { nameInput.focus(); nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length); } catch {} }, 50);
 
   async function patchStreak(payload, errMsg) {
     try {
@@ -7934,15 +8001,23 @@ function openQuitEditSheet(streak) {
     if (choice === null) return;
     if (choice === 'cancel') { closeOverlayAnimated(el); return; }
     if (choice === 'save') {
-      const next = (input.value || '').trim().slice(0, 80);
-      if (!next) { input.focus(); return; }
-      if (next === streak.name) { closeOverlayAnimated(el); return; }
-      await patchStreak({ name: next }, 'Could not save. Try again.');
+      const nextName = (nameInput.value || '').trim().slice(0, 80);
+      if (!nextName) { nameInput.focus(); return; }
+      const nextDate = (dateInput.value || '').trim();
+      const nextTime = (timeInput.value || '').trim() || '00:00';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) { dateInput.focus(); return; }
+      if (!/^\d{2}:\d{2}$/.test(nextTime)) { timeInput.focus(); return; }
+      const nextStartAt = `${nextDate}T${nextTime}`;
+      const payload = {};
+      if (nextName !== streak.name) payload.name = nextName;
+      if (nextStartAt !== `${initDate}T${initTime}`) payload.startAt = nextStartAt;
+      if (Object.keys(payload).length === 0) { closeOverlayAnimated(el); return; }
+      await patchStreak(payload, 'Could not save. Try again.');
       return;
     }
     if (choice === 'slipped') {
       // Reset the day counter to 0 by stamping startAt to now.
-      await patchStreak({ startAt: new Date().toISOString() }, 'Could not reset. Try again.');
+      await patchStreak({ startAt: nowLocalDT() }, 'Could not reset. Try again.');
       return;
     }
     if (choice === 'delete') {

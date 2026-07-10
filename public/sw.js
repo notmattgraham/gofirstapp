@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v28 — day locking removed entirely. Add tasks to any date;
-// check off past days; no lockTime, no commit gate, no overrides.
-const CACHE = 'gofirst-v28';
+// Bumped to v29 — admins auto-premium; quit-streak edit sheet now
+// exposes start date + start time.
+const CACHE = 'gofirst-v29';
 const ASSETS = [
   './',
   './index.html',

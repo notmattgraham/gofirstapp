@@ -168,6 +168,7 @@ router.post('/apple/native', express.json(), async (req, res) => {
 });
 
 function shape(u) {
+  const effectiveIsAdmin = !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL;
   return {
     id: u.id,
     email: u.email,
@@ -181,10 +182,10 @@ function shape(u) {
     coachingClient: u.coachingClient || false,
     // DB flag is the source of truth. Set via /dev role picker.
     isCoach: !!u.isCoach,
-    isAdmin: !!u.isAdmin || (u.email || '').toLowerCase() === ADMIN_EMAIL,
+    isAdmin: effectiveIsAdmin,
     // Stackable attribute — gates analytics depth, unlimited tracked
-    // habits, unlimited quit streaks. Toggled in /dev.
-    isPremium: !!u.isPremium,
+    // habits, unlimited quit streaks. Admins always effective-premium.
+    isPremium: !!u.isPremium || effectiveIsAdmin,
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
     notifyMessages: u.notifyMessages !== false,
