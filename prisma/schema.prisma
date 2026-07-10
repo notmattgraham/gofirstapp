@@ -30,166 +30,28 @@ model User {
   // Drives what date the server calls "today" for this user.
   timezone    String?
 
-  // Free-form "where I live" string the user enters in Profile (e.g.
-  // "Austin, TX" or "Brooklyn, NY"). Not a current-location ping —
-  // it's their stated hometown. Used by the friend-search endpoint to
-  // help users find people in their area, and rendered alongside
-  // the name on search result rows. Up to 80 chars.
+  // Free-form "where I live" string the user enters in Profile. Up to 80 chars.
   location    String?
 
-  // Marks a user as one of the admin's coaching clients. Coaching clients
-  // surface in the hidden /admin dashboard with their full task list and
-  // analytics so the coach can see how their work is going. Toggled only
-  // by the admin account; has no effect on the user's own experience.
-  coachingClient      Boolean  @default(false)
-
-  // Marks a user as the coach. The coach sees the iMessage-style inbox of
-  // every coaching client in the chat tab and can reply to them. Toggled
-  // by the admin via /dev. Falls back to env COACH_EMAIL match in code so
-  // the original coach account works before anyone is flagged in the DB.
-  isCoach             Boolean  @default(false)
-
-  // Marks a user as the app-wide admin. Admin can broadcast a DM to every
-  // user, manage roles, and delete users from /dev. Only one admin exists at
-  // a time (the role PATCH demotes any other admin when promoting). Falls
-  // back to env ADMIN_EMAIL match in code so the original admin account
-  // works before anyone is flagged in the DB.
+  // Marks a user as the app-wide admin. Falls back to env ADMIN_EMAIL
+  // match in code so the original admin account works before anyone is
+  // flagged in the DB.
   isAdmin             Boolean  @default(false)
 
-  // Premium is a STACKABLE attribute (not a mutually-exclusive role like
-  // User/Client/Coach/Admin). A Coach can be Premium, the Admin can be
-  // Premium, etc. Unlocks unlimited tracked habits, unlimited quit
-  // streaks, and full analytics. Toggled from /dev.
+  // Premium is a STACKABLE attribute. Admins are effective-premium
+  // regardless of this flag; see server helpers.
   isPremium           Boolean  @default(false)
 
   // True once the user has finished or skipped the first-login welcome
-  // tour. Used to gate auto-display of the tutorial carousel on subsequent
-  // sessions. Users can re-trigger the tour from Profile regardless.
+  // tour. Users can re-trigger the tour from Profile regardless.
   tutorialSeen        Boolean  @default(false)
 
   // Timestamp of the moment the user finished the commitment-onboarding
-  // ritual (listing bad habits to quit + their first three tasks). Null
-  // means "still needs onboarding". Users with existing tasks/streaks at
-  // the time of the migration get auto-backfilled with their createdAt
-  // so they're never asked to onboard retroactively.
+  // ritual. Null means "still needs onboarding".
   onboardedAt         DateTime?
-
-  // Per-event push toggles. All default true so a freshly-subscribed user
-  // gets every kind of notification until they specifically opt out from
-  // Profile → Notifications. The toggles bucket events into three groups:
-  //   notifyMessages — inbound DM (friend, coach<->client, broadcast reply).
-  //   notifyFriends  — friend request received OR your request accepted.
-  //   notifySystem   — admin in-app broadcasts and any future system push.
-  notifyMessages      Boolean  @default(true)
-  notifyFriends       Boolean  @default(true)
-  notifySystem        Boolean  @default(true)
-
-  // Updated by the trackLastSeen middleware on authenticated requests
-  // (throttled to 1 write/min/user). Drives the "Active now / 5m ago"
-  // presence display in the chat header.
-  lastSeenAt          DateTime?
-
-  // Stamp set when the auto-welcome DM ("Thank you for downloading…")
-  // has been delivered. The welcome scheduler (server/welcome.js) only
-  // sends to users whose lastSeenAt - createdAt >= 15 min AND whose
-  // welcomeDmSentAt is null. The message itself is created with
-  // hiddenFromAdminAt = now so the admin's inbox stays clean unless
-  // the recipient actually replies.
-  welcomeDmSentAt     DateTime?
-
-  // Last time the inactivity-reengagement push fired for this user.
-  // The scheduler (server/inactivity.js) sends a "your goals are
-  // waiting" push when lastSeenAt > 24h ago AND this is either null
-  // or older than ~22h — i.e. at most one reengagement push per day
-  // while they're dormant.
-  lastReengagementPushAt DateTime?
 
   tasks          Task[]
   quitStreaks    QuitStreak[]
-  sentMessages   Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
-  sentFriendships     Friendship[] @relation("SentFriendships")
-  receivedFriendships Friendship[] @relation("ReceivedFriendships")
-  pushSubscriptions   PushSubscription[]
-}
-
-// Web-push subscription. One row per device the user has enabled
-// notifications on (so phone + laptop = 2 rows). Endpoint is the unique
-// per-browser push URL; p256dh + auth are the encryption keys we encode
-// each push payload against. Rows are removed when web-push reports a
-// 404/410 ("subscription gone") on a send attempt.
-model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-
-  // What kind of device label the client sent (e.g. user-agent shortform).
-  // Diagnostic only — handy when the user has multiple subs and wants to
-  // know which is which.
-  label     String?
-
-  createdAt   DateTime @default(now())
-  lastUsedAt  DateTime @default(now())
-
-  @@index([userId])
-}
-
-// In-app social graph. A row exists from the requester (fromUserId) to the
-// target (toUserId). status starts at 'pending' and flips to 'accepted'
-// when the recipient confirms. Either side can delete to unfriend / decline.
-model Friendship {
-  id         String   @id @default(cuid())
-  fromUserId String
-  toUserId   String
-  fromUser   User     @relation("SentFriendships", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser     User     @relation("ReceivedFriendships", fields: [toUserId], references: [id], onDelete: Cascade)
-  status     String   // 'pending' | 'accepted'
-  createdAt  DateTime  @default(now())
-  acceptedAt DateTime?
-
-  @@unique([fromUserId, toUserId])
-  @@index([toUserId, status])
-  @@index([fromUserId, status])
-}
-
-model Message {
-  id         String    @id @default(cuid())
-  fromUserId String
-  toUserId   String
-  fromUser   User      @relation("SentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser     User      @relation("ReceivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
-  content    String
-  // Optional inline image attachment. Stored as a base64 data URL
-  // ("data:image/jpeg;base64,..."). Client downscales to ~1280px / JPEG
-  // before posting, so each row stays under a few hundred KB.
-  attachment String?
-  // Null = unread. Set to the time the recipient first opened the message.
-  readAt     DateTime?
-  // Hides this row from the admin's inbox listing only. Set when:
-  //   (a) the message was sent as part of an admin broadcast — so a thread
-  //       only surfaces in the admin inbox once a reply (which has this
-  //       field null) is created, and
-  //   (b) the admin "deletes" a conversation — every row in the pair gets
-  //       this stamped, and the thread vanishes from the admin's list until
-  //       a new reply lands.
-  // Does not affect the recipient's view, and does not hide messages once
-  // the admin actually opens the thread.
-  hiddenFromAdminAt DateTime?
-  // Mirror of the above for the SENDER's inbox listing. Set when the
-  // message originates from the Share Feedback portal — the user's pinned
-  // admin row stays empty until the admin actually replies (which creates
-  // a row from admin → user with this field null, surfacing the thread).
-  // Once they open the thread, the original feedback messages render
-  // alongside the reply — this only gates the listing, not the history.
-  hiddenFromSenderAt DateTime?
-  createdAt  DateTime  @default(now())
-
-  @@index([fromUserId])
-  @@index([toUserId])
 }
 
 model Task {
@@ -215,13 +77,10 @@ model Task {
   category        String?
   // Preferred time of day (24-hour "HH:MM"). Used for Chronological view grouping.
   scheduledTime   String?
-  // Optional free-text notes the user attaches to a task — context, links,
-  // reminders, anything they need to remember. Up to 1000 chars per the
-  // form; stored as String? to allow null when empty.
+  // Optional free-text notes the user attaches to a task. Up to 1000 chars.
   notes           String?
   // DEPRECATED — left in schema so `prisma db push` doesn't have to drop the
-  // column on deploy (which requires --accept-data-loss). Never read or
-  // written by application code; safe to remove in a future migration window.
+  // column on deploy. Safe to remove in a future migration window.
   devMode         Boolean  @default(false)
   // For one-shot tasks only (recurrence === null).
   done            Boolean  @default(false)
@@ -250,8 +109,7 @@ model QuitStreak {
 }
 
 // Managed by connect-pg-simple. Declared here so `prisma db push` doesn't try
-// to drop it on every deploy (it's auto-created the first time a session is
-// written, but the migration would lose all active logins without this).
+// to drop it on every deploy.
 model Session {
   sid    String   @id @db.VarChar
   sess   Json     @db.Json

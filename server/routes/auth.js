@@ -175,22 +175,12 @@ function shape(u) {
     name: u.name,
     picture: u.picture,
     timezone: u.timezone,
-    // Free-form "where I live" string (e.g. "Austin, TX"). Public — every
-    // other user can see this on friend-search results. Null if unset.
     location: u.location || null,
-    // Coaching fields — frontend uses these to switch tab layout + show chat.
-    coachingClient: u.coachingClient || false,
-    // DB flag is the source of truth. Set via /dev role picker.
-    isCoach: !!u.isCoach,
     isAdmin: effectiveIsAdmin,
-    // Stackable attribute — gates analytics depth, unlimited tracked
-    // habits, unlimited quit streaks. Admins always effective-premium.
+    // Admins are always effective-premium.
     isPremium: !!u.isPremium || effectiveIsAdmin,
     tutorialSeen: !!u.tutorialSeen,
     onboardedAt: u.onboardedAt ? u.onboardedAt.toISOString?.() || u.onboardedAt : null,
-    notifyMessages: u.notifyMessages !== false,
-    notifyFriends:  u.notifyFriends  !== false,
-    notifySystem:   u.notifySystem   !== false,
   };
 }
 
@@ -326,23 +316,6 @@ router.post('/onboarding-commit', express.json({ limit: '64kb' }), async (req, r
     ),
   ]);
   res.json({ user: shape(updated), habits: habits.length, tasks: tasks.length });
-});
-
-// PATCH /api/auth/notify-prefs — flip per-event push toggles. Body may
-// contain any subset of { notifyMessages, notifyFriends, notifySystem };
-// missing keys are left alone. Boolean-only — anything else is a 400.
-router.patch('/notify-prefs', express.json(), async (req, res) => {
-  if (!req.user) return res.status(401).json({ error: 'unauthenticated' });
-  const data = {};
-  for (const k of ['notifyMessages', 'notifyFriends', 'notifySystem']) {
-    if (req.body && Object.prototype.hasOwnProperty.call(req.body, k)) {
-      if (typeof req.body[k] !== 'boolean') return res.status(400).json({ error: `${k}_must_be_boolean` });
-      data[k] = req.body[k];
-    }
-  }
-  if (Object.keys(data).length === 0) return res.json({ user: shape(req.user) });
-  const user = await prisma.user.update({ where: { id: req.user.id }, data });
-  res.json({ user: shape(user) });
 });
 
 // Log out. Destroys the session so the cookie can't be replayed.

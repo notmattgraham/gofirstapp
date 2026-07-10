@@ -1,70 +1,46 @@
-// Admin / developer dashboard. Hidden URL at /admin in the SPA layer; this
-// router holds the JSON endpoints. Every request must come from the single
-// allow-listed admin email — anyone else gets a 404 (not 403, so the
-// existence of the dashboard isn't even acknowledged to other accounts).
+// Admin / developer dashboard. Hidden URL at /admin (also /dev).
+// Only the app-wide admin (DB isAdmin OR env ADMIN_EMAIL) can hit these.
 
 const express = require('express');
 const prisma = require('../db');
 const { requireAuth } = require('../middleware');
-const { dateInTz, userToday } = require('../time');
-const pushModule = require('./push');
+const { dateInTz } = require('../time');
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'help@gofirstbrand.com').toLowerCase();
-// Coach status is purely DB-driven — promote via the role picker in /dev.
 
 // Wrap async handlers so any thrown error reaches Express's error middleware
-// (returning a 500) instead of becoming an unhandledRejection that crashes
-// the dyno. Every async handler in this file MUST go through this.
+// (returning a 500) instead of becoming an unhandledRejection.
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const router = express.Router();
 router.use(requireAuth);
 
-// Access gate. 404 (not 403) so the route is invisible to outsiders.
-// Allowed: the admin (DB flag or env-email fallback) OR the coach (DB
-// flag only). Admin and coach are distinct roles; both can hit /dev.
-router.use((req, res, next) => {
-  if (!req.user) return res.status(404).json({ error: 'not_found' });
-  const email = (req.user.email || '').toLowerCase();
-  const isAdmin = !!req.user.isAdmin || email === ADMIN_EMAIL;
-  const isCoach = !!req.user.isCoach;
-  if (!isAdmin && !isCoach) return res.status(404).json({ error: 'not_found' });
-  next();
-});
-
-// Helper: is the given user the app-wide admin? DB flag wins, env email
-// is the bootstrap fallback (mirrors how isCoach works).
 function isAdmin(user) {
   if (!user) return false;
   return !!user.isAdmin || (user.email || '').toLowerCase() === ADMIN_EMAIL;
 }
 
-// "Am I admin?" — used by the dashboard UI to show/hide itself before
-// kicking off the heavier data calls. Reports the caller's specific role
-// so the dashboard can hide admin-only sections (Broadcast, Delete) from
-// the coach.
+// Access gate. 404 (not 403) so the route is invisible to outsiders.
+router.use((req, res, next) => {
+  if (!isAdmin(req.user)) return res.status(404).json({ error: 'not_found' });
+  next();
+});
+
 router.get('/me', (req, res) => {
   res.json({
     admin: true,
     email: req.user.email,
     name: req.user.name,
-    isAdmin: isAdmin(req.user),
+    isAdmin: true,
   });
 });
 
-// Helper: walk a task across the whole window since createdAt and tally
-// scheduled vs completed days. Mirrors the logic the frontend uses for
-// per-user analytics, but server-side so the dashboard can show one number.
 function taskCounts(t) {
   const completedDates = Array.isArray(t.completedDates) ? t.completedDates : [];
   if (!t.recurrence) {
-    // One-shots: scheduled = 1 if it has a scheduledDate, completed = 1 if done.
     if (!t.scheduledDate) return { scheduled: 0, completed: 0 };
     return { scheduled: 1, completed: t.done ? 1 : 0 };
   }
-  // Recurring: count days-of-week from createdAt to "today" (server UTC date is
-  // close enough for an aggregate dashboard — exact per-user TZ isn't worth the
-  // cost when we're just rolling up across all users).
   const days = (t.recurrence && t.recurrence.daysOfWeek) || [];
   if (!days.length) return { scheduled: 0, completed: completedDates.length };
   const start = new Date(t.createdAt);
@@ -78,7 +54,6 @@ function taskCounts(t) {
   return { scheduled, completed: completedDates.length };
 }
 
-// Collapse a list of tasks into top-line numbers for one user.
 function summarizeTasks(tasks) {
   let scheduled = 0, completed = 0;
   const byCategory = {};
@@ -106,24 +81,18 @@ function summarizeTasks(tasks) {
   };
 }
 
-// GET /api/admin/stats — aggregate numbers for the whole app.
 router.get('/stats', wrap(async (_req, res) => {
   const now = new Date();
   const day = 24 * 60 * 60 * 1000;
   const thirtyDaysAgo = new Date(now.getTime() - 30 * day);
 
-  const [userCount, paidCount, activeUserIds30, allUsers] = await Promise.all([
+  const [userCount, activeUserIds30, allUsers] = await Promise.all([
     prisma.user.count(),
-    // "Paid" = anyone on the coaching subscription (coachingClient flag).
-    prisma.user.count({ where: { coachingClient: true } }),
-    // "Active" = created a task in the last 30 days. Distinct user ids.
     prisma.task.findMany({
       where: { createdAt: { gte: thirtyDaysAgo } },
       select: { userId: true },
       distinct: ['userId'],
     }),
-    // Per-user execution rate, computed via summarizeTasks for consistency
-    // with the per-row column. Pulling task fields once and bucketing in JS.
     prisma.user.findMany({
       select: {
         id: true,
@@ -137,9 +106,6 @@ router.get('/stats', wrap(async (_req, res) => {
     }),
   ]);
 
-  // App-wide execution rate = average of per-user rates (equal weight per
-  // user). Users who have no scheduled tasks are excluded so a freshly
-  // created account doesn't drag the average to 0.
   let rateSum = 0, rateCount = 0;
   for (const u of allUsers) {
     const r = summarizeTasks(u.tasks).executionRate;
@@ -151,14 +117,12 @@ router.get('/stats', wrap(async (_req, res) => {
     users: {
       total: userCount,
       active30d: activeUserIds30.length,
-      paid: paidCount,
     },
     appExecutionRate,
     serverDate: dateInTz(now, 'UTC'),
   });
 }));
 
-// GET /api/admin/users — list every user with light per-user rollups.
 router.get('/users', wrap(async (_req, res) => {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: 'desc' },
@@ -187,8 +151,6 @@ router.get('/users', wrap(async (_req, res) => {
       timezone: u.timezone,
       createdAt: u.createdAt,
       lastActivityAt: lastTaskTouch ? new Date(lastTaskTouch).toISOString() : null,
-      coachingClient: u.coachingClient,
-      isCoach: u.isCoach,
       isAdmin: u.isAdmin,
       isPremium: u.isPremium,
       taskCount: summary.totalTasks,
@@ -202,8 +164,6 @@ router.get('/users', wrap(async (_req, res) => {
   res.json({ users: rows });
 }));
 
-// PATCH /api/admin/users/:id/premium — toggle the Premium attribute
-// (stackable — orthogonal to the User/Client/Coach/Admin role).
 router.patch('/users/:id/premium', wrap(async (req, res) => {
   const { isPremium } = req.body || {};
   if (typeof isPremium !== 'boolean') {
@@ -222,68 +182,25 @@ router.patch('/users/:id/premium', wrap(async (req, res) => {
   }
 }));
 
-// PATCH /api/admin/users/:id/coaching — toggle coachingClient for a user.
-// Body: { coachingClient: boolean }
-router.patch('/users/:id/coaching', wrap(async (req, res) => {
-  const { coachingClient } = req.body || {};
-  if (typeof coachingClient !== 'boolean') {
-    return res.status(400).json({ error: 'coachingClient_required' });
-  }
-  try {
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { coachingClient },
-      select: { id: true, email: true, name: true, coachingClient: true },
-    });
-    res.json({ user: updated });
-  } catch (e) {
-    if (e && e.code === 'P2025') return res.status(404).json({ error: 'not_found' });
-    throw e;
-  }
-}));
-
 // PATCH /api/admin/users/:id/role — set a user's role.
-// Body: { role: 'user' | 'client' | 'coach' | 'admin' }
-//   user   → coachingClient=false, isCoach=false, isAdmin=false
-//   client → coachingClient=true,  isCoach=false, isAdmin=false
-//   coach  → coachingClient=false, isCoach=true,  isAdmin=false  (demote any other coach)
-//   admin  → coachingClient=false, isCoach=false, isAdmin=true   (demote any other admin)
-// Only the admin can promote anyone TO admin (the coach has dashboard
-// access but can't grant the admin role).
+// Body: { role: 'user' | 'admin' }
+// Only one admin at a time — promoting another admin demotes the current one.
 router.patch('/users/:id/role', wrap(async (req, res) => {
   const role = (req.body && req.body.role) || '';
-  if (!['user', 'client', 'coach', 'admin'].includes(role)) {
+  if (!['user', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'invalid_role' });
   }
-  if (role === 'admin' && !isAdmin(req.user)) {
-    return res.status(403).json({ error: 'admin_only' });
-  }
   try {
-    if (role === 'coach') {
-      // Only one coach at a time — demote anyone else flagged.
-      await prisma.user.updateMany({
-        where: { isCoach: true, NOT: { id: req.params.id } },
-        data: { isCoach: false },
-      });
-    }
     if (role === 'admin') {
-      // Only one admin at a time — demote anyone else flagged.
       await prisma.user.updateMany({
         where: { isAdmin: true, NOT: { id: req.params.id } },
         data: { isAdmin: false },
       });
     }
-    const data = role === 'admin'
-      ? { coachingClient: false, isCoach: false, isAdmin: true }
-      : role === 'coach'
-        ? { coachingClient: false, isCoach: true, isAdmin: false }
-        : role === 'client'
-          ? { coachingClient: true, isCoach: false, isAdmin: false }
-          : { coachingClient: false, isCoach: false, isAdmin: false };
     const updated = await prisma.user.update({
       where: { id: req.params.id },
-      data,
-      select: { id: true, email: true, name: true, coachingClient: true, isCoach: true, isAdmin: true },
+      data: { isAdmin: role === 'admin' },
+      select: { id: true, email: true, name: true, isAdmin: true },
     });
     res.json({ user: updated });
   } catch (e) {
@@ -292,11 +209,7 @@ router.patch('/users/:id/role', wrap(async (req, res) => {
   }
 }));
 
-// DELETE /api/admin/users/:id — hard delete. Cascades through tasks,
-// streaks, messages, and friendships per the schema's onDelete: Cascade.
-// Admin-only; refuses to delete the calling admin.
 router.delete('/users/:id', wrap(async (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
   if (req.params.id === req.user.id) return res.status(400).json({ error: 'cannot_delete_self' });
   try {
     await prisma.user.delete({ where: { id: req.params.id } });
@@ -307,198 +220,14 @@ router.delete('/users/:id', wrap(async (req, res) => {
   }
 }));
 
-// POST /api/admin/purge-others — nuke every user account except the
-// caller's. One-shot admin op; cascades tasks/streaks/messages/
-// friendships/subscriptions via the schema's onDelete: Cascade.
+// POST /api/admin/purge-others — nuke every user account except the caller's.
 router.post('/purge-others', wrap(async (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
   const result = await prisma.user.deleteMany({
     where: { id: { not: req.user.id } },
   });
   res.json({ ok: true, deleted: result.count, keptEmail: req.user.email });
 }));
 
-// POST /api/admin/broadcast — admin-only mass DM. Body: { content, attachment? }.
-// Creates one Message per non-admin user with hiddenFromAdminAt stamped at
-// creation time so the admin's inbox does not get flooded with N empty
-// threads. A thread surfaces in the admin inbox only when the recipient
-// replies (creating a row with hiddenFromAdminAt = null).
-const MAX_BROADCAST_RECIPIENTS = 5000;
-const BROADCAST_MAX_LENGTH = 4000;
-// 10 MB base64 (~7.5 MB binary). Lower than the per-message cap
-// because a broadcast fan-outs into N rows — the same attachment
-// is duplicated for every recipient. We'd want true blob storage
-// (Volumes / S3) before raising this further. Good enough for short
-// promo clips at the current user count.
-const BROADCAST_MAX_ATTACHMENT = 10 * 1024 * 1024;
-const BROADCAST_ATTACHMENT_RE = /^data:(image\/(png|jpe?g|webp|gif)|video\/(mp4|webm|quicktime));base64,[A-Za-z0-9+/=]+$/;
-
-router.post('/broadcast', wrap(async (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
-  const { content, attachment } = req.body || {};
-  const trimmed = typeof content === 'string' ? content.trim() : '';
-  const hasAttachment = typeof attachment === 'string' && attachment.length > 0;
-  if (!trimmed && !hasAttachment) return res.status(400).json({ error: 'content_required' });
-  if (trimmed.length > BROADCAST_MAX_LENGTH) return res.status(400).json({ error: 'content_too_long' });
-  if (hasAttachment) {
-    if (attachment.length > BROADCAST_MAX_ATTACHMENT) return res.status(413).json({ error: 'attachment_too_large' });
-    if (!BROADCAST_ATTACHMENT_RE.test(attachment)) return res.status(400).json({ error: 'invalid_attachment' });
-  }
-
-  const recipients = await prisma.user.findMany({
-    where: { id: { not: req.user.id } },
-    select: { id: true, notifySystem: true },
-  });
-  if (recipients.length > MAX_BROADCAST_RECIPIENTS) {
-    return res.status(413).json({ error: 'too_many_recipients', count: recipients.length });
-  }
-  if (recipients.length === 0) return res.json({ sent: 0 });
-
-  const now = new Date();
-  // createMany doesn't return ids, but we don't need them — websocket pushes
-  // use a prebuilt payload below. Hidden-from-admin so threads only surface
-  // when recipients reply.
-  await prisma.message.createMany({
-    data: recipients.map((r) => ({
-      fromUserId: req.user.id,
-      toUserId: r.id,
-      content: trimmed,
-      attachment: hasAttachment ? attachment : null,
-      hiddenFromAdminAt: now,
-      createdAt: now,
-    })),
-  });
-
-  // Real-time push to whoever's online. Best-effort; offline recipients pick
-  // it up the next time they hit GET /api/messages/dm/<admin-id>.
-  if (typeof global.wsBroadcast === 'function') {
-    for (const r of recipients) {
-      global.wsBroadcast(r.id, {
-        type: 'message',
-        message: {
-          fromUserId: req.user.id,
-          toUserId: r.id,
-          content: trimmed,
-          attachment: hasAttachment ? attachment : null,
-          readAt: null,
-          createdAt: now.toISOString(),
-        },
-      });
-    }
-  }
-
-  // Fan-out OS-level pushes — bucketed under notifySystem (not notifyMessages)
-  // so users can opt out of system updates while still receiving friend DMs.
-  // Fire-and-forget; failures don't stall the response.
-  (async () => {
-    const sender = { id: req.user.id, name: req.user.name };
-    for (const r of recipients) {
-      try {
-        await pushModule.pushForMessage({
-          senderUser: sender,
-          recipientUser: r,
-          content: trimmed,
-          hasAttachment,
-          isSystem: true,
-        });
-      } catch (e) { console.warn('[push/broadcast] failed for', r.id, e.message); }
-    }
-  })();
-
-  res.json({ sent: recipients.length });
-}));
-
-// POST /api/admin/push-broadcast — admin-only system push to every user
-// who has at least one active push subscription. Body: { title, body, url? }.
-// Different from /broadcast (which creates DM rows in the inbox); this is
-// a one-shot OS-level notification with no in-app trail. Useful for app
-// updates, maintenance windows, etc.
-router.post('/push-broadcast', wrap(async (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
-  if (!pushModule.isConfigured()) {
-    return res.status(503).json({ error: 'push_not_configured' });
-  }
-  const { title, body, url } = req.body || {};
-  const t = (typeof title === 'string') ? title.trim() : '';
-  const b = (typeof body === 'string')  ? body.trim()  : '';
-  if (!t) return res.status(400).json({ error: 'title_required' });
-  if (t.length > 120) return res.status(400).json({ error: 'title_too_long' });
-  if (b.length > 500) return res.status(400).json({ error: 'body_too_long' });
-  const u = (typeof url === 'string' && url.trim()) ? url.trim() : '/';
-
-  // Distinct user ids that currently have at least one subscription.
-  const subs = await prisma.pushSubscription.findMany({
-    select: { userId: true },
-    distinct: ['userId'],
-  });
-  const userIds = subs.map(s => s.userId);
-  const result = await pushModule.sendPushToUsers(userIds, {
-    title: t,
-    body: b,
-    url: u,
-    tag: 'system',
-  });
-  res.json({
-    audience: userIds.length,
-    sent: result.sent,
-    failed: result.failed,
-    removed: result.removed,
-  });
-}));
-
-// GET /api/admin/coaching-clients — every flagged client with full drill-down.
-// One bundled call so the dashboard can render the coaching section without
-// firing off a per-client request for each one.
-router.get('/coaching-clients', wrap(async (_req, res) => {
-  const clients = await prisma.user.findMany({
-    where: { coachingClient: true },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      tasks: { orderBy: { createdAt: 'desc' } },
-      quitStreaks: { orderBy: { createdAt: 'desc' } },
-    },
-  });
-
-  const payload = clients.map((u) => {
-    const summary = summarizeTasks(u.tasks);
-    return {
-      user: {
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        picture: u.picture,
-        timezone: u.timezone,
-        createdAt: u.createdAt,
-        updatedAt: u.updatedAt,
-        coachingClient: u.coachingClient,
-      },
-      summary,
-      tasks: u.tasks.map((t) => ({
-        id: t.id,
-        text: t.text,
-        startedAt: t.startedAt,
-        scheduledDate: t.scheduledDate,
-        recurrence: t.recurrence,
-        trackStreak: t.trackStreak,
-        category: t.category,
-        done: t.done,
-        completedDates: t.completedDates,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-      })),
-      streaks: u.quitStreaks.map((s) => ({
-        id: s.id,
-        name: s.name,
-        startAt: s.startAt,
-        createdAt: s.createdAt,
-      })),
-    };
-  });
-
-  res.json({ clients: payload });
-}));
-
-// GET /api/admin/users/:id — full per-user picture: tasks, streaks, analytics.
 router.get('/users/:id', wrap(async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.params.id },
@@ -520,7 +249,6 @@ router.get('/users/:id', wrap(async (req, res) => {
       timezone: user.timezone,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      coachingClient: user.coachingClient,
     },
     summary,
     tasks: user.tasks.map((t) => ({

@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v29 — admins auto-premium; quit-streak edit sheet now
-// exposes start date + start time.
-const CACHE = 'gofirst-v29';
+// Bumped to v30 — social/messaging removed entirely (chat tab, DMs,
+// friends, coach chat, admin broadcast, push subscriptions, feedback).
+const CACHE = 'gofirst-v30';
 const ASSETS = [
   './',
   './index.html',

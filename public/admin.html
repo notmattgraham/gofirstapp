@@ -206,8 +206,6 @@
     color: var(--text);
     border-color: transparent;
   }
-  .badge.role-coach { background: var(--warn); color: #1a1d25; border-color: transparent; }
-  .badge.role-client { background: var(--accent-dim); color: var(--text); border-color: transparent; }
   .badge.role-admin { background: var(--danger); color: #fff; border-color: transparent; }
   /* Premium toggle — small clickable badge that sits inline with
      the user's name (next to the role badge). Stackable attribute,
@@ -239,7 +237,7 @@
   .premium-toggle.on:hover { opacity: 0.9; }
   .premium-toggle:disabled { opacity: 0.5; cursor: default; }
 
-  /* Role picker — four-segment toggle (User / Client / Coach / Admin) */
+  /* Role picker — two-segment toggle (User / Admin) */
   .role-picker {
     display: inline-flex;
     border: 1px solid var(--border);
@@ -264,38 +262,6 @@
     color: var(--accent-fg);
   }
   .role-picker button:disabled { opacity: 0.5; cursor: default; }
-
-  /* Override editor — compact [-] N [+] [Reset] control. */
-  .override-editor {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .override-editor button {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    cursor: pointer;
-    padding: 0;
-  }
-  .override-editor button:disabled { opacity: 0.5; cursor: default; }
-  .override-editor button.reset {
-    width: auto;
-    padding: 0 8px;
-  }
-  .override-editor .count {
-    min-width: 18px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-  }
 
   .btn {
     display: inline-flex;
@@ -342,81 +308,6 @@
   .row-delete:hover { color: var(--danger); background: var(--accent-dim); }
   .row-delete:disabled { opacity: 0.4; cursor: default; }
 
-  /* --- Broadcast composer ----------------------------------- */
-  .broadcast {
-    display: grid;
-    gap: 10px;
-  }
-  .broadcast textarea {
-    width: 100%;
-    min-height: 100px;
-    resize: vertical;
-    padding: 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-elev);
-    color: var(--text);
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: inherit;
-    line-height: 1.45;
-  }
-  .broadcast textarea:focus { outline: none; border-color: var(--accent); }
-  .broadcast .row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-  .broadcast .meta { color: var(--text-dim); font-size: 12px; }
-  .broadcast .meta.ok { color: var(--success); }
-  .broadcast .meta.err { color: var(--danger); }
-
-  /* Attach button + media preview in the broadcast composer. */
-  .broadcast .left { display: inline-flex; align-items: center; gap: 10px; }
-  .broadcast .attach-btn {
-    height: 32px;
-    padding: 0 12px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .broadcast .attach-btn:hover { background: var(--surface); }
-  .broadcast .attach-preview[hidden] { display: none; }
-  .broadcast .attach-preview {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 10px 4px 4px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-2);
-    font-size: 12px;
-    color: var(--text-dim);
-  }
-  .broadcast .attach-preview img,
-  .broadcast .attach-preview video {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: #000;
-  }
-  .broadcast .attach-preview button {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-  }
-  .broadcast .attach-preview button:hover { color: var(--danger); }
-
   .filter-row {
     display: flex;
     gap: 10px;
@@ -439,8 +330,7 @@
     border-color: var(--accent);
   }
 
-  /* --- Coaching clients ------------------------------------- */
-  .client-card { padding: 0; overflow: hidden; }
+  /* --- User detail card (shared: modal body) ---------------- */
   .client-head {
     display: flex;
     align-items: center;
@@ -635,7 +525,7 @@
     <div class="head">
       <div>
         <h1>GoFirst — Developer dashboard</h1>
-        <div class="sub">Backend metrics, all users, and coaching clients.</div>
+        <div class="sub">Backend metrics and all users.</div>
       </div>
       <div class="who">
         Signed in as <b id="me-email">—</b><br/>
@@ -645,43 +535,6 @@
 
     <div class="section-title">App-wide stats</div>
     <div id="stats" class="stats"></div>
-
-    <div class="section-title">Coaching clients</div>
-    <div id="clients-empty" class="card center" hidden>
-      No coaching clients yet. Mark someone as <b>Coach</b> in the users table below.
-    </div>
-    <div id="clients"></div>
-
-    <div class="section-title" id="broadcast-title" hidden>Broadcast to all users</div>
-    <div class="card broadcast" id="broadcast-card" hidden>
-      <textarea id="broadcast-content" placeholder="Write a message to send to every user…" maxlength="4000"></textarea>
-      <div class="row">
-        <div class="left">
-          <button class="attach-btn" id="broadcast-attach-btn" type="button">+ Photo / video</button>
-          <span class="attach-preview" id="broadcast-attach-preview" hidden>
-            <img id="broadcast-attach-thumb-img" alt="" hidden />
-            <video id="broadcast-attach-thumb-vid" muted playsinline hidden></video>
-            <span id="broadcast-attach-label">attached</span>
-            <button type="button" id="broadcast-attach-clear" aria-label="Remove attachment">×</button>
-          </span>
-        </div>
-        <button class="btn primary" id="broadcast-send">Send to all</button>
-      </div>
-      <div class="meta" id="broadcast-meta">Delivered as a DM from your account. Replies show up in your inbox.</div>
-    </div>
-
-    <div class="section-title" id="push-broadcast-title" hidden>Push notification</div>
-    <div class="card broadcast" id="push-broadcast-card" hidden>
-      <input id="push-broadcast-title-input" type="text" placeholder="Title (shown bold in the OS notification)" maxlength="120"
-             style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);border-radius:10px;font-size:14px;font-family:inherit;" />
-      <textarea id="push-broadcast-body" placeholder="Body — keep it short. Shows below the title." maxlength="500"></textarea>
-      <input id="push-broadcast-url" type="text" placeholder="Open URL on tap (default: /)" maxlength="200"
-             style="width:100%;height:40px;padding:0 12px;border:1px solid var(--border);background:var(--bg-elev);color:var(--text);border-radius:10px;font-size:14px;font-family:inherit;" />
-      <div class="row">
-        <div class="meta" id="push-broadcast-meta">Sends an OS-level notification to every user who has push enabled. No in-app trail.</div>
-        <button class="btn primary" id="push-broadcast-send">Send push</button>
-      </div>
-    </div>
 
     <div class="section-title">All users</div>
     <div class="filter-row">
@@ -698,13 +551,12 @@
             <th class="num">Tasks</th>
             <th class="num hide-sm">Streaks</th>
             <th class="num">Exec %</th>
-            <th class="num hide-sm">Overrides</th>
             <th></th>
             <th></th>
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="9" class="center">Loading users…</td></tr>
+          <tr><td colspan="8" class="center">Loading users…</td></tr>
         </tbody>
       </table>
     </div>
@@ -718,9 +570,8 @@
   </div>
 
   <!-- User-detail modal. Populated lazily on avatar click via
-       /api/admin/users/:id; renders the same client-card layout
-       that coaching clients get on this page, plus a full streaks
-       list and a longer task history. -->
+       /api/admin/users/:id; renders their tasks, streaks, and
+       per-category analytics. -->
   <div id="user-detail-overlay" class="user-detail-overlay" hidden role="dialog" aria-modal="true">
     <div class="user-detail-card" id="user-detail-card">
       <button class="user-detail-close" id="user-detail-close" aria-label="Close">×</button>
@@ -773,8 +624,8 @@
     : `<span class="avatar">${escapeHtml(initials(u.name, u.email))}</span>`;
 
   // Auth gate: hit /api/admin/me. 404 (or anything else) => 404 page.
-  // Also captures whether the caller is the app-wide admin (vs the coach
-  // who has dashboard access but not admin-only powers like Delete/Broadcast).
+  // Also captures whether the caller is the app-wide admin (vs a viewer
+  // who has dashboard access but not admin-only powers like Delete).
   let amAdmin = false;
   async function gate() {
     let me;
@@ -815,16 +666,6 @@
     $('loading').hidden = true;
     $('app').hidden = false;
 
-    // Broadcast composer is admin-only — coach view doesn't show it.
-    if (amAdmin) {
-      $('broadcast-title').hidden = false;
-      $('broadcast-card').hidden = false;
-      $('push-broadcast-title').hidden = false;
-      $('push-broadcast-card').hidden = false;
-      wireBroadcast();
-      wirePushBroadcast();
-    }
-
     // Each section loads independently — one slow endpoint must not block
     // the others. Sections with a failed fetch render an inline error.
     fetchJson('/api/admin/stats')
@@ -833,9 +674,6 @@
     fetchJson('/api/admin/users')
       .then((d) => renderUsers(d.users || []))
       .catch((err) => { console.error('[admin] users failed', err); renderUsersError(err); });
-    fetchJson('/api/admin/coaching-clients')
-      .then((d) => renderClients(d.clients || []))
-      .catch((err) => { console.error('[admin] coaching-clients failed', err); });
   }
 
   function renderStatsError(err) {
@@ -843,7 +681,7 @@
     el.innerHTML = `<div class="stat" style="grid-column:1/-1"><div class="label">Stats failed to load</div><div class="num" style="font-size:14px;color:var(--danger)">${escapeHtml(String(err.message || err))}</div></div>`;
   }
   function renderUsersError(err) {
-    $('users-body').innerHTML = `<tr><td colspan="9" class="center" style="color:var(--danger)">Could not load users: ${escapeHtml(String(err.message || err))}</td></tr>`;
+    $('users-body').innerHTML = `<tr><td colspan="8" class="center" style="color:var(--danger)">Could not load users: ${escapeHtml(String(err.message || err))}</td></tr>`;
   }
 
   function renderStats(s) {
@@ -888,7 +726,7 @@
     const body = $('users-body');
     const pager = $('users-pagination');
     if (!rows.length) {
-      body.innerHTML = `<tr><td colspan="9" class="center">No users match.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="center">No users match.</td></tr>`;
       pager.hidden = true;
       return;
     }
@@ -907,20 +745,16 @@
     $('users-next').disabled = usersPage >= totalPages;
 
     body.innerHTML = pageRows.map(u => {
-      const role = u.isAdmin ? 'admin' : (u.isCoach ? 'coach' : (u.coachingClient ? 'client' : 'user'));
+      const role = u.isAdmin ? 'admin' : 'user';
       const roleBadge = role === 'admin'
         ? '<span class="badge role-admin">Admin</span>'
-        : role === 'coach'
-          ? '<span class="badge role-coach">Coach</span>'
-          : role === 'client'
-            ? '<span class="badge role-client">Client</span>'
-            : '';
+        : '';
       const premiumPill = `<button class="premium-toggle ${u.isPremium ? 'on' : ''}"
                   data-premium-toggle data-id="${escapeHtml(u.id)}"
                   title="${u.isPremium ? 'Remove Premium' : 'Grant Premium'}">${u.isPremium ? '★ Premium' : '☆ Premium'}</button>`;
-      // Only the actual admin can promote/demote the admin role; coach
+      // Only the actual admin can promote/demote the admin role; other
       // viewers see the segment but it's disabled. The X delete button is
-      // also admin-only (coach can't remove users).
+      // also admin-only.
       const adminBtnAttrs = amAdmin ? '' : 'disabled title="Only the admin can grant the admin role"';
       const deleteCell = amAdmin
         ? `<td><button class="row-delete" data-delete data-id="${escapeHtml(u.id)}" data-email="${escapeHtml(u.email || '')}" title="Delete user" aria-label="Delete user">×</button></td>`
@@ -941,20 +775,10 @@
         <td class="num">${fmt.int(u.taskCount)}</td>
         <td class="num hide-sm">${fmt.int(u.streakCount)}</td>
         <td class="num">${fmt.pct(u.executionRate)}</td>
-        <td class="num hide-sm">
-          <div class="override-editor" data-override-editor data-id="${escapeHtml(u.id)}">
-            <button data-step="-1" aria-label="Give back one override">&minus;</button>
-            <span class="count">${fmt.int(u.overridesUsed)}</span>
-            <button data-step="1" aria-label="Use one override">+</button>
-            <button class="reset" data-step="0" title="Reset to 0">Reset</button>
-          </div>
-        </td>
         <td>
           <div class="role-picker" data-role-picker data-id="${escapeHtml(u.id)}">
-            <button data-role="user"   class="${role === 'user'   ? 'active' : ''}">User</button>
-            <button data-role="client" class="${role === 'client' ? 'active' : ''}">Client</button>
-            <button data-role="coach"  class="${role === 'coach'  ? 'active' : ''}">Coach</button>
-            <button data-role="admin"  class="${role === 'admin'  ? 'active' : ''}" ${adminBtnAttrs}>Admin</button>
+            <button data-role="user"  class="${role === 'user'  ? 'active' : ''}">User</button>
+            <button data-role="admin" class="${role === 'admin' ? 'active' : ''}" ${adminBtnAttrs}>Admin</button>
           </div>
         </td>
         ${deleteCell}
@@ -976,14 +800,13 @@
   });
 
   // Click handler for the role picker. Disable the segment while the
-  // request runs, then refresh both the users table and the coaching
-  // clients section. Selecting "coach" demotes any existing coach.
+  // request runs, then refresh the users table.
   $('users-body').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-role-picker] button');
     if (!btn) return;
     const picker = btn.closest('[data-role-picker]');
     const id = picker.dataset.id;
-    const role = btn.dataset.role; // 'user' | 'client' | 'coach' | 'admin'
+    const role = btn.dataset.role; // 'user' | 'admin'
     if (btn.classList.contains('active')) return; // no-op
     if (btn.disabled) return; // admin segment is disabled for non-admin viewers
     [...picker.querySelectorAll('button')].forEach(b => b.disabled = true);
@@ -995,22 +818,13 @@
         body: JSON.stringify({ role }),
       });
       if (!r.ok) throw new Error('bad status ' + r.status);
-      // Update in-memory state — roles are mutually exclusive.
       const u = allUsers.find(x => x.id === id);
-      if (u) {
-        u.coachingClient = role === 'client';
-        u.isCoach = role === 'coach';
-        u.isAdmin = role === 'admin';
-      }
-      // Single-coach / single-admin invariants — demote any other in-memory holder.
-      if (role === 'coach') {
-        for (const x of allUsers) if (x.id !== id) x.isCoach = false;
-      }
+      if (u) u.isAdmin = role === 'admin';
+      // Single-admin invariant — demote any other in-memory holder.
       if (role === 'admin') {
         for (const x of allUsers) if (x.id !== id) x.isAdmin = false;
       }
       applyUserFilter();
-      reloadClients();
     } catch (err) {
       [...picker.querySelectorAll('button')].forEach(b => b.disabled = false);
       alert('Could not update role. ' + err.message);
@@ -1073,360 +887,9 @@
       }
       allUsers = allUsers.filter(x => x.id !== id);
       applyUserFilter();
-      reloadClients();
     } catch (err) {
       btn.disabled = false;
       alert('Could not delete user. ' + err.message);
-    }
-  });
-
-  // --- Broadcast ----------------------------------------------------
-  function wireBroadcast() {
-    const send = $('broadcast-send');
-    const ta = $('broadcast-content');
-    const meta = $('broadcast-meta');
-    const attachBtn   = $('broadcast-attach-btn');
-    const attachPrev  = $('broadcast-attach-preview');
-    const attachThumb = $('broadcast-attach-thumb-img');
-    const attachVidEl = $('broadcast-attach-thumb-vid');
-    const attachLabel = $('broadcast-attach-label');
-    const attachClear = $('broadcast-attach-clear');
-    // Server cap: 10 MB base64. Mirror it client-side so we can show a
-    // friendly error instead of letting the request bounce off the
-    // body parser.
-    const BROADCAST_MAX_ATTACH = 10 * 1024 * 1024;
-    let attachmentDataUrl = null;
-
-    function showPreview(dataUrl) {
-      attachmentDataUrl = dataUrl || null;
-      if (!dataUrl) {
-        attachPrev.hidden = true;
-        attachThumb.hidden = true;
-        attachVidEl.hidden = true;
-        attachThumb.src = '';
-        attachVidEl.src = '';
-        return;
-      }
-      const isVideo = /^data:video\//.test(dataUrl);
-      attachPrev.hidden = false;
-      if (isVideo) {
-        attachVidEl.src = dataUrl;
-        attachVidEl.hidden = false;
-        attachThumb.hidden = true;
-        attachLabel.textContent = 'video attached';
-      } else {
-        attachThumb.src = dataUrl;
-        attachThumb.hidden = false;
-        attachVidEl.hidden = true;
-        attachLabel.textContent = 'photo attached';
-      }
-    }
-
-    attachBtn.addEventListener('click', () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*,video/*';
-      input.addEventListener('change', async () => {
-        const file = input.files && input.files[0];
-        if (!file) return;
-        const isVideo = (file.type || '').startsWith('video/');
-        const approxBase64 = Math.ceil(file.size * 4 / 3);
-        if (approxBase64 > BROADCAST_MAX_ATTACH) {
-          const cap = Math.floor((BROADCAST_MAX_ATTACH * 3 / 4) / (1024 * 1024));
-          meta.className = 'meta err';
-          meta.textContent = `${isVideo ? 'Video' : 'File'} too large — max ${cap} MB for broadcasts.`;
-          return;
-        }
-        try {
-          if (isVideo) {
-            // No scaling — broadcast just takes what you give it. The
-            // size check above already enforces the cap.
-            const dataUrl = await new Promise((res, rej) => {
-              const r = new FileReader();
-              r.onerror = () => rej(new Error('read failed'));
-              r.onload = () => res(r.result);
-              r.readAsDataURL(file);
-            });
-            showPreview(dataUrl);
-          } else {
-            // Same scaling pattern as the chat photo path: downscale
-            // to 1280px max edge as JPEG @85%, which trims most photos
-            // into the size cap painlessly.
-            const dataUrl = await scaleImageFileToDataURL(file, 1280);
-            showPreview(dataUrl);
-          }
-          meta.className = 'meta';
-          meta.textContent = 'Delivered as a DM from your account. Replies show up in your inbox.';
-        } catch (e) {
-          console.warn('[broadcast attach]', e);
-          meta.className = 'meta err';
-          meta.textContent = 'Could not read file.';
-        }
-      });
-      input.click();
-    });
-
-    attachClear.addEventListener('click', () => showPreview(null));
-
-    send.addEventListener('click', async () => {
-      const content = (ta.value || '').trim();
-      if (!content && !attachmentDataUrl) { ta.focus(); return; }
-      const recipientCount = allUsers.length; // approx — server is source of truth
-      const ok = confirm(
-        `Send this message to every user${recipientCount ? ` (~${recipientCount})` : ''}?\n\n` +
-        `Replies will appear in your inbox. The broadcast itself stays hidden ` +
-        `from your inbox until someone responds.\n\n${content.slice(0, 280)}` +
-        (content.length > 280 ? '…' : '')
-      );
-      if (!ok) return;
-      send.disabled = true;
-      ta.disabled = true;
-      meta.className = 'meta';
-      meta.textContent = 'Sending…';
-      try {
-        const payload = { content };
-        if (attachmentDataUrl) payload.attachment = attachmentDataUrl;
-        const r = await fetch('/api/admin/broadcast', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.error || `status ${r.status}`);
-        meta.className = 'meta ok';
-        meta.textContent = `Sent to ${data.sent} user${data.sent === 1 ? '' : 's'}.`;
-        ta.value = '';
-        showPreview(null);
-      } catch (err) {
-        meta.className = 'meta err';
-        meta.textContent = 'Failed: ' + (err.message || err);
-      } finally {
-        send.disabled = false;
-        ta.disabled = false;
-      }
-    });
-  }
-
-  // Helper: scale an image file via canvas to a data URL with a max
-  // edge of `maxEdge` px. JPEG @85% — same trick the chat photo path
-  // uses. Reused here so the broadcast composer doesn't have to ship
-  // raw 12MP camera images.
-  function scaleImageFileToDataURL(file, maxEdge) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('read failed'));
-      reader.onload = () => {
-        const img = new Image();
-        img.onerror = () => reject(new Error('decode failed'));
-        img.onload = () => {
-          const longest = Math.max(img.width, img.height);
-          const scale = longest > maxEdge ? maxEdge / longest : 1;
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // --- Push broadcast ----------------------------------------------
-  function wirePushBroadcast() {
-    const send  = $('push-broadcast-send');
-    const titleI = $('push-broadcast-title-input');
-    const bodyI  = $('push-broadcast-body');
-    const urlI   = $('push-broadcast-url');
-    const meta   = $('push-broadcast-meta');
-    send.addEventListener('click', async () => {
-      const title = (titleI.value || '').trim();
-      const body  = (bodyI.value || '').trim();
-      const url   = (urlI.value || '').trim();
-      if (!title) { titleI.focus(); return; }
-      if (!confirm(`Send this push to every subscribed user?\n\n${title}\n${body.slice(0, 240)}${body.length > 240 ? '…' : ''}`)) return;
-      send.disabled = true;
-      [titleI, bodyI, urlI].forEach(el => el.disabled = true);
-      meta.className = 'meta';
-      meta.textContent = 'Sending…';
-      try {
-        const r = await fetch('/api/admin/push-broadcast', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, body, url: url || undefined }),
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) {
-          if (data.error === 'push_not_configured') throw new Error('Push not configured (set VAPID env vars)');
-          throw new Error(data.error || `status ${r.status}`);
-        }
-        meta.className = 'meta ok';
-        meta.textContent = `Audience ${data.audience} · sent ${data.sent}` +
-          (data.failed ? ` · failed ${data.failed}` : '') +
-          (data.removed ? ` · removed ${data.removed}` : '');
-        titleI.value = ''; bodyI.value = ''; urlI.value = '';
-      } catch (err) {
-        meta.className = 'meta err';
-        meta.textContent = 'Failed: ' + (err.message || err);
-      } finally {
-        send.disabled = false;
-        [titleI, bodyI, urlI].forEach(el => el.disabled = false);
-      }
-    });
-  }
-
-  // Click handler for the override editor. step="-1"/"1"/"0":
-  //   -1 → give the user one back   (overridesUsed - 1)
-  //    1 → consume one on their behalf (overridesUsed + 1)
-  //    0 → reset to 0
-  // Server clamps to 0..3.
-  $('users-body').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-override-editor] button');
-    if (!btn) return;
-    const editor = btn.closest('[data-override-editor]');
-    const id = editor.dataset.id;
-    const step = Number(btn.dataset.step);
-    const u = allUsers.find(x => x.id === id);
-    if (!u) return;
-    const current = u.overridesUsed || 0;
-    let next;
-    if (step === 0) next = 0;
-    else next = Math.max(0, Math.min(3, current + step));
-    if (next === current) return; // already at boundary
-    [...editor.querySelectorAll('button')].forEach(b => b.disabled = true);
-    try {
-      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/overrides`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ overridesUsed: next }),
-      });
-      if (!r.ok) throw new Error('bad status ' + r.status);
-      u.overridesUsed = next;
-      applyUserFilter();
-    } catch (err) {
-      [...editor.querySelectorAll('button')].forEach(b => b.disabled = false);
-      alert('Could not update overrides. ' + err.message);
-    }
-  });
-
-  // --- Coaching clients ------------------------------------------------
-  async function reloadClients() {
-    try {
-      const r = await fetch('/api/admin/coaching-clients', { credentials: 'same-origin' });
-      const data = await r.json();
-      renderClients(data.clients || []);
-    } catch (_e) { /* no-op */ }
-  }
-
-  function renderClients(list) {
-    const root = $('clients');
-    const empty = $('clients-empty');
-    if (!list.length) {
-      root.innerHTML = '';
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-    root.innerHTML = list.map(renderClient).join('');
-  }
-
-  function renderClient(c) {
-    const u = c.user;
-    const s = c.summary || {};
-    const cats = s.byCategory || {};
-    const catKeys = Object.keys(cats).sort();
-    // Find max scheduled count so the bars are scaled relatively.
-    const maxScheduled = Math.max(1, ...catKeys.map(k => cats[k].scheduled || 0));
-
-    const catRows = catKeys.length
-      ? catKeys.map(k => {
-          const v = cats[k];
-          const pct = v.scheduled > 0 ? (v.completed / v.scheduled) : null;
-          const w = v.scheduled / maxScheduled * 100;
-          return `
-            <div class="cat-row">
-              <div class="label">${escapeHtml(k)}</div>
-              <div class="bar"><div style="width:${w.toFixed(1)}%"></div></div>
-              <div class="pct">${v.completed}/${v.scheduled} · ${fmt.pct(pct)}</div>
-            </div>`;
-        }).join('')
-      : '<div class="center" style="padding:8px 0">No categorized tasks yet.</div>';
-
-    // Show up to 8 most-recently-updated tasks for a quick read.
-    const tasks = (c.tasks || []).slice(0, 8);
-    const taskHtml = tasks.length
-      ? tasks.map(t => {
-          const recurLabel = t.recurrence
-            ? (t.recurrence.type || 'recurring')
-            : (t.done ? 'done' : 'open');
-          const meta = t.recurrence
-            ? `${(t.completedDates || []).length} done`
-            : (t.scheduledDate || fmt.date(t.createdAt));
-          return `
-            <li>
-              <span class="recur">${escapeHtml(recurLabel)}</span>
-              <span class="text">${escapeHtml(t.text)}</span>
-              <span class="meta">${escapeHtml(meta)}</span>
-            </li>`;
-        }).join('')
-      : '<li><span class="text" style="color:var(--text-dim)">No tasks yet.</span></li>';
-
-    return `
-      <div class="card client-card" style="margin-bottom:12px">
-        <div class="client-head">
-          ${avatarHtml(u)}
-          <div class="meta">
-            <div class="name">${escapeHtml(u.name || u.email)}</div>
-            <div class="email">${escapeHtml(u.email)} · joined ${fmt.date(u.createdAt)} · ${escapeHtml(u.timezone || 'no tz')}</div>
-          </div>
-          <button class="btn danger" data-coach data-id="${escapeHtml(u.id)}" data-on="1">Unmark</button>
-        </div>
-        <div class="client-body">
-          <div class="client-stats">
-            <div class="stat"><div class="label">Tasks</div><div class="num">${fmt.int(s.totalTasks)}</div></div>
-            <div class="stat"><div class="label">Recurring</div><div class="num">${fmt.int(s.recurringCount)}</div></div>
-            <div class="stat"><div class="label">One-shots</div><div class="num">${fmt.int(s.oneShotCount)}</div></div>
-            <div class="stat"><div class="label">Exec rate</div><div class="num">${fmt.pct(s.executionRate)}</div></div>
-            <div class="stat"><div class="label">Streaks</div><div class="num">${fmt.int((c.streaks || []).length)}</div></div>
-          </div>
-          <div class="cat-grid">${catRows}</div>
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:6px 0">Recent tasks</div>
-          <ul class="task-list">${taskHtml}</ul>
-        </div>
-      </div>
-    `;
-  }
-
-  // Wire the unmark buttons inside client cards too — they share the
-  // same data-coach attribute as the table buttons.
-  $('clients').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-coach]');
-    if (!btn) return;
-    const id = btn.dataset.id;
-    btn.disabled = true;
-    btn.textContent = 'Removing…';
-    try {
-      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/coaching`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coachingClient: false }),
-      });
-      if (!r.ok) throw new Error('bad status ' + r.status);
-      const u = allUsers.find(x => x.id === id);
-      if (u) u.coachingClient = false;
-      applyUserFilter();
-      reloadClients();
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Unmark';
-      alert('Could not update coaching status. ' + err.message);
     }
   });
 
@@ -1475,36 +938,6 @@
       body.innerHTML = `<div class="user-detail-loading">Couldn't load user details.<br/><small>${escapeHtml(err.message || 'unknown')}</small></div>`;
     }
   }
-
-  // Uncommit-today button delegated off the detail modal body. Confirms
-  // first, POSTs to /api/admin/users/:id/uncommit, and re-renders the
-  // modal on success so any state refresh (overrides etc) reflects.
-  $('user-detail-body').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-uncommit]');
-    if (!btn) return;
-    const id   = btn.dataset.id;
-    const name = btn.dataset.name || 'this user';
-    if (!confirm(`Roll ${name}'s today back to planning mode? Their tasks stay; the lock lifts so they can edit + recommit.`)) return;
-    btn.disabled = true;
-    const originalLabel = btn.textContent;
-    btn.textContent = 'Uncommitting…';
-    try {
-      const r = await fetch(`/api/admin/users/${encodeURIComponent(id)}/uncommit`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `status_${r.status}`);
-      btn.textContent = data.deleted > 0
-        ? `Uncommitted ${data.date}`
-        : `Nothing to uncommit (${data.date})`;
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-      alert('Uncommit failed. ' + (err.message || err));
-    }
-  });
 
   function renderUserDetail(d) {
     const u = d.user;
@@ -1561,13 +994,12 @@
         }).join('')
       : '<li><span class="meta" style="color:var(--text-dim)">No quit streaks.</span></li>';
 
-    const role = u.coachingClient ? 'Client' : '';
     const tzLabel = u.timezone || 'no tz';
     return `
       <div class="client-head">
         ${avatarHtml(u)}
         <div class="meta">
-          <div class="name">${escapeHtml(u.name || u.email)} ${role ? `<span class="badge role-client">${role}</span>` : ''}</div>
+          <div class="name">${escapeHtml(u.name || u.email)}</div>
           <div class="email">${escapeHtml(u.email)} · joined ${fmt.date(u.createdAt)} · ${escapeHtml(tzLabel)}</div>
         </div>
       </div>
@@ -1578,17 +1010,7 @@
           <div class="stat"><div class="label">One-shots</div><div class="num">${fmt.int(s.oneShotCount)}</div></div>
           <div class="stat"><div class="label">Exec rate</div><div class="num">${fmt.pct(s.executionRate)}</div></div>
           <div class="stat"><div class="label">Streaks</div><div class="num">${fmt.int(streaks.length)}</div></div>
-          <div class="stat"><div class="label">Overrides</div><div class="num">${fmt.int(u.overridesUsed)}</div></div>
         </div>
-        ${amAdmin ? `
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">Day controls</div>
-          <button class="btn ghost" data-uncommit data-id="${escapeHtml(u.id)}" data-name="${escapeHtml(u.name || u.email)}">
-            Uncommit today
-          </button>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:6px;line-height:1.4">
-            Rolls today back to planning mode. Their tasks stay; just the lock lifts so they can edit + recommit.
-          </div>
-        ` : ''}
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">By category</div>
         <div class="cat-grid">${catRows}</div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);font-weight:600;margin:14px 0 6px">Recent tasks</div>
