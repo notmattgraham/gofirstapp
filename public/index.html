@@ -460,21 +460,6 @@
   }
   .cal-today-btn:active { opacity: 0.7; }
 
-  /* Lock state banner */
-  .lock-banner {
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    margin-bottom: 12px;
-    font-size: 13px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .lock-banner[hidden] { display: none; }
-
   /* Quit-streak rows on the Analytics tab. Each shows the habit name
      + days since the user committed to walking away from it. */
   .quit-streak-list {
@@ -576,154 +561,6 @@
   .quit-streak-add-btn:hover { border-color: var(--accent); }
   .quit-streak-add-btn:active { background: var(--surface-2); }
 
-  /* ── Day-mode banner ───────────────────────────────────────────
-     Sits at the top of the Tasks tab and tells the user what they
-     should be doing right now. Different copy per mode is set in
-     JS — see DayState.applyToTodoView. */
-  .mode-banner {
-    padding: 14px 16px;
-    border-radius: 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    margin-bottom: 12px;
-  }
-
-  /* Viewer-switcher pill at the top of the Tasks tab. Only shows when
-     the user is a collaborator on at least one other account. */
-  .viewer-switcher {
-    position: relative;
-    margin: 0 0 12px;
-  }
-  .viewer-switcher[hidden] { display: none; }
-  .viewer-switcher-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .viewer-switcher-trigger:active { background: var(--surface-2); }
-  .viewer-switcher-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    z-index: 30;
-    min-width: 220px;
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 6px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-    display: none;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .viewer-switcher.open .viewer-switcher-menu { display: flex; }
-  .viewer-switcher-menu button {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: 14px;
-    text-align: left;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .viewer-switcher-menu button:hover { background: var(--surface); }
-  .viewer-switcher-menu button.active {
-    background: var(--accent-dim);
-    color: var(--text);
-    font-weight: 600;
-  }
-  .mode-banner[hidden] { display: none; }
-  .mode-banner-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.3;
-  }
-  .mode-banner-sub {
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-top: 4px;
-    line-height: 1.45;
-  }
-
-  /* Commit button — bottom of the planning task list. Locks today
-     (or tomorrow, depending on mode) when tapped. */
-  .commit-row {
-    margin: 18px 0 24px;
-    display: flex;
-    justify-content: center;
-  }
-  .commit-row[hidden] { display: none; }
-  .commit-btn {
-    appearance: none;
-    border: 0;
-    font: inherit;
-    font-size: 16px;
-    font-weight: 800;
-    height: 52px;
-    padding: 0 36px;
-    border-radius: 999px;
-    background: var(--text);
-    color: var(--bg);
-    cursor: pointer;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    transition: box-shadow 0.2s ease, transform 0.08s ease;
-  }
-  .commit-btn:active { transform: scale(0.98); }
-  .commit-btn:disabled { opacity: 0.5; cursor: default; }
-
-  /* "You crushed today" full-screen waiting state. Replaces the task
-     list when mode === 'tomorrow-committed'. */
-  .crushed-card {
-    margin: 36px 0;
-    padding: 28px 22px;
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    text-align: center;
-  }
-  .crushed-card[hidden] { display: none; }
-  .crushed-eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.10em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-  }
-  .crushed-title {
-    font-size: clamp(22px, 6vw, 28px);
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    color: var(--text);
-    line-height: 1.25;
-    margin: 0 0 14px;
-  }
-  .crushed-sub {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 18px;
-  }
-  .crushed-countdown {
-    font-size: 36px;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-
   /* "X tasks left" / green-glow states for the top New-Task button. */
   .top-action-disabled {
     opacity: 0.55;
@@ -745,7 +582,6 @@
   }
   .badge .icon { vertical-align: -2px; margin-right: 3px; }
   .row-meta .icon { vertical-align: -2px; margin-right: 3px; }
-  .lock-banner .icon { color: currentColor; }
 
   /* Missed-task row variant */
   .row-missed {
@@ -1105,26 +941,6 @@
     font-size: 13px;
     color: var(--text-dim);
     line-height: 1.5;
-  }
-
-  .notes-textarea {
-    width: 100%;
-    min-height: 120px;
-    padding: 14px 16px;
-    background: transparent;
-    border: none;
-    color: var(--text);
-    font-size: 15px;
-    line-height: 1.5;
-    font-family: inherit;
-    resize: vertical;
-    outline: none;
-  }
-  .notes-textarea::placeholder { color: var(--text-faint); }
-  .notes-status {
-    padding: 0 16px 12px;
-    font-size: 12px;
-    color: var(--text-dim);
   }
 
   /* Styled native <select> that matches the input look */
@@ -2897,10 +2713,9 @@
      standard content card. margin-top of 16px so the gap above this
      card matches the gap above every other section label on the
      page WHEN it follows another card directly (analytics tab
-     pattern). When it follows a section-title (profile collaborator
-     pattern), kill the margin so the section-title's own 8px bottom
-     margin is the only gap — matching every other title→card pair
-     on that surface. */
+     pattern). When it follows a section-title, kill the margin so
+     the section-title's own 8px bottom margin is the only gap —
+     matching every other title→card pair on that surface. */
   .premium-locked-card {
     display: flex;
     flex-direction: column;
@@ -4093,46 +3908,6 @@
     animation: none !important;
   }
 
-  /* Lock-time picker on onboarding step 1. Each preset is a stacked
-     label/sub button; the active one gets the accent ring. The custom
-     branch reveals an HH:MM <input type="time"> below the grid. */
-  .onb-lock-presets {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .onb-lock-preset {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    border-radius: 14px;
-    padding: 14px 14px;
-    text-align: left;
-    cursor: pointer;
-    font: inherit;
-    transition: border-color 0.15s ease, background 0.15s ease;
-  }
-  .onb-lock-preset:hover { border-color: var(--text-dim); }
-  .onb-lock-preset.active {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-  .onb-lock-preset-label {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .onb-lock-preset-sub {
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-top: 2px;
-  }
-  .onb-lock-input {
-    /* Stretches under the preset grid when Custom is selected. */
-    margin-top: 8px;
-  }
-
   /* ── Commit ceremony ─────────────────────────────────────────
      Plays for ~2.4s after a successful commit, then the page
      reloads into the user's fresh task list. The pop + check-draw
@@ -4951,38 +4726,7 @@
       <div class="view-slider" id="view-slider">
       <!-- To Do List view -->
       <section id="view-todo" class="view">
-        <!-- Viewer switcher — only rendered when the signed-in user is
-             a collaborator on at least one Premium account. Default
-             value is "Your tasks"; selecting another row swaps every
-             Tasks-tab fetch + mutation to operate on that owner's
-             account via ?as=. Hidden otherwise. -->
-        <div class="viewer-switcher" id="viewer-switcher" hidden>
-          <button type="button" class="viewer-switcher-trigger">
-            <span class="viewer-switcher-label">Your tasks</span>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          <div class="viewer-switcher-menu" role="menu"></div>
-        </div>
-
-        <!-- Mode banner. Driven by DayState.applyToTodoView() — copy
-             changes per mode (planning today / today incomplete /
-             planning tomorrow / tomorrow committed). -->
-        <div class="mode-banner" id="mode-banner" hidden>
-          <div class="mode-banner-title" id="mode-banner-title"></div>
-          <div class="mode-banner-sub" id="mode-banner-sub"></div>
-        </div>
-
-        <!-- "You crushed today" waiting state. Replaces the entire task
-             list when mode is tomorrow-committed; the countdown ticks
-             down to the user's next lockTime. -->
-        <div class="crushed-card" id="crushed-card" hidden>
-          <div class="crushed-eyebrow">Day complete</div>
-          <h2 class="crushed-title">You crushed today.</h2>
-          <p class="crushed-sub">You can begin your next tasks in:</p>
-          <div class="crushed-countdown" id="crushed-countdown">—</div>
-        </div>
-
-        <div class="date-nav" id="date-nav" hidden>
+        <div class="date-nav" id="date-nav">
           <button class="date-nav-arrow" id="date-prev" aria-label="Previous day"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
           <button class="date-nav-label" id="date-label-btn" aria-label="Open calendar">
             <span class="date-nav-day-text" id="date-nav-day">Today</span>
@@ -5020,8 +4764,6 @@
             </select>
           </div>
         </div>
-        <div class="lock-banner" id="lock-banner" hidden></div>
-
         <div class="stat-strip" id="stat-strip" hidden>
           <div class="stat-ring" id="stat-ring"
                style="background: conic-gradient(var(--accent) 0deg, var(--surface-2) 0deg);">
@@ -5063,11 +4805,6 @@
           <ul class="list completed-list" id="completed-list"></ul>
         </details>
 
-        <!-- Commit button — only visible in planning modes. Locks the
-             current planning day's list when tapped. -->
-        <div class="commit-row" id="commit-row" hidden>
-          <button type="button" class="commit-btn" id="commit-btn">Commit</button>
-        </div>
       </section>
 
       <!-- Streaks view (retired — habits/streaks now live on the Tasks view) -->
@@ -5345,90 +5082,12 @@
           </div>
         </div>
 
-        <div class="section-title">Day end</div>
-        <div class="card">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <div class="setting-title">Tasks lock at</div>
-              <div class="setting-sub" id="lock-time-sub">You have until this time each day to finish the tasks you committed to.</div>
-            </div>
-            <input type="time" id="profile-lock-time" class="field-input setting-select" style="height:32px;font-size:13px;padding:0 8px;width:auto;" />
-          </div>
-        </div>
-
-        <!-- Overrides hidden — replaced by the day-commit lifecycle.
-             Markup kept (hidden) so the renderOverrides() handler doesn't
-             throw on missing nodes. -->
-        <div hidden>
-          <div class="setting-title" id="override-title"></div>
-          <div class="setting-sub" id="override-sub"></div>
-          <button id="use-override"></button>
-        </div>
-
-        <div class="section-title">Notes</div>
-        <div class="card">
-          <textarea
-            id="notes-text"
-            class="notes-textarea"
-            placeholder="Persistent scratch pad — captures thoughts that don't belong on today's locked list. Saves automatically."
-            maxlength="4000"
-          ></textarea>
-          <div class="notes-status" id="notes-status">Saved</div>
-        </div>
-
         <div class="section-title">Missed tasks</div>
         <div class="card" id="missed-card">
           <ul class="list" id="missed-list"></ul>
           <div class="empty" id="missed-empty">
             <div class="empty-title">Nothing missed</div>
             <div>Anything you don't check off by midnight lands here.</div>
-          </div>
-        </div>
-
-        <!-- Collaborator manager. Free users see the
-             .premium-locked-card upsell; Premium users see the
-             real interactive section below it. NO outer wrapper —
-             keeping these as direct children of .view so the
-             .section-title:first-child rule (which gives 4px top
-             margin) doesn't accidentally fire on COLLABORATOR. -->
-        <div class="section-title">Collaborator</div>
-        <div class="premium-locked-card">
-          <div class="premium-locked-card-eyebrow">
-            <svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26L20 9l-5.18 4.04L17 20l-5-3.5L7 20l2.18-6.96L4 9l5.91-.74z"/></svg>
-            Premium Feature
-          </div>
-          <div class="premium-locked-card-title">Add a collaborator to your task list.</div>
-          <div class="premium-locked-card-body">
-            Give an executive assistant, your spouse, or anyone you trust the ability to add, edit, and complete tasks on your behalf. They keep their own account.
-          </div>
-          <button type="button" class="premium-locked-card-cta" data-premium-upgrade>Upgrade to Premium</button>
-        </div>
-        <div class="card premium-only">
-          <div class="setting-row" id="collab-current-row" hidden>
-            <div class="setting-copy">
-              <div class="setting-title" id="collab-current-name">—</div>
-              <div class="setting-sub" id="collab-current-sub">—</div>
-            </div>
-            <button class="action-btn ghost setting-btn" id="collab-remove-btn">Remove</button>
-          </div>
-          <div class="setting-row" id="collab-empty-row">
-            <div class="setting-copy">
-              <div class="setting-title">No collaborator yet</div>
-              <div class="setting-sub">Invite someone (by email) who can manage your task list — add, edit, delete, mark complete. They keep their own account too.</div>
-            </div>
-            <button class="action-btn ghost setting-btn" id="collab-add-btn">Add</button>
-          </div>
-        </div>
-
-        <!-- Accessible accounts → for users who are someone ELSE's collaborator.
-             Lists each Premium account that's granted them access; entry
-             point to the viewer-switcher. Visible only when the list is
-             non-empty (i.e. the user is at least one Premium owner's
-             collaborator). -->
-        <div id="accessible-accounts-section" hidden>
-          <div class="section-title">You manage</div>
-          <div class="card" id="accessible-accounts-card">
-            <!-- rows injected by renderAccessibleAccounts() -->
           </div>
         </div>
 
@@ -5499,14 +5158,18 @@
           </div>
         </div>
 
-        <div class="section-title">Help</div>
-        <div class="card">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <div class="setting-title">App tour</div>
-              <div class="setting-sub">Five quick cards covering each tab. Replay anytime.</div>
+        <!-- Admin/Coach entry point. Hidden by default; renderProfile()
+             unhides for users with isAdmin or isCoach. -->
+        <div id="profile-admin-section" hidden>
+          <div class="section-title">Admin</div>
+          <div class="card">
+            <div class="setting-row">
+              <div class="setting-copy">
+                <div class="setting-title">Dev dashboard</div>
+                <div class="setting-sub">Manage users, roles, and premium.</div>
+              </div>
+              <a class="action-btn setting-btn" href="/dev" id="profile-dev-link">Open</a>
             </div>
-            <button class="action-btn ghost setting-btn" id="profile-show-tour">Show</button>
           </div>
         </div>
 
@@ -5565,7 +5228,6 @@
             <button type="button" class="chip" data-repeat="none">Once</button>
             <button type="button" class="chip" data-repeat="daily">Daily</button>
             <button type="button" class="chip" data-repeat="weekly">Weekly</button>
-            <button type="button" class="chip" data-repeat="monthly">Monthly</button>
             <button type="button" class="chip" data-repeat="custom">Custom</button>
           </div>
         </div>
@@ -6165,20 +5827,8 @@ function removePendingTask(tmpId) {
   setPendingTasks(getPendingTasks().filter(p => p.tmpId !== tmpId));
 }
 
-// Auto-scope task and day-state requests through the Collab viewer so
-// that whenever the user has switched to view another account's tasks,
-// every fetch (including mutations) carries ?as=<ownerId>. No call
-// site in the SPA needs to know about scoping — this is the single
-// chokepoint.
-function _maybeScopePath(path) {
-  if (!window.Collab || !Collab.viewingAsId()) return path;
-  if (/^\/api\/(tasks|days)(\/|\?|$)/.test(path)) return Collab.scopedUrl(path);
-  return path;
-}
-
 async function api(method, path, body) {
-  const finalPath = _maybeScopePath(path);
-  const res = await fetch(finalPath, {
+  const res = await fetch(path, {
     method,
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
     credentials: 'same-origin',
@@ -6271,35 +5921,11 @@ const Auth = {
 function pad(n) { return String(n).padStart(2, '0'); }
 function toISO(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 
-// Parse a "HH:MM" lockTime into minutes-since-midnight. Defensive against
-// missing / malformed input — anything we can't parse falls back to 0
-// (equivalent to "lock at midnight", which is the original behaviour).
-function lockMinutes() {
-  const raw = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
-  const m = String(raw).match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return 0;
-  const h  = Math.max(0, Math.min(23, parseInt(m[1], 10) || 0));
-  const mm = Math.max(0, Math.min(59, parseInt(m[2], 10) || 0));
-  return h * 60 + mm;
-}
-
-// "Today" respects the user's lockTime — see server/time.js for the
-// full rationale. lockTime is a DEADLINE; the day's name is the
-// calendar date of its deadline.
-//   lockMin > 720 (evening): today = end-date. Shift forward by
-//      (1440 - lockMin) min, then back 1ms to dodge the midnight flip.
-//   lockMin <= 720 (morning/midnight): today = start-date. Shift back
-//      by lockMin minutes.
-function _refOffsetMs() {
-  const lockMin = lockMinutes();
-  if (lockMin > 720) return (1440 - lockMin) * 60_000 - 1;
-  return -(lockMin * 60_000);
-}
 function todayISO() {
-  return toISO(new Date(Date.now() + _refOffsetMs()));
+  return toISO(new Date());
 }
 function todayDow() {
-  return new Date(Date.now() + _refOffsetMs()).getDay();
+  return new Date().getDay();
 }
 function addDaysISO(iso, n) {
   const d = new Date(iso + 'T00:00:00');
@@ -6335,12 +5961,8 @@ function uid() {
 const DAY_LONG = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAY_SHORT = ['Su','M','T','W','Th','F','Sa'];
 
-function scheduleLabel(recurrence, startedAt) {
+function scheduleLabel(recurrence) {
   if (!recurrence) return '';
-  if (recurrence.type === 'monthly') {
-    const day = parseInt((startedAt || '').slice(8, 10), 10);
-    return Number.isFinite(day) ? `Monthly · Day ${day}` : 'Monthly';
-  }
   const days = recurrence.daysOfWeek || [];
   if (recurrence.type === 'daily' || days.length === 7) return 'Every day';
   if (days.length === 0) return '';
@@ -6404,84 +6026,47 @@ const Store = (() => {
     tasks: [],
     streaks: [],
     missed: [],
-    overrides: { used: 0, remaining: 3, active: false },
     today: todayISO(),
     tomorrow: addDaysISO(todayISO(), 1),
     todayComplete: true, // if there are no tasks, today is vacuously complete
-    overrideActive: false,
   };
   const listeners = new Set();
   const emit = () => listeners.forEach(fn => fn(state));
 
   async function load() {
-    // Snapshot what we're scoping to BEFORE the fetches go out. If
-    // the user (or another caller) changes scope mid-flight — e.g.
-    // boot()'s initial unscoped load is still in flight when the user
-    // clicks the viewer-switcher and a NEW scoped load starts — the
-    // older one would otherwise resolve later and overwrite the
-    // newer state with stale wife's-tasks data. We drop the result
-    // when the snapshot doesn't match what's current at write time.
-    const startedAs = (window.Collab && Collab.viewingAsId) ? Collab.viewingAsId() : null;
-    const [t, s, m, o] = await Promise.all([
+    const [t, s, m] = await Promise.all([
       api('GET', '/api/tasks'),
       api('GET', '/api/streaks'),
       // Timeout-guarded fetch so a hanging /missed query never stalls load()
       new Promise(resolve => {
         const ctrl = new AbortController();
         const timer = setTimeout(() => { ctrl.abort(); resolve({ missed: [] }); }, 4000);
-        fetch(_maybeScopePath('/api/tasks/missed'), { credentials: 'same-origin', signal: ctrl.signal })
+        fetch('/api/tasks/missed', { credentials: 'same-origin', signal: ctrl.signal })
           .then(r => r.json()).then(d => { clearTimeout(timer); resolve(d); })
           .catch(() => { clearTimeout(timer); resolve({ missed: [] }); });
       }),
-      api('GET', '/api/overrides').catch(() => ({ overrides: state.overrides })),
     ]);
-    const endedAs = (window.Collab && Collab.viewingAsId) ? Collab.viewingAsId() : null;
-    if (startedAs !== endedAs) {
-      console.warn('[store] load discarded — viewingAs changed mid-flight', { startedAs, endedAs });
-      return;
-    }
     state = {
       ...state,
       tasks: (t && t.tasks) || [],
       streaks: (s && s.streaks) || [],
       missed: (m && m.missed) || [],
-      overrides: (o && o.overrides) || state.overrides,
       today: (t && t.today) || todayISO(),
       tomorrow: (t && t.tomorrow) || addDaysISO(todayISO(), 1),
       todayComplete: !!(t && t.todayComplete),
-      overrideActive: !!(t && t.overrideActive),
     };
     emit();
-    // Task data just refreshed — pull the day-state machine alongside
-    // so the mode banner / Commit button / countdown reflect the new
-    // counts (e.g. user just completed today's last task, mode flips
-    // to planning-tomorrow).
-    //
-    // Deferred by 250ms so the check-mark / list-row animations from
-    // the just-completed mutation get to finish before any DayState-
-    // driven re-render interrupts them. Without this the user sees
-    // the check animation skip mid-frame.
-    if (window.DayState) setTimeout(() => DayState.refresh(), 250);
     // Persist a snapshot so the next boot can render instantly from cache
-    // while fresh data loads in the background. SKIPPED when we're
-    // currently scoped to another account (Premium collaborator viewing
-    // someone else's tasks) — caching that under the same key would
-    // poison the next session and flash the wrong account's tasks at
-    // boot before the auth round-trip completes.
+    // while fresh data loads in the background.
     try {
-      const isScoped = !!(window.Collab && Collab.viewingAsId && Collab.viewingAsId());
-      if (!isScoped) {
-        localStorage.setItem('gofirst:ui-cache', JSON.stringify({
-          tasks: state.tasks,
-          streaks: state.streaks,
-          overrides: state.overrides,
-          today: state.today,
-          tomorrow: state.tomorrow,
-          todayComplete: state.todayComplete,
-          overrideActive: state.overrideActive,
-          ts: Date.now(),
-        }));
-      }
+      localStorage.setItem('gofirst:ui-cache', JSON.stringify({
+        tasks: state.tasks,
+        streaks: state.streaks,
+        today: state.today,
+        tomorrow: state.tomorrow,
+        todayComplete: state.todayComplete,
+        ts: Date.now(),
+      }));
     } catch {}
   }
 
@@ -6590,11 +6175,9 @@ const Store = (() => {
         ...state,
         tasks: Array.isArray(cached.tasks) ? cached.tasks : state.tasks,
         streaks: Array.isArray(cached.streaks) ? cached.streaks : state.streaks,
-        overrides: cached.overrides || state.overrides,
         today: cached.today || state.today,
         tomorrow: cached.tomorrow || state.tomorrow,
         todayComplete: !!cached.todayComplete,
-        overrideActive: !!cached.overrideActive,
       };
     },
 
@@ -6735,22 +6318,6 @@ const Store = (() => {
       );
     },
 
-    // Overrides + missed-task carry-over.
-    async useOverride() {
-      let overrides;
-      try {
-        const result = await api('POST', '/api/overrides/use');
-        overrides = result.overrides;
-      } catch (e) {
-        return { ok: false, error: e && e.message };
-      }
-      // Server confirmed; commit locally before attempting a refresh so a
-      // transient load failure doesn't roll back the visible override state.
-      state = { ...state, overrides, overrideActive: !!overrides.active };
-      emit();
-      await safeLoad();
-      return { ok: true };
-    },
     async retryMissed(id) {
       try {
         await api('POST', `/api/tasks/missed/${id}/retry`);
@@ -6921,9 +6488,6 @@ const TaskForm = {
     els.trackInput.checked = this.track;
   },
 
-  // Monthly recurrence reuses the task's startedAt day-of-month — no
-  // explicit day-of-week chips needed.
-
   updateSubmitEnabled() {
     const hasText = els.taskInput.value.trim().length > 0;
     const hasRepeat = this.repeat !== null;
@@ -6935,7 +6499,6 @@ const TaskForm = {
     this.repeat = type;
     if (type === 'none') this.daysOfWeek = [];
     if (type === 'daily') this.daysOfWeek = [0,1,2,3,4,5,6];
-    if (type === 'monthly') this.daysOfWeek = [];
     if (type === 'weekly') {
       if (!this.daysOfWeek.length) this.daysOfWeek = [todayDow()];
       else this.daysOfWeek = this.daysOfWeek.slice(0, 1);
@@ -6968,7 +6531,6 @@ const TaskForm = {
   toRecurrence() {
     if (this.repeat === null || this.repeat === 'none') return null;
     if (this.repeat === 'daily') return { type: 'daily', daysOfWeek: [0,1,2,3,4,5,6] };
-    if (this.repeat === 'monthly') return { type: 'monthly' };
     const days = this.daysOfWeek.slice().sort();
     if (!days.length) return null;
     return { type: this.repeat, daysOfWeek: days };
@@ -7030,23 +6592,8 @@ function setTopAction() {
   }
   els.topAction.hidden = false;
   els.topAction.classList.remove('top-action-disabled', 'top-action-glow');
-  // Mode-aware label / disabled / glow. Falls back to the original
-  // "+ New task" / "Close" toggle when DayState hasn't loaded yet.
-  const mode = (window.DayState && DayState.current && DayState.current.mode) || null;
   const dockOpen = !els.dockWrap.classList.contains('closed');
-  if (dockOpen) { els.topAction.textContent = 'Close'; return; }
-  if (mode === 'today-incomplete') {
-    const left = (DayState.current && DayState.current.todayRemaining) || 0;
-    els.topAction.textContent = `${left} task${left === 1 ? '' : 's'} left`;
-    els.topAction.classList.add('top-action-disabled');
-  } else if (mode === 'tomorrow-committed') {
-    els.topAction.hidden = true;
-  } else if (mode === 'planning-tomorrow') {
-    els.topAction.textContent = '+ New task';
-    els.topAction.classList.add('top-action-glow');
-  } else {
-    els.topAction.textContent = '+ New task';
-  }
+  els.topAction.textContent = dockOpen ? 'Close' : '+ New task';
 }
 
 // Dock open/close helpers — toggle the `closed` class so the transition runs.
@@ -7087,7 +6634,7 @@ function setTab(name) {
 
 /* ---- Task-check animation ----
    Two parallel sets track the per-task animation state so re-renders
-   triggered by background syncs (Store.load, DayState.refresh) during
+   triggered by background syncs (Store.load) during
    the animation window don't destroy the in-progress animation:
      _poppingTasks  — the check-button is mid-pop (0–220 ms)
      _exitingTasks  — the row is mid-slide-out (220–720 ms)
@@ -7222,17 +6769,9 @@ function renderStatStrip(state) {
 
 // Currently-selected date ISO string (YYYY-MM-DD). Empty until first render.
 let selectedDateISO = '';
-// Exposed so the Collab module can clear the selection when the
-// viewer switches accounts — otherwise the previous viewer's "today"
-// stays pinned and the next render filters the new account's tasks
-// against the wrong date (looks like an empty / unchanged list).
-window.__resetSelectedDate = function _resetSelectedDate() { selectedDateISO = ''; };
 
 // Calendar view state
 let calViewYear = 0, calViewMonth = 0;
-
-// Day-lock is suspended — always editable.
-function canEditDay() { return true; }
 
 // Offset an ISO date string by N days
 function offsetDate(iso, days) {
@@ -7312,14 +6851,6 @@ function taskScheduledFor(t, dayISO) {
     // Don't show recurring tasks before their creation date
     const startDate = (t.startedAt || '').slice(0, 10);
     if (startDate && dayISO < startDate) return false;
-    if (t.recurrence.type === 'monthly') {
-      // Monthly tasks recur on the same day-of-month as the start date.
-      // Months that don't have that day (e.g. Feb for a day-31 task) are
-      // simply skipped that month.
-      const startDay = parseInt((t.startedAt || '').slice(8, 10), 10);
-      const dayPart  = parseInt(dayISO.slice(8, 10), 10);
-      return startDay === dayPart;
-    }
     const days = (t.recurrence.daysOfWeek) || [];
     return days.includes(new Date(dayISO + 'T00:00:00').getDay());
   }
@@ -7335,55 +6866,6 @@ function taskScheduledFor(t, dayISO) {
 function isTaskDoneOn(t, dayISO) {
   if (!t.recurrence) return t.done;
   return (t.completedDates || []).includes(dayISO);
-}
-
-function renderDayToggle(state) {
-  const tomorrowEnabled = canEditDay(state, 'tomorrow') || state.tasks.some(t => taskScheduledFor(t, state.tomorrow));
-  const todayBtn = document.querySelector('.day-chip[data-day="today"]');
-  const tomorrowBtn = document.querySelector('.day-chip[data-day="tomorrow"]');
-  if (todayBtn) todayBtn.classList.toggle('selected', selectedDay === 'today');
-  if (tomorrowBtn) {
-    tomorrowBtn.classList.toggle('selected', selectedDay === 'tomorrow');
-    tomorrowBtn.disabled = !tomorrowEnabled;
-  }
-}
-
-function renderLockBanner(state) {
-  const banner = document.getElementById('lock-banner');
-  if (!banner) return;
-  // Day-lock suspended \u2014 banner hidden until locking is re-enabled.
-  banner.hidden = true;
-  if (false) {
-  let icon = lockIcon, msg = '';
-  if (selectedDay === 'today') {
-    if (state.overrideActive) {
-      icon = unlockIcon;
-      msg = 'Override active \u2014 today is editable until midnight.';
-    } else {
-      const todayTaskCount = state.tasks.filter(t =>
-        taskScheduledFor(t, state.today)
-      ).length;
-      icon = lockIcon;
-      msg = todayTaskCount > 0
-        ? 'Today is locked. Complete all tasks to unlock tomorrow.'
-        : 'Today is locked. Start planning for tomorrow.';
-    }
-  } else {
-    if (state.todayComplete) {
-      icon = checkIcon;
-      msg = 'Today is complete. Plan tomorrow \u2014 list locks at midnight.';
-    } else {
-      const incomplete = state.tasks.filter(t =>
-        taskScheduledFor(t, state.today) && !isTaskDoneOn(t, state.today)
-      ).length;
-      const word = incomplete === 1 ? 'task' : 'tasks';
-      icon = lockIcon;
-      msg = `Finish today\u2019s ${incomplete} unchecked ${word} before planning tomorrow.`;
-    }
-  }
-  banner.innerHTML = `${icon}<span>${msg}</span>`;
-  banner.hidden = false;
-  } // end if (false) \u2014 lock banner disabled
 }
 
 // ---- View mode state ('category' | 'recent' | 'chronological' | 'custom') ----
@@ -7426,9 +6908,6 @@ function getTaskAnalytics(task, today) {
   if (!recurrence) return null;
   const daysOfWeek = (recurrence.daysOfWeek) || [];
   const startDate = (task.startedAt || '').slice(0, 10) || today;
-  const monthlyDay = recurrence.type === 'monthly'
-    ? parseInt((task.startedAt || '').slice(8, 10), 10)
-    : null;
   const rawDates = task.completedDates || [];
   const completedSet = new Set(rawDates.filter(d => !d.startsWith('skip:')));
   const skippedSet  = new Set(rawDates.filter(d => d.startsWith('skip:')).map(d => d.slice(5)));
@@ -7439,10 +6918,7 @@ function getTaskAnalytics(task, today) {
   const todayDate = new Date(today + 'T00:00:00');
   while (cur <= todayDate) {
     const iso = cur.toISOString().slice(0, 10);
-    const isScheduled = recurrence.type === 'monthly'
-      ? (Number.isFinite(monthlyDay) && cur.getDate() === monthlyDay)
-      : daysOfWeek.includes(cur.getDay());
-    if (isScheduled) allScheduled.push(iso);
+    if (daysOfWeek.includes(cur.getDay())) allScheduled.push(iso);
     cur.setDate(cur.getDate() + 1);
   }
 
@@ -7473,14 +6949,14 @@ function getTaskAnalytics(task, today) {
     else if (d <= today) break; // missed or today not done yet
   }
 
-  return { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate, monthlyDay };
+  return { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate };
 }
 
 function renderAnalyticsPanel(task, today) {
   const openState = analyticsOpen.get(task.id) || { monthOffset: 0 };
   const analytics = getTaskAnalytics(task, today);
   if (!analytics) return '';
-  const { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate, monthlyDay } = analytics;
+  const { pct, bestStreak, currentStreak, completedSet, skippedSet, daysOfWeek, startDate } = analytics;
 
   // --- Stats row ---
   const pctDisplay = pct === null ? '--' : pct + '%';
@@ -7524,11 +7000,7 @@ function renderAnalyticsPanel(task, today) {
   for (let day = 1; day <= daysInMonth; day++) {
     const iso = year + '-' + String(month + 1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
     const dayOfWeek = new Date(iso + 'T00:00:00').getDay();
-    const isScheduled = (
-      monthlyDay != null
-        ? (Number.isFinite(monthlyDay) && day === monthlyDay)
-        : daysOfWeek.includes(dayOfWeek)
-    ) && iso >= startDate;
+    const isScheduled = daysOfWeek.includes(dayOfWeek) && iso >= startDate;
     const isDone    = completedSet.has(iso);
     const isSkipped = skippedSet.has(iso);
     const isPast    = iso < today;
@@ -7575,7 +7047,6 @@ function renderViewModeBar() {
 function renderTasksView(state) {
   if (!selectedDateISO) selectedDateISO = state.today;
   renderDateNav(state);
-  renderLockBanner(state);
   renderViewModeBar();
 
   const dayISO = selectedDateISO;
@@ -7887,17 +7358,7 @@ function countTaskInRange(t, start, end) {
     if (endsBefore && endsBefore <= cursorEnd) {
       cursorEnd = addDaysISO(endsBefore, -1);
     }
-    if (t.recurrence.type === 'monthly') {
-      const startDay = parseInt((t.startedAt || createdISO).slice(8, 10), 10);
-      let cursor = startCursor;
-      while (cursor <= cursorEnd) {
-        if (parseInt(cursor.slice(8, 10), 10) === startDay) {
-          scheduled++;
-          if (doneSet.has(cursor)) completed++;
-        }
-        cursor = addDaysISO(cursor, 1);
-      }
-    } else {
+    {
       const days = t.recurrence.daysOfWeek || [];
       if (days.length) {
         let cursor = startCursor;
@@ -8051,20 +7512,24 @@ function executionStreak(state) {
 }
 
 /* ─── Coach upsell prompt ───────────────────────────────────────────
-   When the user's per-day execution rate is below 50% for three
-   consecutive completed days (i.e. yesterday + two before — today is
-   excluded so a mid-day rate doesn't trigger it), pop a modal asking
-   if they'd like a coach. Skipped for users who already have a coach,
-   the coach themselves, and the admin. Cooldown via localStorage so
-   the same user doesn't see the prompt repeatedly.
+   Triggered on MOMENTUM, not failure. When a user hits a 7-day
+   execution streak (consecutive 100% days), they're already proving
+   they can perform — that's the moment to invite them to level up
+   with a 1:1 coach. Previously we showed this after 3 sub-50% days,
+   which read as the app piling on shame when a user was already
+   struggling. Wrong moment, wrong message. Now it's a reward-the-
+   winners pattern.
+
+   Other suitable success triggers (left as TODO so the UX team can
+   pick which to expand to): after completing a challenge, after a
+   strong calendar month. For now: 7-day streak only.
    ─────────────────────────────────────────────────────────────────── */
 const CoachUpsell = (() => {
   const STORAGE_KEY = 'gofirst:coach-upsell:lastShown';
-  // Don't re-prompt the same user within this window even if their
-  // streak keeps going. Resets on a fresh login or storage clear.
-  const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
-  const STREAK_DAYS = 3;
-  const THRESHOLD_PCT = 50;
+  // After we show it once, hold off for a long window so we don't
+  // re-prompt the same user every time they hit a fresh streak.
+  const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const STREAK_TARGET = 7; // consecutive 100% days
 
   let _open = false;
   let _checkScheduled = false;
@@ -8079,21 +7544,12 @@ const CoachUpsell = (() => {
     try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch {}
   }
 
-  // Returns true iff each of the last STREAK_DAYS completed days
-  // (yesterday and the two before) has a rate that's BOTH measurable
-  // (scheduled > 0, i.e. not null) AND below THRESHOLD_PCT. If any of
-  // the three days has null rate (no scheduled tasks) we don't count it
-  // either way — we just exit without prompting, since the user might
-  // not have been using the app yet.
-  function streakBelowThreshold(state) {
-    const today = todayISO();
-    for (let i = 1; i <= STREAK_DAYS; i++) {
-      const iso = addDaysISO(today, -i);
-      const rate = dayExecutionRate(state, iso);
-      if (rate === null) return false;
-      if (rate >= THRESHOLD_PCT) return false;
-    }
-    return true;
+  // True iff the user has just hit the target streak. Uses the
+  // existing executionStreak() helper — consecutive 100% days
+  // walking back from today.
+  function streakHit(state) {
+    try { return executionStreak(state) >= STREAK_TARGET; }
+    catch { return false; }
   }
 
   function eligible(user) {
@@ -8107,7 +7563,7 @@ const CoachUpsell = (() => {
     return true;
   }
 
-  function show() {
+  function show(streakDays) {
     if (_open) return;
     _open = true;
     markShown();
@@ -8119,11 +7575,11 @@ const CoachUpsell = (() => {
           <img src="/coach.jpg" alt="" referrerpolicy="no-referrer" />
           <span class="coach-upsell-online-dot" aria-label="Online"></span>
         </div>
-        <div class="coach-upsell-title">Could a coach help?</div>
+        <div class="coach-upsell-title">${streakDays} days at 100%. Want more?</div>
         <div class="coach-upsell-body">
-          Your execution rate has been below 50% for three days. A
-          1:1 coach can keep you on track, in-app, with daily
-          check-ins and accountability.
+          You're proving you can execute. A 1:1 coach can help you
+          set bigger commitments, raise your ceiling, and stay
+          accountable when life gets harder.
         </div>
         <div class="coach-upsell-actions">
           <button class="coach-upsell-btn primary" data-action="get">Get a coach</button>
@@ -8162,8 +7618,8 @@ const CoachUpsell = (() => {
         if (Date.now() - lastShown() < COOLDOWN_MS) return;
         const state = (typeof Store !== 'undefined') ? Store.get() : null;
         if (!state || !Array.isArray(state.tasks)) return;
-        if (!streakBelowThreshold(state)) return;
-        show();
+        if (!streakHit(state)) return;
+        show(executionStreak(state));
       } catch (e) { console.warn('[coach-upsell] check failed', e); }
     }, 1500);
   }
@@ -8695,23 +8151,10 @@ function renderAnalyticsView(state) {
   }
 }
 
-/* ============================================================
-   Notes — persistent scratch pad. Local-only for now; the server
-   endpoint will come with the day-lock build.
-   ============================================================ */
-const NOTES_KEY = 'gofirst:notes';
-function loadNotes() {
-  try { return localStorage.getItem(NOTES_KEY) || ''; } catch { return ''; }
-}
-function saveNotesValue(v) {
-  try { localStorage.setItem(NOTES_KEY, v); } catch {}
-}
-
 function render(state) {
   renderTasksView(state);
   renderStreaksView(state);
   renderAnalyticsView(state);
-  renderOverrides(state);
   renderMissed(state);
   // Re-sync the Profile view on every render so the visible state never drifts
   // from `Auth.user`.
@@ -8781,20 +8224,6 @@ document.getElementById('cal-grid').addEventListener('click', (e) => {
   selectedDateISO = cell.dataset.iso;
   closeCalendar();
   render(Store.get());
-});
-
-// --- Use Override button on Profile ---
-document.getElementById('use-override').addEventListener('click', async () => {
-  const r = await Store.useOverride();
-  if (!r.ok) {
-    if (r.error === 'paywall') {
-      banner('Out of free overrides — $4.99 IAP coming soon.', true, 4000);
-    } else {
-      banner('Could not use override', true);
-    }
-    return;
-  }
-  banner('Override active — today is editable.');
 });
 
 // --- Missed-list click delegation (retry button) ---
@@ -8877,24 +8306,6 @@ els.categoryToggle.addEventListener('click', (e) => {
   if (!c) return;
   TaskForm.setCategory(c.dataset.category);
 });
-
-// --- Notes textarea (persistent scratch pad, local-only for now) ---
-(() => {
-  const ta = document.getElementById('notes-text');
-  const status = document.getElementById('notes-status');
-  if (!ta) return;
-  ta.value = loadNotes();
-  status.textContent = ta.value ? 'Saved' : '';
-  let t;
-  ta.addEventListener('input', () => {
-    status.textContent = 'Saving…';
-    clearTimeout(t);
-    t = setTimeout(() => {
-      saveNotesValue(ta.value);
-      status.textContent = 'Saved';
-    }, 400);
-  });
-})();
 
 // --- Top action (context-sensitive per tab) ---
 els.topAction.addEventListener('click', () => {
@@ -9364,31 +8775,14 @@ function renderProfile() {
       ? u.location
       : 'Where you live — others can find you by searching their area.';
   }
+  const adminSection = document.getElementById('profile-admin-section');
+  if (adminSection) adminSection.hidden = !(u && (u.isAdmin || u.isCoach));
   // Notify any setting-row IIFE that depends on Auth.user (e.g. the
   // lock-time picker) to re-read its value. Cheaper than each one
   // polling the auth state on its own.
   document.dispatchEvent(new CustomEvent('auth:userloaded'));
-  // NOTE: Collab.refresh() is NOT called from here. renderProfile fires
-  // on every Store.subscribe tick, and a fresh /api/collaborators call
-  // briefly empties _state before the response lands — long enough for
-  // the snap-back check (viewingAs set + no accessibleAccounts) to
-  // revert the active viewer back to self, which made the
-  // collaborator switch look broken. Refreshes happen on auth:userloaded
-  // and on Profile-tab visit instead — see Collab module below.
 }
 
-/* ============================================================
-   Collaboration module — Premium feature.
-   Two faces:
-     1. Premium owner: Profile section to manage their ONE collaborator
-        (add by email, remove). Calls /api/collaborators.
-     2. Collaborator: a list of accounts they have access to, plus
-        a viewer-switcher dropdown that swaps Tasks + Analytics tabs
-        to render the OWNER's data via ?as=<ownerId> on every fetch.
-   `Collab.viewingAs` is the global "currently acting as" user id
-   (null = self). All task / day-state network calls funnel through
-   `Collab.scopedUrl(path)` which appends ?as=… when set.
-   ============================================================ */
 /* ============================================================
    Premium module. Owns the html.is-premium-gated body class +
    the upgrade handler that opens Stripe checkout. Sync'd with
@@ -9459,274 +8853,6 @@ window.Premium = (function setupPremium() {
   };
 })();
 
-window.Collab = (function setupCollab() {
-  let _state = { isPremium: false, mine: null, accessibleAccounts: [] };
-  let viewingAs = null; // null → acting as self; else owner user id
-
-  // Append ?as=<id> to a path when we're acting on someone else's
-  // data. Idempotent if the path already has a query string.
-  function scopedUrl(path) {
-    if (!viewingAs) return path;
-    const sep = path.includes('?') ? '&' : '?';
-    return `${path}${sep}as=${encodeURIComponent(viewingAs)}`;
-  }
-
-  function viewingAsId() { return viewingAs; }
-
-  function viewingAsAccount() {
-    if (!viewingAs) return null;
-    return _state.accessibleAccounts.find(a => a.id === viewingAs) || null;
-  }
-
-  async function setViewingAs(id) {
-    if (id === viewingAs) return;
-    const previous = viewingAs;
-    viewingAs = id || null;
-    console.log('[collab] viewingAs →', viewingAs);
-    renderSwitcher();
-    // Reset the persistent date selection BEFORE the data refetch so
-    // the next render keys off the new account's "today" rather than
-    // the previous viewer's date. Without this the switch looks like
-    // a no-op when the two viewers are in different time zones / have
-    // tasks scheduled on different dates.
-    try {
-      if (typeof window.__resetSelectedDate === 'function') {
-        window.__resetSelectedDate();
-      }
-    } catch {}
-    // Optional UX toast — the visual change happens in two waves
-    // (Store.load → DayState.refresh) and on a slow connection that
-    // can feel like nothing happened.
-    if (typeof banner === 'function') {
-      const acct = viewingAsAccount();
-      banner(acct ? `Viewing ${acct.name || acct.email}'s tasks…` : 'Switching back to your tasks…', false, 1500);
-    }
-    // Await both. If either throws, surface the error rather than
-    // swallowing it — the user was getting "nothing happens" UX from
-    // a silent failure with no log trail.
-    let storeOk = true, dayOk = true;
-    try {
-      if (window.Store && typeof Store.load === 'function') {
-        await Store.load();
-      }
-    } catch (e) {
-      storeOk = false;
-      console.error('[collab] Store.load after switch failed:', e);
-    }
-    try {
-      if (window.DayState && typeof DayState.refresh === 'function') {
-        await DayState.refresh();
-      }
-    } catch (e) {
-      dayOk = false;
-      console.error('[collab] DayState.refresh after switch failed:', e);
-    }
-    if (!storeOk || !dayOk) {
-      // Roll back so the UI doesn't claim we're viewing an account we
-      // can't actually load.
-      viewingAs = previous;
-      renderSwitcher();
-      if (typeof banner === 'function') banner('Could not load that account. Reverted.', true);
-    }
-  }
-
-  async function refresh() {
-    try {
-      _state = await api('GET', '/api/collaborators');
-    } catch (e) {
-      console.warn('[collab] fetch failed', e);
-      _state = { isPremium: false, mine: null, accessibleAccounts: [] };
-    }
-    renderProfileSections();
-    renderSwitcher();
-    // If we were viewing an account that's no longer accessible, snap back to self.
-    if (viewingAs && !_state.accessibleAccounts.some(a => a.id === viewingAs)) {
-      setViewingAs(null);
-    }
-  }
-
-  function renderProfileSections() {
-    // The collaborator section's section-title + cards are now
-    // flat children of .view (no wrapper div) so the first-child
-    // 4px-top-margin rule doesn't accidentally fire. Visibility
-    // of the inner content is handled by the .premium-only /
-    // .premium-locked-card CSS classes alone — no JS toggle needed.
-    const currentRow = document.getElementById('collab-current-row');
-    const emptyRow   = document.getElementById('collab-empty-row');
-    const nameEl     = document.getElementById('collab-current-name');
-    const subEl      = document.getElementById('collab-current-sub');
-    if (currentRow && emptyRow) {
-      if (_state.mine) {
-        currentRow.hidden = false;
-        emptyRow.hidden = true;
-        if (nameEl) nameEl.textContent = _state.mine.name || _state.mine.email;
-        if (subEl)  subEl.textContent  = _state.mine.email + ' — full task-list access.';
-      } else {
-        currentRow.hidden = true;
-        emptyRow.hidden = false;
-      }
-    }
-
-    // Accessible accounts (collaborator face)
-    const accSec  = document.getElementById('accessible-accounts-section');
-    const accCard = document.getElementById('accessible-accounts-card');
-    if (accSec && accCard) {
-      const list = _state.accessibleAccounts || [];
-      accSec.hidden = list.length === 0;
-      accCard.innerHTML = list.map((a) => `
-        <div class="setting-row">
-          <div class="setting-copy">
-            <div class="setting-title">${esc(a.name || a.email)}</div>
-            <div class="setting-sub">${esc(a.email)} — you can add, edit, complete, and remove their tasks.</div>
-          </div>
-          <button class="action-btn ghost setting-btn" data-collab-leave="${esc(a.id)}">Leave</button>
-        </div>
-      `).join('');
-    }
-  }
-
-  // Renders the viewer-switcher pill at the top of the Tasks tab. Only
-  // shows when the user has at least one accessible account. Default
-  // option is "Your tasks"; each accessible account is one extra row.
-  function renderSwitcher() {
-    const sw = document.getElementById('viewer-switcher');
-    if (!sw) return;
-    const list = _state.accessibleAccounts || [];
-    if (!list.length) { sw.hidden = true; return; }
-    sw.hidden = false;
-    const current = viewingAsAccount();
-    const label = current ? `${current.name || current.email}'s tasks` : 'Your tasks';
-    sw.querySelector('.viewer-switcher-label').textContent = label;
-    const menu = sw.querySelector('.viewer-switcher-menu');
-    menu.innerHTML = `
-      <button type="button" data-viewer-set="" class="${!viewingAs ? 'active' : ''}">Your tasks</button>
-      ${list.map(a => `
-        <button type="button" data-viewer-set="${esc(a.id)}" class="${viewingAs === a.id ? 'active' : ''}">${esc(a.name || a.email)}'s tasks</button>
-      `).join('')}
-    `;
-  }
-
-  // Wire the Profile add/remove buttons + accessible-account leave
-  // buttons + viewer-switcher dropdown. Idempotent — safe to call once
-  // at boot.
-  function wireUI() {
-    const addBtn = document.getElementById('collab-add-btn');
-    if (addBtn) addBtn.addEventListener('click', async () => {
-      const email = window.prompt('Collaborator email (must already have a GoFirst account):', '');
-      if (!email) return;
-      try {
-        await api('POST', '/api/collaborators', { email: email.trim() });
-        await refresh();
-        banner('Collaborator added');
-      } catch (e) {
-        const msg = (e && e.message) || 'failed';
-        banner(
-          msg.includes('user_not_found') ? 'No GoFirst account with that email.'
-          : msg.includes('already')       ? 'Already have a collaborator — remove the current one first.'
-          : msg.includes('premium_only')  ? 'Premium only.'
-          : 'Could not add collaborator.',
-          true
-        );
-      }
-    });
-
-    const removeBtn = document.getElementById('collab-remove-btn');
-    if (removeBtn) removeBtn.addEventListener('click', async () => {
-      if (!confirm('Remove your collaborator? They\'ll lose access to your task list immediately.')) return;
-      try {
-        await api('DELETE', '/api/collaborators/mine');
-        await refresh();
-        banner('Collaborator removed');
-      } catch { banner('Could not remove collaborator', true); }
-    });
-
-    const accCard = document.getElementById('accessible-accounts-card');
-    if (accCard) accCard.addEventListener('click', async (e) => {
-      const btn = e.target.closest('[data-collab-leave]');
-      if (!btn) return;
-      const ownerId = btn.dataset.collabLeave;
-      if (!confirm('Leave this collaboration? You\'ll lose access to their task list.')) return;
-      try {
-        await api('DELETE', `/api/collaborators/access/${encodeURIComponent(ownerId)}`);
-        if (viewingAs === ownerId) setViewingAs(null);
-        await refresh();
-        banner('Left collaboration');
-      } catch { banner('Could not leave collaboration', true); }
-    });
-
-    const sw = document.getElementById('viewer-switcher');
-    if (sw) {
-      const trigger = sw.querySelector('.viewer-switcher-trigger');
-      const menu    = sw.querySelector('.viewer-switcher-menu');
-      trigger.addEventListener('click', () => {
-        sw.classList.toggle('open');
-      });
-      menu.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-viewer-set]');
-        if (!btn) return;
-        sw.classList.remove('open');
-        setViewingAs(btn.dataset.viewerSet || null);
-      });
-      // Close the menu on outside click.
-      document.addEventListener('click', (e) => {
-        if (!sw.contains(e.target)) sw.classList.remove('open');
-      });
-    }
-  }
-
-  // Wire UI when DOM is parsed — markup IDs above will exist by then.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wireUI);
-  } else {
-    wireUI();
-  }
-
-  // Refresh once when auth resolves (initial population of mine /
-  // accessibleAccounts) and once whenever the user opens the Profile
-  // tab (catches admin-side Premium toggling and collaborator
-  // adds/removes from the other side). Keep this AWAY from the
-  // render-on-every-Store-tick path — the temporary _state empty
-  // window during the fetch can race against the snap-back check
-  // and yank the active viewer back to self mid-switch.
-  document.addEventListener('auth:userloaded', () => { refresh().catch(() => {}); });
-  document.addEventListener('click', (e) => {
-    const tab = e.target && e.target.closest && e.target.closest('.tab[data-tab="profile"]');
-    if (tab) refresh().catch(() => {});
-  });
-
-  return {
-    refresh,
-    scopedUrl,
-    viewingAsId,
-    viewingAsAccount,
-    setViewingAs,
-  };
-})();
-
-function renderOverrides(state) {
-  const ov = state.overrides || { used: 0, remaining: 3, active: false };
-  const title = document.getElementById('override-title');
-  const sub = document.getElementById('override-sub');
-  const btn = document.getElementById('use-override');
-  if (!title || !btn) return;
-  if (ov.active) {
-    title.textContent = 'Override active until midnight';
-    sub.textContent = `${ov.remaining} free overrides remaining this month.`;
-    btn.textContent = 'Active';
-    btn.disabled = true;
-  } else if (ov.remaining > 0) {
-    title.textContent = `${ov.remaining} override${ov.remaining === 1 ? '' : 's'} left this month`;
-    sub.textContent = 'Use one to unlock today\u2019s list when you missed planning the night before.';
-    btn.textContent = 'Use';
-    btn.disabled = false;
-  } else {
-    title.textContent = 'Out of free overrides this month';
-    sub.textContent = 'Additional overrides are $4.99 each (in-app purchase coming soon).';
-    btn.textContent = '$4.99';
-    btn.disabled = false;
-  }
-}
-
 function renderMissed(state) {
   const list = document.getElementById('missed-list');
   const empty = document.getElementById('missed-empty');
@@ -9762,11 +8888,6 @@ function renderMissed(state) {
 document.getElementById('profile-logout').addEventListener('click', async () => {
   try { await Auth.logout(); } catch {}
   location.reload();
-});
-
-// Profile → Show app tour (replay path; doesn't reset the seen flag).
-document.getElementById('profile-show-tour').addEventListener('click', () => {
-  if (window.Tour) Tour.open({ replay: true });
 });
 
 // Header → Share Feedback. Bottom sheet with a textarea; tapping Send
@@ -9859,82 +8980,6 @@ function openFeedbackSheet() {
   });
 }
 document.getElementById('feedback-btn').addEventListener('click', openFeedbackSheet);
-
-// Profile → Day-end lock time. Initial value is seeded from Auth.user
-// once it's populated; PATCHes /api/auth/me on change. Page is NOT
-// reloaded — the SPA's todayISO already reads Auth.user.lockTime
-// directly, so the new boundary takes effect immediately.
-(function wireLockTimeSetting() {
-  const input = document.getElementById('profile-lock-time');
-  const sub   = document.getElementById('lock-time-sub');
-  if (!input) return;
-  function fmt(s) {
-    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return '12:00 AM';
-    let h = parseInt(m[1], 10);
-    const mm = m[2];
-    const period = h >= 12 ? 'PM' : 'AM';
-    h = h % 12; if (h === 0) h = 12;
-    return `${h}:${mm} ${period}`;
-  }
-  // Format an ISO timestamp as a short countdown ("4 days") or
-  // calendar date ("May 23") depending on how far out it is.
-  function fmtAvailable(nextISO) {
-    if (!nextISO) return null;
-    const next = new Date(nextISO);
-    const ms = next.getTime() - Date.now();
-    if (ms <= 0) return null;
-    const days = Math.ceil(ms / 86_400_000);
-    if (days <= 1) {
-      const hrs = Math.ceil(ms / 3_600_000);
-      return `${hrs} hour${hrs === 1 ? '' : 's'}`;
-    }
-    return `${days} day${days === 1 ? '' : 's'}`;
-  }
-  function refresh() {
-    const t = (Auth && Auth.user && Auth.user.lockTime) || '00:00';
-    input.value = t;
-    const nextISO = Auth && Auth.user && Auth.user.nextLockChangeAt;
-    const available = fmtAvailable(nextISO);
-    if (available) {
-      // Within the 14-day cooldown window — block the input and show
-      // when it can change again.
-      input.disabled = true;
-      if (sub) sub.textContent = `Locked at ${fmt(t)}. Available to change in ${available}.`;
-    } else {
-      input.disabled = false;
-      if (sub) sub.textContent = `Currently ${fmt(t)}. After you change it, you can't change it again for 14 days.`;
-    }
-  }
-  // Initial render — wait until Auth resolves. boot() calls renderProfile
-  // after auth, so a microtask delay is enough; otherwise refresh manually.
-  refresh();
-  document.addEventListener('auth:userloaded', refresh);
-  input.addEventListener('change', async () => {
-    const v = input.value;
-    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(v)) return;
-    try {
-      const r = await fetch('/api/auth/me', {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lockTime: v }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (r.status === 429 && data && data.error === 'lock_time_cooldown') {
-        const available = fmtAvailable(data.nextChangeAt);
-        alert(`You can only change this once every 14 days. Available again in ${available || 'a bit'}.`);
-        // Sync the auth shape so the UI reflects the locked state.
-        if (Auth && Auth.user) Auth.user.nextLockChangeAt = data.nextChangeAt;
-        refresh();
-        return;
-      }
-      if (!r.ok) throw new Error(data && data.error || `status_${r.status}`);
-      if (data && data.user) Auth.user = data.user;
-      refresh();
-    } catch (e) { console.warn('[lock-time] save failed', e); }
-  });
-})();
 
 /* ============================================================
    Push notifications — Profile toggle.
@@ -11825,13 +10870,9 @@ const Coaching = (() => {
     // for today's day-of-week + one-shots scheduled for today.
     const today = todayISO();
     const dow = new Date().getDay();
-    const todayDay = parseInt(today.slice(8, 10), 10);
     const todayTasks = (_clientGlanceTasks || []).filter(t => {
       if (t.scheduledDate === today) return true;
       if (!t.recurrence) return false;
-      if (t.recurrence.type === 'monthly') {
-        return parseInt((t.startedAt || '').slice(8, 10), 10) === todayDay;
-      }
       return (t.recurrence.daysOfWeek || []).includes(dow);
     });
 
@@ -12658,11 +11699,6 @@ async function boot() {
   // start out unchecked even when notifyMessages/Friends/System are true.
   if (window.PushNotifications) PushNotifications.refreshState();
 
-  // Pull the day-state machine immediately so the Tasks tab shows the
-  // right mode (planning / today-incomplete / etc.) on first paint.
-  // Subsequent refreshes are triggered by Store.load on task changes.
-  if (window.DayState) DayState.refresh();
-
   // Fetch fresh data in the background; Store.load() calls emit() when done,
   // which triggers a second render with the live server state.
   try {
@@ -12766,239 +11802,6 @@ document.querySelectorAll('details').forEach(smoothDetails);
    it's plain prose by design (Option A from the design discussion).
    ============================================================ */
 
-/* ============================================================
-   DayState — the Tasks tab's state machine.
-   Pulls /api/days/state on boot and after every task mutation, then
-   drives:
-     - mode-banner copy (planning/today-incomplete/planning-tomorrow/...)
-     - the New Task button (label / disabled / glow)
-     - the Commit button at the bottom of the planning list
-     - the "You crushed today" countdown card
-     - which date the task list is rendering (today vs tomorrow)
-   ============================================================ */
-window.DayState = (() => {
-  let current = null;          // last response from /api/days/state
-  let countdownTimer = null;   // setInterval handle for crushed-card
-
-  async function refresh() {
-    try {
-      const r = await fetch(_maybeScopePath('/api/days/state'), { credentials: 'same-origin' });
-      if (!r.ok) return null;
-      current = await r.json();
-      apply();
-      return current;
-    } catch (e) {
-      console.warn('[day-state] fetch failed', e);
-      return null;
-    }
-  }
-
-  // Force-render whatever's currently in `current` to the DOM.
-  function apply() {
-    if (!current) return;
-    const banner       = document.getElementById('mode-banner');
-    const bannerTitle  = document.getElementById('mode-banner-title');
-    const bannerSub    = document.getElementById('mode-banner-sub');
-    const crushed      = document.getElementById('crushed-card');
-    const commitRow    = document.getElementById('commit-row');
-    const commitBtn    = document.getElementById('commit-btn');
-    const dateNav      = document.getElementById('date-nav');
-    const tasksList    = document.getElementById('tasks-list');
-    const tasksEmpty   = document.getElementById('tasks-empty');
-    const completedSec = document.getElementById('completed-section');
-
-    // Format an ISO date as "Sat, May 9" — used in the sub line so the
-    // user can always see which calendar date the system thinks they're
-    // looking at. This was added after a confused-day-rollover report
-    // ("it's May 10 but the app says May 9 with 10 tasks left"); making
-    // the date visible removes the guesswork.
-    const fmtBannerDate = (iso) => {
-      try {
-        const d = new Date(iso + 'T00:00:00');
-        return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-      } catch { return iso; }
-    };
-
-    // Mode-specific copy + visibility.
-    let title = '', sub = '', commitLabel = '';
-    let showCrushed = false, showCommit = false, showList = true;
-    switch (current.mode) {
-      case 'planning-today':
-        title = `Plan today — ${fmtBannerDate(current.today)}.`;
-        sub   = 'Add the things you\'re committing to today, then tap Commit.';
-        commitLabel = 'Commit today';
-        showCommit = (current.todayCount > 0);
-        break;
-      case 'today-incomplete':
-        // No banner — the "X tasks left" pill in the header already
-        // tells the user how much is left, so this would just be
-        // duplicate noise at the top of the list.
-        title = '';
-        sub   = '';
-        showCommit = false;
-        break;
-      case 'planning-tomorrow':
-        title = 'You crushed today.';
-        sub   = `Plan tomorrow (${fmtBannerDate(current.tomorrow)}) and commit.`;
-        commitLabel = 'Commit tomorrow';
-        showCommit = (current.tomorrowCount > 0);
-        break;
-      case 'tomorrow-committed':
-        showCrushed = true;
-        showList = false;
-        showCommit = false;
-        break;
-    }
-
-    if (banner)      banner.hidden = !title && !sub;
-    if (bannerTitle) bannerTitle.textContent = title;
-    if (bannerSub)   bannerSub.textContent   = sub;
-    if (crushed)     crushed.hidden = !showCrushed;
-    if (commitBtn)   commitBtn.textContent = 'Commit';
-    if (commitRow)   commitRow.hidden = !showCommit;
-
-    // Date navigator is permanently hidden — the whole point of the
-    // commit lifecycle is "focus on what's in front of you, no
-    // wandering around past or future days."
-    if (dateNav)      dateNav.hidden    = true;
-    if (tasksList)    tasksList.hidden  = !showList;
-    if (completedSec) completedSec.style.display = showList ? '' : 'none';
-    if (tasksEmpty && !showList) tasksEmpty.hidden = true;
-
-    // Make sure the Tasks tab is rendering the RIGHT day. In planning-
-    // tomorrow mode we shift to tomorrow; everywhere else, today. The
-    // SPA tracks the visible date in `selectedDateISO`; setting it +
-    // re-rendering moves the list.
-    try {
-      const target = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
-      if (typeof selectedDateISO !== 'undefined' && selectedDateISO !== target) {
-        selectedDateISO = target;
-        if (typeof Store !== 'undefined' && typeof render === 'function') render(Store.get());
-      }
-    } catch {}
-
-    // Top-action button reflects the mode too — re-render via the
-    // existing helper.
-    if (typeof setTopAction === 'function') setTopAction();
-
-    // Countdown ticking — only in committed-waiting mode.
-    stopCountdown();
-    if (showCrushed && current.msUntilNextLock > 0) startCountdown(current.msUntilNextLock);
-  }
-
-  function startCountdown(initialMs) {
-    const el = document.getElementById('crushed-countdown');
-    if (!el) return;
-    const target = Date.now() + initialMs;
-    const tick = () => {
-      const ms = Math.max(0, target - Date.now());
-      const totalSec = Math.floor(ms / 1000);
-      const h = Math.floor(totalSec / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      if (ms <= 0) { stopCountdown(); refresh(); /* lockTime hit, re-pull state */ }
-    };
-    tick();
-    countdownTimer = setInterval(tick, 1000);
-  }
-  function stopCountdown() {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-  }
-
-  // Bare commit — POSTs to the server and resolves. Caller decides
-  // when to refresh DayState / Store; the wired Commit button defers
-  // those updates until the ceremony has fully appeared so the
-  // underlying re-render doesn't fight the animation for paint frames.
-  async function commit(date) {
-    if (!date) return;
-    const r = await fetch(_maybeScopePath(`/api/days/${encodeURIComponent(date)}/commit`), {
-      method: 'POST', credentials: 'same-origin',
-    });
-    if (!r.ok) throw new Error('commit_failed');
-  }
-
-  // Replays the onboarding's commit ceremony (green check pop +
-  // "Committed." text + sub line) on top of the Tasks tab. We rewrite
-  // the ceremony container's innerHTML so the CSS animations run from
-  // the start each time — animations are tied to element creation,
-  // and just toggling hidden doesn't replay them.
-  function playCeremony(subText) {
-    const cel = document.getElementById('onb-celebration');
-    if (!cel) return;
-    cel.innerHTML = `
-      <div class="onb-celebration-icon">
-        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-      </div>
-      <h1 class="onb-celebration-title">Committed.</h1>
-      <p class="onb-celebration-sub">${subText || ''}</p>
-    `;
-    cel.hidden = false;
-    cel.setAttribute('aria-hidden', 'false');
-  }
-  function hideCeremony() {
-    const cel = document.getElementById('onb-celebration');
-    if (!cel) return;
-    cel.hidden = true;
-    cel.setAttribute('aria-hidden', 'true');
-  }
-
-  // Wire the Commit button — picks the right date based on current
-  // mode, plays the ceremony, then refreshes + scrolls to the top of
-  // the page so the user lands at the top (mode banner) rather than
-  // looking at where the now-gone Commit button was.
-  function wire() {
-    const btn = document.getElementById('commit-btn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-      if (!current) return;
-      const date = current.mode === 'planning-tomorrow' ? current.tomorrow : current.today;
-      const isTomorrow = (current.mode === 'planning-tomorrow');
-      const count = isTomorrow ? current.tomorrowCount : current.todayCount;
-      btn.disabled = true;
-      try {
-        await commit(date);
-        // Sub-line: shows what the user just locked in. Brief by
-        // design — the ceremony is the moment, not the data.
-        const noun = count === 1 ? 'task' : 'tasks';
-        const sub  = isTomorrow
-          ? `${count} ${noun} ready for tomorrow.`
-          : `${count} ${noun} for today. Now execute.`;
-        playCeremony(sub);
-        // Smoothness: defer the DayState refresh until the ceremony
-        // has fully animated in (~1.5s). Otherwise the underlying
-        // mode-banner / commit-button DOM updates compete with the
-        // ceremony for paint frames and the animation stutters.
-        // No Store.load here — the task data didn't change, only the
-        // DayCommit row did, and that's covered by refresh() below.
-        setTimeout(() => { refresh(); }, 1500);
-        // Hide ceremony at 2.4s + snap to the top of the Tasks tab.
-        // Instant scroll (not smooth) — smooth scrolling animates
-        // alongside the ceremony fade and tends to stutter on long
-        // task lists.
-        setTimeout(() => {
-          hideCeremony();
-          const view = document.getElementById('view-todo');
-          if (view && view.scrollTo) view.scrollTo({ top: 0, behavior: 'auto' });
-          window.scrollTo({ top: 0, behavior: 'auto' });
-        }, 2400);
-      } catch (e) {
-        alert('Could not commit. ' + (e.message || e));
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  }
-  wire();
-
-  return {
-    get current() { return current; },
-    refresh,
-    apply,
-    commit,
-  };
-})();
-
 window.Tour = (() => {
   const STEPS = [
     {
@@ -13009,8 +11812,8 @@ window.Tour = (() => {
     {
       eyebrow: 'Tasks',
       title: 'Plan it, then do it.',
-      body: `<p>Tap <b>+</b> to add a task — one-shot for today, or recurring (daily, weekly, monthly) for habits. Tap a row to mark it done.</p>
-             <p>You plan today, hit <b>Commit</b>, and the list locks until your day ends. Finish them all to unlock tomorrow's planning.</p>`,
+      body: `<p>Tap <b>+</b> to add a task — one-shot for a specific date, or recurring (daily or weekly) for habits. Tap a row to mark it done.</p>
+             <p>Use the date navigator to jump to any past or future day.</p>`,
     },
     {
       eyebrow: 'Analytics',
@@ -13138,8 +11941,7 @@ window.Onboarding = (() => {
   const MAX_TASKS  = 30;
 
   const STATE = {
-    step: 0,           // 0=welcome, 1=how-it-works, 2=lock-time, 3=habits, 4=tasks, 5=commit
-    lockTime: '00:00', // HH:MM, 24-hour. Day-end / lock instant.
+    step: 0,           // 0=welcome, 1=how-it-works, 2=habits, 3=tasks, 4=commit
     habits: ['', '', ''],
     tasks: ['', '', ''],
     submitting: false,
@@ -13172,7 +11974,7 @@ window.Onboarding = (() => {
 
   function pullInputsIntoState() {
     // Collect the current input values so they survive a step change.
-    const list = STATE.step === 3 ? 'habits' : STATE.step === 4 ? 'tasks' : null;
+    const list = STATE.step === 2 ? 'habits' : STATE.step === 3 ? 'tasks' : null;
     if (!list) return;
     const inputs = $('onb-content').querySelectorAll('.onb-input');
     STATE[list] = [...inputs].map((el) => el.value);
@@ -13193,14 +11995,13 @@ window.Onboarding = (() => {
     c.innerHTML = '';
     if      (STATE.step === 0) c.innerHTML = stepWelcome();
     else if (STATE.step === 1) c.innerHTML = stepHowItWorks();
-    else if (STATE.step === 2) c.innerHTML = stepLockTime();
-    else if (STATE.step === 3) c.innerHTML = stepHabits();
-    else if (STATE.step === 4) c.innerHTML = stepTasks();
-    else if (STATE.step === 5) c.innerHTML = stepCommit();
+    else if (STATE.step === 2) c.innerHTML = stepHabits();
+    else if (STATE.step === 3) c.innerHTML = stepTasks();
+    else if (STATE.step === 4) c.innerHTML = stepCommit();
     wireStep();
     // Auto-focus the first empty input on data-entry steps so the
     // keyboard pops on mobile without a second tap.
-    if (STATE.step === 3 || STATE.step === 4) {
+    if (STATE.step === 2 || STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const target = [...inputs].find((el) => !el.value.trim()) || inputs[0];
       if (target) target.focus({ preventScroll: true });
@@ -13217,7 +12018,7 @@ window.Onboarding = (() => {
       </p>
       <p class="onb-body">
         In the next two minutes you'll name what's been holding you back
-        and decide what you'll <b>do today</b>. Then you'll lock it in.
+        and decide what you'll <b>do today</b>.
       </p>
       <div class="onb-actions">
         <button class="onb-btn primary" data-action="next">Begin</button>
@@ -13228,27 +12029,27 @@ window.Onboarding = (() => {
   function stepHowItWorks() {
     return `
       <div class="onb-eyebrow">How it works</div>
-      <h1 class="onb-h1">Plan, lock, execute.</h1>
+      <h1 class="onb-h1">Plan and execute.</h1>
       <div class="onb-explain-list">
         <div class="onb-explain-row">
           <div class="onb-explain-num">1</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Each day, plan the next.</div>
-            <div class="onb-explain-sub">Before your day ends, set tomorrow's list.</div>
+            <div class="onb-explain-title">Name what you'll do.</div>
+            <div class="onb-explain-sub">Add tasks to any day — today, tomorrow, or further out.</div>
           </div>
         </div>
         <div class="onb-explain-row">
           <div class="onb-explain-num">2</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Commit. The list locks.</div>
-            <div class="onb-explain-sub">No additions. No deletions. No excuses.</div>
+            <div class="onb-explain-title">Execute.</div>
+            <div class="onb-explain-sub">Check them off as you finish them.</div>
           </div>
         </div>
         <div class="onb-explain-row">
           <div class="onb-explain-num">3</div>
           <div class="onb-explain-body">
-            <div class="onb-explain-title">Execute before your day ends.</div>
-            <div class="onb-explain-sub">What you finish counts. What you don't, doesn't.</div>
+            <div class="onb-explain-title">Track the hit rate.</div>
+            <div class="onb-explain-sub">Analytics shows the days you actually followed through.</div>
           </div>
         </div>
       </div>
@@ -13257,69 +12058,6 @@ window.Onboarding = (() => {
         <button class="onb-btn primary" data-action="next">Got it</button>
       </div>
     `;
-  }
-
-  function stepLockTime() {
-    // Pre-built presets keyed off when the user actually goes to sleep.
-    // "Day ends" = the moment today's list locks, which lines up with
-    // when they wind down for the night. Custom covers everyone else.
-    const presets = [
-      { label: '12 AM', sub: 'Most people',     value: '00:00' },
-      { label: '3 AM',  sub: 'Up late',         value: '03:00' },
-      { label: '8 AM',  sub: 'Overnight shift', value: '08:00' },
-    ];
-    const isCustom = !presets.some(p => p.value === STATE.lockTime);
-    const buttons = presets.map(p => `
-      <button type="button" class="onb-lock-preset${STATE.lockTime === p.value ? ' active' : ''}" data-action="lock-set" data-value="${p.value}">
-        <div class="onb-lock-preset-label">${p.label}</div>
-        <div class="onb-lock-preset-sub">${p.sub}</div>
-      </button>
-    `).join('');
-    const customRow = `
-      <button type="button" class="onb-lock-preset${isCustom ? ' active' : ''}" data-action="lock-custom">
-        <div class="onb-lock-preset-label">Custom</div>
-        <div class="onb-lock-preset-sub">${isCustom ? formatLockLabel(STATE.lockTime) : 'Pick any time'}</div>
-      </button>
-    `;
-    const customInput = isCustom ? `
-      <input class="onb-input onb-lock-input" type="time"
-             value="${escHtml(STATE.lockTime)}" data-lock-input />
-    ` : '';
-    return `
-      <div class="onb-eyebrow">Step 1 of 4</div>
-      <h1 class="onb-h1">When does your day end?</h1>
-      <p class="onb-body">
-        Pick the time you usually <b>go to sleep</b>. That's the
-        <b>deadline</b> to finish the tasks you committed to — and
-        the moment tomorrow's planning unlocks. Most people pick
-        midnight — go later if you stay up past it, or much later
-        (8 AM) if you work overnight.
-      </p>
-      <p class="onb-body" style="font-size:13px;color:var(--text-faint);">
-        You get one free adjustment after onboarding to fix this if
-        you pick wrong. After that, it's locked for <b>14 days</b>.
-      </p>
-      <div class="onb-lock-presets">
-        ${buttons}
-        ${customRow}
-      </div>
-      ${customInput}
-      <div class="onb-actions">
-        <button class="onb-btn ghost" data-action="back">Back</button>
-        <button class="onb-btn primary" data-action="next">Continue</button>
-      </div>
-    `;
-  }
-
-  // Pretty-print "HH:MM" 24h → "h:MM AM/PM" for the Custom preset's sub.
-  function formatLockLabel(s) {
-    const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return '12:00 AM';
-    let h = parseInt(m[1], 10);
-    const mm = m[2];
-    const period = h >= 12 ? 'PM' : 'AM';
-    h = h % 12; if (h === 0) h = 12;
-    return `${h}:${mm} ${period}`;
   }
 
   function stepHabits() {
@@ -13336,7 +12074,7 @@ window.Onboarding = (() => {
              placeholder="${escHtml(placeholder)}" />`;
     }).join('');
     return `
-      <div class="onb-eyebrow">Step 2 of 4</div>
+      <div class="onb-eyebrow">Step 1 of 3</div>
       <h1 class="onb-h1">What's been holding you back?</h1>
       <p class="onb-body">
         Everyone has at least one bad habit holding them back that they
@@ -13364,7 +12102,7 @@ window.Onboarding = (() => {
     const filled = nonEmpty(STATE.tasks).length;
     const enough = filled >= MIN_TASKS;
     return `
-      <div class="onb-eyebrow">Step 3 of 4</div>
+      <div class="onb-eyebrow">Step 2 of 3</div>
       <h1 class="onb-h1">What can you do today?</h1>
       <p class="onb-body">
         At least <b>three things</b> you can do today that move you closer
@@ -13393,7 +12131,7 @@ window.Onboarding = (() => {
     const tasksHtml = `<ul class="onb-summary-list">${tasks.map(t => `<li>${escHtml(t)}</li>`).join('')}</ul>`;
     const errorHtml = STATE.error ? `<div class="onb-error">${escHtml(STATE.error)}</div>` : '';
     return `
-      <div class="onb-eyebrow">Step 4 of 4</div>
+      <div class="onb-eyebrow">Step 3 of 3</div>
       <h1 class="onb-h1">Your commitment.</h1>
       <div class="onb-summary-section">
         <div class="onb-summary-label">Quitting</div>
@@ -13404,9 +12142,7 @@ window.Onboarding = (() => {
         ${tasksHtml}
       </div>
       <div class="onb-fineprint">
-        Once you commit, this list <b>locks immediately</b>. You have
-        until <b>${escHtml(formatLockLabel(STATE.lockTime))}</b> to
-        finish them. The streaks start now.
+        The streaks start now.
       </div>
       ${errorHtml}
       <div class="onb-actions">
@@ -13427,7 +12163,7 @@ window.Onboarding = (() => {
         const action = btn.dataset.action;
         if (action === 'next') {
           pullInputsIntoState();
-          if (STATE.step === 4 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
+          if (STATE.step === 3 && nonEmpty(STATE.tasks).length < MIN_TASKS) return;
           STATE.step += 1;
           render();
         } else if (action === 'back') {
@@ -13442,35 +12178,17 @@ window.Onboarding = (() => {
           pullInputsIntoState();
           if (STATE.tasks.length < MAX_TASKS) STATE.tasks.push('');
           render({ skipAnim: true });
-        } else if (action === 'lock-set') {
-          STATE.lockTime = btn.dataset.value || '00:00';
-          render({ skipAnim: true });
-        } else if (action === 'lock-custom') {
-          // If they tap Custom while one of the fixed presets is active,
-          // seed the custom value to a sensible "in-between" time so the
-          // time input doesn't snap to a default they didn't intend.
-          if (['00:00','03:00','08:00'].includes(STATE.lockTime)) STATE.lockTime = '22:00';
-          render({ skipAnim: true });
         } else if (action === 'commit') {
           await commit();
         }
       });
     });
 
-    // Custom HH:MM input (only present when Custom is selected). Updates
-    // STATE.lockTime live so the summary on the commit step reflects it.
-    const lockInput = c.querySelector('[data-lock-input]');
-    if (lockInput) {
-      lockInput.addEventListener('input', () => {
-        if (lockInput.value) STATE.lockTime = lockInput.value;
-      });
-    }
-
     // Live-update the Continue button on the tasks step. Without this,
     // STATE.tasks only refreshes when an action button is tapped, so the
     // button stays disabled / shows "Add N more" even after the user has
     // typed in the third task.
-    if (STATE.step === 4) {
+    if (STATE.step === 3) {
       const inputs = c.querySelectorAll('.onb-input');
       const nextBtn = c.querySelector('[data-action="next"]');
       const sync = () => {
@@ -13499,7 +12217,6 @@ window.Onboarding = (() => {
         body: JSON.stringify({
           habits: nonEmpty(STATE.habits),
           tasks: nonEmpty(STATE.tasks),
-          lockTime: STATE.lockTime,
         }),
       });
       if (!r.ok) {

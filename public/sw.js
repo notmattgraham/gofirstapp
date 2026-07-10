@@ -7,9 +7,9 @@
  * This keeps the installed PWA on your phone auto-updating the moment you
  * open it while on a network, instead of getting stuck on a stale bundle.
  */
-// Bumped to v25 — extra 10px below the Quitting Add button so the
-// next section doesn't crowd it.
-const CACHE = 'gofirst-v25';
+// Bumped to v28 — day locking removed entirely. Add tasks to any date;
+// check off past days; no lockTime, no commit gate, no overrides.
+const CACHE = 'gofirst-v28';
 const ASSETS = [
   './',
   './index.html',
