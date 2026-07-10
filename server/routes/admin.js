@@ -307,6 +307,17 @@ router.delete('/users/:id', wrap(async (req, res) => {
   }
 }));
 
+// POST /api/admin/purge-others — nuke every user account except the
+// caller's. One-shot admin op; cascades tasks/streaks/messages/
+// friendships/subscriptions via the schema's onDelete: Cascade.
+router.post('/purge-others', wrap(async (req, res) => {
+  if (!isAdmin(req.user)) return res.status(403).json({ error: 'admin_only' });
+  const result = await prisma.user.deleteMany({
+    where: { id: { not: req.user.id } },
+  });
+  res.json({ ok: true, deleted: result.count, keptEmail: req.user.email });
+}));
+
 // POST /api/admin/broadcast — admin-only mass DM. Body: { content, attachment? }.
 // Creates one Message per non-admin user with hiddenFromAdminAt stamped at
 // creation time so the admin's inbox does not get flooded with N empty
